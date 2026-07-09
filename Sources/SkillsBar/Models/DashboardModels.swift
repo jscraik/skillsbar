@@ -1,0 +1,599 @@
+import Foundation
+import SwiftUI
+
+enum StatusTone {
+    case positive
+    case advisory
+    case pending
+    case warning
+    case danger
+
+    var color: Color {
+        switch self {
+        case .positive: return .successAccent
+        case .advisory: return .advisoryAccent
+        case .pending: return .pendingAccent
+        case .warning: return .warningAccent
+        case .danger: return .dangerAccent
+        }
+    }
+
+    var panelColor: Color {
+        switch self {
+        case .positive: return Color.successAccent.opacity(0.16)
+        case .advisory: return Color.advisoryAccent.opacity(0.16)
+        case .pending: return Color.pendingAccent.opacity(0.12)
+        case .warning: return Color.warningAccent.opacity(0.16)
+        case .danger: return Color.dangerAccent.opacity(0.16)
+        }
+    }
+}
+
+struct SkillDashboard {
+    var displayName: String
+    var version: String
+    var description: String
+    var registryPath: String
+    var repoPath: String
+    var installCommand: String
+    var localEvidenceCommand: String
+    var reviewedText: String
+    var deltaText: String
+    var quality: MetricSignal
+    var impact: MetricSignal
+    var security: SecuritySignal
+    var tessl: TesslSignal
+    var fleet: FleetSignal
+    var refreshedAt: Date
+    var error: String?
+
+    var score: Int? {
+        guard let qualityScore = quality.score,
+              let impactScore = impact.score,
+              let securityScore = security.score else { return nil }
+        return Int((Double(qualityScore + impactScore + securityScore) / 3.0).rounded())
+    }
+
+    var scoreText: String { score.map(String.init) ?? "--" }
+    var summaryLine: String { description }
+    var scoreTone: StatusTone {
+        guard let score else { return .pending }
+        if score >= 80 { return .positive }
+        if score >= 60 { return .warning }
+        return .danger
+    }
+    var scoreCaption: String {
+        "Local"
+    }
+    var scoreSourceLine: String {
+        score == nil ? "Q/I/S pending" : "Q\(quality.formulaValue) I\(impact.formulaValue) S\(security.formulaValue)"
+    }
+    var localImpactDisplay: String {
+        impact.ratioLabel ?? (impact.score == nil ? "Not run" : impact.statusLabel)
+    }
+    var registryURL: URL? {
+        let escaped = registryPath
+            .split(separator: "/")
+            .map { String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0) }
+            .joined(separator: "/")
+        return URL(string: "https://tessl.io/registry/\(escaped)")
+    }
+    var registrySearchCommand: String {
+        "tessl search --json --type skills \(registryPath)"
+    }
+    var selectedSkillInspectCommand: String {
+        "cd \(globalShellQuoted(repoPath)) && sed -n '1,120p' \(globalShellQuoted(fleet.selectedSkillPath))"
+    }
+    var emblemBadgeLabel: String {
+        if security.status.localizedCaseInsensitiveContains("flag") {
+            return security.statusDisplay
+        }
+        if score == nil {
+            return "Local pending"
+        }
+        return "Local score"
+    }
+    var emblemBadgeSystemName: String {
+        if security.status.localizedCaseInsensitiveContains("flag") {
+            return "exclamationmark.shield.fill"
+        }
+        if score == nil {
+            return "clock"
+        }
+        return "checkmark.seal.fill"
+    }
+    var emblemBadgeTone: StatusTone {
+        if security.status.localizedCaseInsensitiveContains("flag") {
+            return security.tone
+        }
+        if score == nil {
+            return .pending
+        }
+        return scoreTone
+    }
+    var verdictTitle: String {
+        if security.status.localizedCaseInsensitiveContains("flag") { return "Needs review" }
+        if score == nil { return "Local pending" }
+        return "Skills SDK"
+    }
+    var verdictDetail: String {
+        if security.status.localizedCaseInsensitiveContains("flag") && !tessl.ok {
+            return "Security flagged · \(tessl.blockerSummary)"
+        }
+        if security.status.localizedCaseInsensitiveContains("flag") {
+            return "\(security.statusDisplay) need inspection"
+        }
+        if !tessl.ok {
+            return "Current improve-agent-native run · \(tessl.blockerSummary)"
+        }
+        return "Local SDK evidence and Tessl registry checks available"
+    }
+    var provenanceLine: String {
+        let tesslState = tessl.ok ? "loaded" : tessl.compactBlockerSummary
+        return "SDK \(compactScoreBreakdownLine) · \(tessl.compactVersionBadge) · 5m · \(tesslState)"
+    }
+    var scoreBreakdownLine: String {
+        "Q \(quality.formulaValue) · I \(impact.formulaValue) · S \(security.formulaValue)"
+    }
+    var compactScoreBreakdownLine: String {
+        "Q\(quality.formulaValue) I\(impact.formulaValue) S\(security.formulaValue)"
+    }
+    var localComparisonDetail: String {
+        let impactValue = impact.score == nil ? "--" : impact.formulaValue
+        return "Q\(quality.formulaValue) I\(impactValue) S\(security.formulaValue)"
+    }
+    var refreshedTimeText: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: refreshedAt)
+    }
+
+    func withError(_ message: String) -> SkillDashboard {
+        var copy = self
+        copy.error = message
+        copy.tessl = TesslSignal(
+            ok: false,
+            cliAvailable: false,
+            authenticated: false,
+            displayStatus: "Blocked",
+            detail: message,
+            cliVersion: nil,
+            registryScore: nil,
+            registryVersion: nil,
+            registryQualityScore: nil,
+            registryImpactScore: nil,
+            registrySecurityLabel: nil,
+            registryEvalCount: nil,
+            registryImprovementMultiplier: nil,
+            recoveryCommand: "tessl doctor"
+        )
+        return copy
+    }
+
+    static let placeholder = SkillDashboard(
+        displayName: "improve-agent-native",
+        version: "0.2.0",
+        description: "Audit agent-native readiness for this skill.",
+        registryPath: "jscraik/improve-agent-native",
+        repoPath: "/Users/jamiecraik/dev/agent-skills",
+        installCommand: "tessl install jscraik/improve-agent-native",
+        localEvidenceCommand: DashboardLoader.localEvidenceCommand(root: DashboardLoader.defaultRepoRoot),
+        reviewedText: "Local SDK evidence",
+        deltaText: "Local SDK",
+        quality: MetricSignal(
+            score: nil,
+            detail: "Run package verify to populate quality.",
+            source: "Local SDK package verify",
+            command: DashboardLoader.copyCommand(root: DashboardLoader.defaultRepoRoot, command: DashboardLoader.packageCommand)
+        ),
+        impact: MetricSignal(
+            score: nil,
+            detail: "Run scenario-quality to populate impact.",
+            source: "Local SDK scenario-quality",
+            command: DashboardLoader.copyCommand(root: DashboardLoader.defaultRepoRoot, command: DashboardLoader.impactCommand)
+        ),
+        security: SecuritySignal(
+            score: nil,
+            status: "Pending",
+            detail: "Run risk-modes to populate security.",
+            sourceLabel: "Local SDK",
+            segmentCount: 0,
+            inspectCommand: DashboardLoader.copyCommand(root: DashboardLoader.defaultRepoRoot, command: DashboardLoader.securityCommand)
+        ),
+        tessl: TesslSignal(
+            ok: false,
+            cliAvailable: false,
+            authenticated: false,
+            displayStatus: "Not fetched",
+            detail: "Tessl has not been probed yet.",
+            cliVersion: nil,
+            registryScore: nil,
+            registryVersion: nil,
+            registryQualityScore: nil,
+            registryImpactScore: nil,
+            registrySecurityLabel: nil,
+            registryEvalCount: nil,
+            registryImprovementMultiplier: nil,
+            recoveryCommand: "tessl doctor"
+        ),
+        fleet: FleetSignal.placeholder,
+        refreshedAt: Date(),
+        error: nil
+    )
+}
+
+private func globalShellQuoted(_ value: String) -> String {
+    "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
+}
+
+struct FleetSignal {
+    var skillCount: Int
+    var groupCount: Int
+    var largestGroupName: String
+    var largestGroupCount: Int
+    var metadataCount: Int
+    var referencesCount: Int
+    var evalsCount: Int
+    var selectedSkillPath: String
+    var inventoryCommand: String
+
+    static let placeholder = FleetSignal(
+        skillCount: 0,
+        groupCount: 0,
+        largestGroupName: "unknown",
+        largestGroupCount: 0,
+        metadataCount: 0,
+        referencesCount: 0,
+        evalsCount: 0,
+        selectedSkillPath: "Skills/agent-ops/improve-agent-native/SKILL.md",
+        inventoryCommand: DashboardLoader.copyCommand(root: DashboardLoader.defaultRepoRoot, command: DashboardLoader.allSkillsInventoryCommand)
+    )
+
+    var title: String {
+        skillCount > 0 ? "\(skillCount) local skills" : "Skill inventory pending"
+    }
+
+    var scanMode: String {
+        "inventory"
+    }
+
+    var detail: String {
+        guard skillCount > 0 else { return "Discovering Skills/**/SKILL.md before deeper checks." }
+        return "\(groupCount) groups · meta \(coverage(metadataCount)) · refs \(coverage(referencesCount)) · evals \(coverage(evalsCount))"
+    }
+    var compactLine: String {
+        guard skillCount > 0 else { return "Discovering local skills inventory" }
+        return "\(skillCount) skills · \(groupCount) groups · \(largestGroupName) \(largestGroupCount)"
+    }
+
+    var tone: StatusTone {
+        guard skillCount > 0 else { return .pending }
+        if evalsCount < skillCount || referencesCount < skillCount || metadataCount < skillCount { return .warning }
+        return .positive
+    }
+
+    private func coverage(_ count: Int) -> String {
+        guard skillCount > 0 else { return "--" }
+        return "\(count)/\(skillCount)"
+    }
+}
+
+struct MetricSignal {
+    var score: Int?
+    var detail: String
+    var source: String
+    var command: String
+    var statusOverride: String? = nil
+    var displayScore: String { score.map { "\($0)%" } ?? "--" }
+    var statusLabel: String { statusOverride ?? score.map { "\($0)%" } ?? "Pending" }
+    var formulaValue: String { score.map { "\($0)" } ?? "--" }
+    var sourceShort: String {
+        if source.localizedCaseInsensitiveContains("package") { return "package verify" }
+        if source.localizedCaseInsensitiveContains("scenario") { return "scenario-quality" }
+        return source
+    }
+    var scoreFraction: Double { min(max(Double(score ?? 0) / 100.0, 0), 1) }
+    var ratioLabel: String? {
+        guard let first = detail.split(separator: " ").first.map(String.init),
+              first.contains("/") else { return nil }
+        return first
+    }
+    var tone: StatusTone {
+        guard let score else { return .pending }
+        if score >= 80 { return .positive }
+        if score >= 60 { return .warning }
+        return .danger
+    }
+    var compactDetail: String {
+        if score != nil {
+            if source.localizedCaseInsensitiveContains("package") {
+                return "Package verified"
+            }
+            if source.localizedCaseInsensitiveContains("scenario") {
+                return detail
+                    .replacingOccurrences(of: " eval scenarios available.", with: " scenarios")
+                    .replacingOccurrences(of: "Average across ", with: "")
+            }
+            return detail
+        }
+        if source.localizedCaseInsensitiveContains("package") {
+            return "No package score yet"
+        }
+        if source.localizedCaseInsensitiveContains("scenario") {
+            return "Scenario check not run"
+        }
+        return "Waiting for verification"
+    }
+    var shortDetail: String {
+        compactDetail
+            .replacingOccurrences(of: " scenarios", with: " scen.")
+            .replacingOccurrences(of: "Package verified", with: "package")
+            .replacingOccurrences(of: "Scenario check not run", with: "not run")
+            .replacingOccurrences(of: "No package score yet", with: "no score")
+    }
+}
+
+struct SecuritySignal {
+    var score: Int?
+    var status: String
+    var detail: String
+    var sourceLabel: String
+    var segmentCount: Int
+    var inspectCommand: String
+    var tone: StatusTone {
+        if score == nil { return .pending }
+        if status.localizedCaseInsensitiveContains("flag") { return .warning }
+        if status.localizedCaseInsensitiveContains("pass") { return .positive }
+        return .pending
+    }
+    var compactDetail: String {
+        if detail.hasPrefix("Run ") { return "Security scan pending" }
+        return detail
+            .replacingOccurrences(of: "; no mutation performed.", with: "")
+            .replacingOccurrences(of: " signal(s)", with: "")
+            .replacingOccurrences(of: "mode detected", with: "modes detected")
+    }
+    var riskLabel: String {
+        if let score, score > 0, status.localizedCaseInsensitiveContains("flag") {
+            return compactDetail.replacingOccurrences(of: " detected", with: "")
+        }
+        return status
+    }
+    var statusDisplay: String {
+        if status.localizedCaseInsensitiveContains("flag") {
+            if let count = Int(riskLabel.prefix { $0.isNumber }) {
+                return "\(count) risks"
+            }
+            return riskLabel.replacingOccurrences(of: " risk modes", with: " risks")
+        }
+        return status
+    }
+    var detailLine: String {
+        if status.localizedCaseInsensitiveContains("flag") {
+            return "\(riskLabel) from \(sourceLabel) evidence"
+        }
+        return compactDetail
+    }
+    var formulaValue: String { score.map { "\($0)" } ?? "--" }
+    var scoreMathLine: String {
+        guard let score else { return "pending" }
+        return "100 - \(max(0, 100 - score)) = \(score)"
+    }
+    var penaltyLine: String {
+        guard let score else { return "pending" }
+        let penalty = max(0, 100 - score)
+        return penalty > 0 ? "-\(penalty)" : "no penalty"
+    }
+    var severityLine: String {
+        if status.localizedCaseInsensitiveContains("flag") {
+            let withoutModes = riskLabel
+                .replacingOccurrences(of: " risk modes", with: "")
+                .replacingOccurrences(of: ".", with: "")
+            if let colonIndex = withoutModes.firstIndex(of: ":") {
+                return String(withoutModes[withoutModes.index(after: colonIndex)...]).trimmingCharacters(in: .whitespaces)
+            }
+            return withoutModes
+        }
+        return compactDetail
+    }
+    var sourceBadge: String {
+        status.localizedCaseInsensitiveContains("flag") ? "from \(sourceLabel) receipt" : sourceLabel
+    }
+    var accessibilityText: String {
+        if status.localizedCaseInsensitiveContains("flag") {
+            return "Security flagged. \(riskLabel) from \(sourceLabel) evidence."
+        }
+        return "Security \(status). \(compactDetail)."
+    }
+}
+
+struct TesslSignal {
+    var ok: Bool
+    var cliAvailable: Bool
+    var authenticated: Bool
+    var displayStatus: String
+    var detail: String
+    var cliVersion: String?
+    var registryScore: Int?
+    var registryVersion: String?
+    var registryQualityScore: Int?
+    var registryImpactScore: Int?
+    var registrySecurityLabel: String?
+    var registryEvalCount: Int?
+    var registryImprovementMultiplier: Double?
+    var recoveryCommand: String
+    var compactDetail: String {
+        if ok, let registryVersion { return "Registry metadata v\(registryVersion); local evidence remains separate." }
+        if ok { return "Registry metadata connected; local evidence remains separate." }
+        if !cliAvailable { return "Tessl CLI is not available on PATH." }
+        if !authenticated { return "\(cliVersionLabel) · login unlocks registry search." }
+        return detail
+    }
+    var registryDetailLine: String {
+        if ok {
+            var parts: [String] = []
+            if let registryVersion { parts.append("v\(registryVersion)") }
+            if let registryScore { parts.append("score \(registryScore)") }
+            parts.append("separate proof")
+            return parts.joined(separator: " · ")
+        }
+        return compactDetail
+    }
+    var cliVersionLabel: String {
+        cliVersion.map { "tessl \($0)" } ?? "tessl CLI detected"
+    }
+    var versionBadge: String {
+        cliVersion.map { "tessl \($0)" } ?? (cliAvailable ? "tessl CLI" : "no tessl")
+    }
+    var compactVersionBadge: String {
+        cliVersion.map { "tessl \($0)" } ?? (cliAvailable ? "tessl" : "no tessl")
+    }
+    var tone: StatusTone {
+        if ok { return .positive }
+        if cliAvailable { return .warning }
+        return .pending
+    }
+    var registryStatusLabel: String {
+        if ok, registryScore != nil { return "Loaded" }
+        return displayStatus
+    }
+    var registryStatusTone: StatusTone {
+        if ok { return .pending }
+        return tone
+    }
+    var actionTitle: String {
+        if ok { return "Open Tessl registry" }
+        if cliAvailable { return "Log in to Tessl" }
+        return "Copy install help"
+    }
+    var copiedActionTitle: String {
+        if ok { return "Open Tessl registry" }
+        return "Copied \(recoveryCommand)"
+    }
+    var actionHelp: String {
+        if ok { return "Open Tessl registry" }
+        if cliAvailable { return "Open Terminal and run \(recoveryCommand)" }
+        return "Copy \(recoveryCommand) to the clipboard"
+    }
+    var installLabel: String {
+        ok ? "Install" : "Login"
+    }
+    var blockerSummary: String {
+        if ok { return "registry ok" }
+        if !cliAvailable { return "CLI missing" }
+        if !authenticated { return "auth expired" }
+        return displayStatus.lowercased()
+    }
+    var compactBlockerSummary: String {
+        if ok { return "registry ok" }
+        if !cliAvailable { return "no CLI" }
+        if !authenticated { return "auth exp" }
+        return displayStatus.lowercased()
+    }
+    var nextStepSentence: String {
+        if ok { return "Registry metadata is available." }
+        return "Run \(recoveryCommand); local Q/I/S stays current."
+    }
+    var registryResultLabel: String {
+        if let registryScore { return "\(registryScore)" }
+        if ok { return "Registry OK" }
+        if !cliAvailable { return "No CLI" }
+        if !authenticated { return "Locked" }
+        return "Blocked"
+    }
+    var registryScoreTone: StatusTone {
+        guard let registryScore else { return ok ? .pending : tone }
+        if registryScore >= 80 { return .positive }
+        if registryScore >= 60 { return .warning }
+        return .danger
+    }
+    var registryImpactDisplay: String {
+        if let registryImprovementMultiplier {
+            return "\(String(format: "%.2f", registryImprovementMultiplier))x"
+        }
+        if let registryImpactScore {
+            return "\(registryImpactScore)%"
+        }
+        return "--"
+    }
+    var registryImpactTone: StatusTone {
+        if let registryImprovementMultiplier {
+            return registryImprovementMultiplier >= 1 ? .positive : .danger
+        }
+        guard let registryImpactScore else { return .pending }
+        if registryImpactScore >= 80 { return .positive }
+        if registryImpactScore >= 60 { return .warning }
+        return .danger
+    }
+    var registrySecurityDisplay: String {
+        guard ok else { return displayStatus }
+        guard let registrySecurityLabel else { return "Loaded" }
+        if registrySecurityLabel.localizedCaseInsensitiveContains("pass") {
+            return "Passed"
+        }
+        if registrySecurityLabel.localizedCaseInsensitiveContains("low") {
+            return "Passed"
+        }
+        return registrySecurityLabel.capitalized
+    }
+    var registrySecurityTone: StatusTone {
+        guard ok else { return tone }
+        guard let registrySecurityLabel else { return .pending }
+        if registrySecurityLabel.localizedCaseInsensitiveContains("pass") { return .positive }
+        if registrySecurityLabel.localizedCaseInsensitiveContains("low") { return .positive }
+        if registrySecurityLabel.localizedCaseInsensitiveContains("advisory") { return .advisory }
+        return .danger
+    }
+    func driftLabel(localScore: Int?) -> String {
+        guard let localScore else { return "--" }
+        if let registryScore {
+            let delta = registryScore - localScore
+            if delta > 0 { return "+\(delta)" }
+            return "\(delta)"
+        }
+        if ok { return "No score" }
+        return "--"
+    }
+    func registryRelationLabel(localScore: Int?) -> String {
+        guard localScore != nil else { return "local score pending" }
+        guard let localScore, let registryScore else { return "No registry score" }
+        let delta = registryScore - localScore
+        if delta == 0 { return "Matches local" }
+        if delta > 0 { return "\(delta) above local" }
+        return "\(abs(delta)) below local"
+    }
+    func registryComparisonDetail(localScore: Int?) -> String {
+        if ok, let breakdown = registryBreakdownLine {
+            if localScore == nil {
+                return breakdown
+            }
+            return "\(breakdown) · \(registryRelationLabel(localScore: localScore))"
+        }
+        if ok {
+            return "Registry metadata · \(registryRelationLabel(localScore: localScore))"
+        }
+        return nextStepSentence
+    }
+    func headerBadgeLabel(localScore: Int?) -> String? {
+        guard ok, let registryScore else { return nil }
+        return "Tessl \(registryScore) \(driftLabel(localScore: localScore))"
+    }
+    func headerBadgeTone(localScore: Int?) -> StatusTone {
+        guard ok else { return .pending }
+        guard let localScore, let registryScore else { return .positive }
+        if registryScore < localScore { return .warning }
+        return .positive
+    }
+    var registryBreakdownLine: String? {
+        guard ok else { return nil }
+        var parts: [String] = []
+        if let registryQualityScore { parts.append("Q\(registryQualityScore)") }
+        if let registryImpactScore { parts.append("I\(registryImpactScore)") }
+        if let registrySecurityLabel { parts.append("S:\(registrySecurityLabel.uppercased())") }
+        if let registryEvalCount { parts.append("E\(registryEvalCount)") }
+        if let registryImprovementMultiplier {
+            parts.append("x\(String(format: "%.2f", registryImprovementMultiplier))")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+}
