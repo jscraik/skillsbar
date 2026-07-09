@@ -91,23 +91,28 @@ swift test --build-system native --disable-sandbox --build-path /private/tmp/ski
 
 ## Project Layout
 
-| Path | Purpose |
-| --- | --- |
-| `Package.swift` | Swift package definition for the app, core library, and tests. |
-| `Launch.command` | Build, bundle, sign, and LaunchServices entrypoint. |
-| `script/build_and_run.sh` | Convenience wrapper for run, debug, logs, telemetry, and live verify modes. |
-| `Sources/SkillsBar` | SwiftUI app, models, services, stores, resources, and views. |
-| `Sources/SkillsBarCore` | Shared shell execution and JSON parsing helpers. |
-| `Tests/SkillsBarCoreTests` | Unit tests for core shell behavior. |
-| `.harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md` | Draft visual and behavior spec for the review popover. |
-| `.harness/media/2026-07-09-skills-sdk-menubar-final-mockup.png` | Persisted mockup referenced by the spec. |
+| Path                                                                                     | Purpose                                                                                                |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `Package.swift`                                                                          | Swift package definition for the app, core library, and tests.                                         |
+| `Launch.command`                                                                         | Build, bundle, sign, and LaunchServices entrypoint.                                                    |
+| `script/build_and_run.sh`                                                                | Convenience wrapper for run, debug, logs, telemetry, and live verify modes.                            |
+| `Sources/SkillsBar`                                                                      | SwiftUI app, models, services, stores, resources, and views.                                           |
+| `Sources/SkillsBarCore`                                                                  | Shared shell execution and JSON parsing helpers.                                                       |
+| `Tests/SkillsBarCoreTests`                                                               | Unit tests for core shell behavior.                                                                    |
+| `.harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md`                    | Implementation-handoff visual and behavior spec for the review popover.                                |
+| `.harness/reviews/2026-07-09-review-popover-3lane-synthesis.md`                          | Three-lane implementation handoff for the final-polish review popover refactor.                        |
+| `.harness/reviews/2026-07-09-review-popover-pass3-synthesis.md`                          | Pass-three review closeout separating spec/doc handoff defects from remaining implementation blockers. |
+| `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-implementation-handoff.png` | Current full-height implementation-handoff mockup referenced by the review popover spec.               |
+| `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-final-polish.png`           | Earlier final-polish mockup retained as historical comparison evidence.                                |
+| `.harness/media/2026-07-09-skills-sdk-menubar-final-mockup.png`                          | Earlier persisted mockup retained as historical comparison evidence.                                   |
 
 ## Development Notes
 
 - Keep menu-bar launch truth, SwiftPM build truth, unit-test truth, live UI proof, Tessl registry proof, and hosted readiness as separate lanes.
 - Do not route Computer Use directly through a client notifier from this project; keep Computer Use behind `SkyComputerUseService` when adjacent Codex config work appears.
 - Do not edit `.codex/environments/environment.toml` directly; it is generated.
-- Treat `.harness` artifacts as supporting project context. Refresh runtime evidence before using the draft spec as implementation proof.
+- Treat `.harness` artifacts as supporting project context. Refresh runtime evidence before using the implementation-handoff spec as runtime proof.
+- For the review popover, read the spec and current implementation-handoff mockup first, then the three-lane synthesis for component boundaries, fixture requirements, copy-command guardrails, and validation route. Read the pass-three synthesis for the review history behind the now-resolved spec decisions and the remaining product-code blockers.
 - Keep generated app bundles and build output out of the repository; `dist/` is ignored and the default app bundle lives under `~/.codex/usage-data/skillsbar`.
 
 ## Proof Boundaries
