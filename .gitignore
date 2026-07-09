@@ -1,1 +1,10 @@
-dist/
+.DS_Store
+/.build/
+/.swiftpm/
+/DerivedData/
+/*.app/
+/*.dSYM/
+*.xcuserstate
+/dist/
+/artifacts/
+/.codex/config.toml
