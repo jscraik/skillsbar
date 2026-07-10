@@ -15,8 +15,8 @@ struct SkillsMenuBarIconView: View {
                     .foregroundStyle(.primary)
             }
         }
-        .frame(width: 23, height: 23)
-        .frame(width: 23, height: 23, alignment: .center)
+        .frame(width: 18, height: 18)
+        .frame(width: 18, height: 18, alignment: .center)
         .contentShape(Rectangle())
     }
 }

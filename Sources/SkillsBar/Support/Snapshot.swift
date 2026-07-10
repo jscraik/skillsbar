@@ -12,30 +12,79 @@ enum SnapshotRequest {
     }
 }
 
+struct SnapshotConfiguration {
+    var dynamicTypeSize: DynamicTypeSize = .large
+    var reduceTransparency = false
+    var increasedContrast = false
+
+    static let `default` = SnapshotConfiguration()
+}
+
+private struct ReduceTransparencyOverrideKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+private struct IncreasedContrastOverrideKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var skillsBarReduceTransparencyOverride: Bool? {
+        get { self[ReduceTransparencyOverrideKey.self] }
+        set { self[ReduceTransparencyOverrideKey.self] = newValue }
+    }
+
+    var skillsBarIncreasedContrastOverride: Bool? {
+        get { self[IncreasedContrastOverrideKey.self] }
+        set { self[IncreasedContrastOverrideKey.self] = newValue }
+    }
+}
+
 enum SnapshotRenderer {
     @MainActor
     static func render(to outputURL: URL) {
         do {
-            let dashboard = try DashboardLoader().loadSync()
-            let model = DashboardModel(dashboard: dashboard, autorefresh: false)
-            let view = DashboardView(model: model)
-                .frame(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
-                .background(Color.black)
-            let renderer = ImageRenderer(content: view)
-            renderer.scale = 2
-            guard let image = renderer.cgImage else {
-                throw SnapshotError.bitmapUnavailable
-            }
-            let bitmap = NSBitmapImageRep(cgImage: image)
-            guard let data = bitmap.representation(using: .png, properties: [:]) else {
-                throw SnapshotError.pngUnavailable
-            }
-            try data.write(to: outputURL)
+            let dashboard = try DashboardDataSource().loadSync()
+            try render(dashboard: dashboard, to: outputURL)
             print("Wrote snapshot \(outputURL.path)")
         } catch {
             fputs("Snapshot failed: \(error.localizedDescription)\n", stderr)
             Foundation.exit(1)
         }
+    }
+
+    @MainActor
+    static func render(dashboard: SkillDashboard, to outputURL: URL) throws {
+        try render(dashboard: dashboard, configuration: .default, to: outputURL)
+    }
+
+    @MainActor
+    static func render(
+        dashboard: SkillDashboard,
+        configuration: SnapshotConfiguration,
+        to outputURL: URL
+    ) throws {
+        let model = DashboardModel(dashboard: dashboard, autorefresh: false)
+        let view = DashboardView(model: model)
+            .frame(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
+            .background(Color.black)
+            .environment(\.dynamicTypeSize, configuration.dynamicTypeSize)
+            .environment(\.skillsBarReduceTransparencyOverride, configuration.reduceTransparency)
+            .environment(\.skillsBarIncreasedContrastOverride, configuration.increasedContrast)
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(
+            origin: .zero,
+            size: NSSize(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
+        )
+        hostingView.layoutSubtreeIfNeeded()
+        guard let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds) else {
+            throw SnapshotError.bitmapUnavailable
+        }
+        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+        guard let data = bitmap.representation(using: .png, properties: [:]) else {
+            throw SnapshotError.pngUnavailable
+        }
+        try data.write(to: outputURL)
     }
 }
 

@@ -4,7 +4,7 @@ artifact_id: spec-2026-07-09-skills-sdk-menubar-review-popover
 artifact_type: he-spec
 canonical_slug: skills-sdk-menubar-review-popover
 title: Skills SDK Menubar Review Popover Visual and Behavior Spec
-status: implementation_handoff
+status: implemented_pending_live_proof
 date: 2026-07-09
 origin: user-requested mockup-to-spec
 risk: medium
@@ -20,7 +20,7 @@ external_mutation_boundary: none
 freshness_required: validation_time
 human_acceptance_boundary: required
 proof_boundary: Implementation proof requires the running macOS menubar app rendering the specified states, clipboard behavior verification, keyboard/focus checks, and height validation against laptop constraints.
-runtime_state: Spec decisions locked from current repository and CLI evidence; product implementation not started in this artifact.
+runtime_state: Product implementation and deterministic snapshot exist; live MenuBarExtra interaction proof remains blocked by the current LaunchServices session boundary.
 resumption_key: .harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md
 runtime_invocation_receipt: blocked - no workflow-closeout receipt generated in this mockup/spec turn
 artifact_chain_key: skills-sdk-menubar-review-popover
@@ -31,6 +31,8 @@ persistent_artifacts:
   - .harness/media/2026-07-09-skills-sdk-menubar-review-popover-final-polish.prompt.md
   - .harness/media/2026-07-09-skills-sdk-menubar-review-popover-implementation-handoff.png
   - .harness/media/2026-07-09-skills-sdk-menubar-review-popover-implementation-handoff.prompt.md
+  - .harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png
+  - .harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.md
   - .harness/reviews/2026-07-09-review-popover-3lane-synthesis.md
   - .harness/reviews/2026-07-09-review-popover-pass3-synthesis.md
 live_state_refresh: required
@@ -95,9 +97,9 @@ When a local Skills SDK source has review findings while the Tessl Registry pack
 | Three-lane review synthesis | available | .harness/reviews/2026-07-09-review-popover-3lane-synthesis.md |
 | Pass-three review synthesis | available | .harness/reviews/2026-07-09-review-popover-pass3-synthesis.md |
 | Skills SDK and Tessl icon sources | available in repository | `Sources/SkillsBar/Resources/SkillsSDKIcon.png` and `Sources/SkillsBar/Resources/TesslLogo.png`; implementation must create optical treatments rather than scaling one bitmap unchanged. |
-| Live menubar implementation | not checked | No runtime app launch or screenshot validation was run for this spec. |
+| Live menubar implementation | blocked | Product code and deterministic snapshot exist, but `script/build_and_run.sh --verify` cannot open the app from the Codex process because LaunchServices returns `kLSNoExecutableErr`. |
 | Canonical inspect command | confirmed | `./bin/ask sdk security risk-modes 'Skills/agent-ops/improve-agent-native/SKILL.md' --preview --json --robot` returned the expected three detected risks and a no-mutation preview receipt. |
-| Snapshot fixture seam in current implementation | implementation gap | SnapshotRenderer still enters live DashboardLoader; implementation must add SKILLSBAR_REVIEW_FIXTURE=1 before snapshot proof can close. |
+| Snapshot fixture seam in current implementation | implemented | `DashboardDataSource` selects `SKILLSBAR_REVIEW_FIXTURE=1` before live loading, and `SnapshotRenderer` uses that source through an `NSHostingView` render. |
 
 ## Authority and Scope Boundary
 
@@ -134,7 +136,8 @@ Prose requirements and acceptance IDs are authoritative if the image conflicts w
 ### Functional Requirements
 
 - FR-001: The popover MUST show the product title Skills SDK, status Needs review, substatus 3 risks need inspection, and a Tessl-style hex score 78 in the header.
-- FR-002: The package identity MUST show jscraik/improve-agent-native, a Private pill, and Private live eval plugin for improve-agent-native.
+- FR-002: The package identity MUST show jscraik/improve-agent-native and Live eval plugin for improve-agent-native. Registry visibility is Tessl metadata and MUST NOT be attached to the local package identity or description.
+- FR-002a: The Tessl Registry row MUST show a Private or Public pill when registry metadata supplies that visibility. It MUST omit the pill rather than infer visibility when metadata is unavailable.
 - FR-003: When review state is active, the local Skills SDK source card MUST be auto-expanded and MUST NOT require a user accordion or chevron interaction to expose risk evidence.
 - FR-004: The local source card MUST show Review trigger, Skills SDK, LOCAL, improve-agent-native, score 78, impact 71/71, and security 3 risks.
 - FR-005: The local metrics MUST show Quality 100% / Follows best practices, Impact 71/71 / All 71 local scenarios passed, and Security 3 risks / 1 critical, 2 high.
@@ -312,6 +315,7 @@ testing_lens:
 - The copy icon control MUST have the accessible name Copy inspect command and visible keyboard focus.
 - Focus state MUST be visible and MUST use lavender-blue or another non-amber focus token.
 - Status MUST NOT rely on color alone; text labels such as Needs review, 3 risks, Passed, and Registry clean. Local source has findings. are required.
+- Local and registry security states MUST share one severity-first disposition: failed/critical is danger red, flagged is warning amber, advisory is cyan, passed is green, and missing or unknown is pending gray. Advisory MUST NOT be presented as healthy.
 - Reduced-motion users MUST NOT receive transform-heavy popover or row-reveal motion.
 - Small grey labels and dim registry badge MUST pass contrast checks in the real implementation.
 - The command field MUST expose the full command to assistive technology even if visual text wraps or truncates.
@@ -340,9 +344,10 @@ testing_lens:
 | V-006 accessibility/focus | Keyboard focus order and accessible names checked in app | blocked until implementation/run exists |
 | V-007 reduced motion | Reduced-motion setting removes transform-heavy motion | blocked until implementation/run exists |
 | V-008 height fit | Popover fits target laptop screen constraints | blocked until implementation/run exists |
-| V-009 final-polish fixture | Fixture renders score 78, impact 71/71, 3 risks, registry score 66, and 68 registry eval scenarios | blocked until fixture exists |
+| V-009 final-polish fixture | Fixture renders score 78, impact 71/71, 3 risks, registry score 66, Private visibility, and 68 registry eval scenarios | pass through `SkillDashboard.reviewFixture`, sanitized Tessl payload fixtures, and the retained pixel-comparison test; see implementation snapshot evidence |
+| V-009a semantic variants | Local advisory, Public registry, missing visibility, ambiguous registry metadata, accessibility-sized text, Reduce Transparency, and Increased Contrast | pass through focused `ReviewPopoverTests` render and model assertions |
 | V-010 pasteboard equality | Copy action writes the canonical inspect command from the model to NSPasteboard | blocked until implementation/run exists |
-| V-011 deterministic snapshot command | `SKILLSBAR_REVIEW_FIXTURE=1 TESSL_REGISTRY_FIXTURE=1 TESSL_REGISTRY_FIXTURE_SCORE=66 TESSL_REGISTRY_FIXTURE_VERSION=0.2.0 TESSL_REGISTRY_FIXTURE_QUALITY=100 TESSL_REGISTRY_FIXTURE_IMPACT=63 TESSL_REGISTRY_FIXTURE_SECURITY=Passed TESSL_REGISTRY_FIXTURE_EVALS=68 swift run --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-snapshot-build SkillsBar --snapshot /private/tmp/skillsbar-implementation-handoff.png` | blocked until fixture implementation exists |
+| V-011 deterministic snapshot command | `HOME=/private/tmp/skillsbar-snapshot-home XDG_CACHE_HOME=/private/tmp/skillsbar-snapshot-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-snapshot-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer SKILLSBAR_REVIEW_FIXTURE=1 TESSL_REGISTRY_FIXTURE=1 TESSL_REGISTRY_FIXTURE_SCORE=66 TESSL_REGISTRY_FIXTURE_VERSION=0.2.0 TESSL_REGISTRY_FIXTURE_QUALITY=100 TESSL_REGISTRY_FIXTURE_IMPACT=63 TESSL_REGISTRY_FIXTURE_SECURITY=Passed TESSL_REGISTRY_FIXTURE_EVALS=68 swift run --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-snapshot-build SkillsBar --snapshot /private/tmp/skillsbar-implementation-handoff.png` | writes a deterministic `404 x 720` implementation snapshot without entering live parsing |
 
 ## Acceptance Criteria
 
@@ -401,9 +406,9 @@ flowchart TD
 - Preserve native MenuBarExtra(.window) anchoring. Add custom interior materialization only if it improves comprehension without duplicating AppKit's native popover presentation; use a critically damped, non-bouncy spring when custom motion is added.
 - Use opacity/material crossfade for reduced-motion users when custom interior motion exists; otherwise document that native presentation is used without extra transform-heavy motion.
 - Preserve MenuBarExtra(.window); do not introduce WindowGroup, NavigationSplitView, sidebar/detail, or document-window structure for this slice.
-- Add a deterministic review fixture, such as SKILLSBAR_REVIEW_FIXTURE=1, for final-polish screenshot/snapshot proof.
+- Preserve the deterministic `SKILLSBAR_REVIEW_FIXTURE=1` path for final-polish screenshot/snapshot proof.
 - Add a named review inspect command presentation property so the visible preview and copied command have an explicit contract even if their formatting differs.
-- Route SnapshotRenderer through the same deterministic final-polish fixture seam before live command parsing when SKILLSBAR_REVIEW_FIXTURE=1 is set.
+- Keep `SnapshotRenderer` routed through the same deterministic final-polish fixture seam before live command parsing when `SKILLSBAR_REVIEW_FIXTURE=1` is set.
 - Render the baseline popover at `404 x 720 pt`; use internal vertical scrolling below a `900 pt` visible screen-frame height.
 - Keep tooltip/helper text out of resting state; hover/focus help MAY be added if implementation evidence shows ambiguity remains.
 - If height is tight, compress package identity and card gaps before removing the bridge line or action.
@@ -414,12 +419,14 @@ None for the selected implementation slice. New navigation, alternate commands, 
 
 ## Decision
 
-Adopt the persisted implementation-handoff mockup as the visual target for the selected slice. Use the proven JSON/robot risk-modes preview as the canonical `reviewInspectCommand`, omit the details control, use a `404 x 720 pt` baseline with bounded internal scrolling, and create menubar/header/row optical treatments from the existing source assets. Implementation must still add the deterministic fixture seam and produce fresh live MenuBarExtra proof before runtime closeout.
+Adopt the persisted implementation-handoff mockup as the visual target for the selected slice. The product implementation now uses the proven JSON/robot risk-modes preview as `reviewInspectCommand`, omits the details control, renders a `404 x 720 pt` baseline with bounded internal scrolling, and uses distinct menubar/header/row icon treatments from the existing source assets. The deterministic fixture and app-rendered snapshot exist; fresh live MenuBarExtra interaction proof is still required before runtime closeout.
 
 ## Evidence and References
 
 - Generated visual target: .harness/media/2026-07-09-skills-sdk-menubar-review-popover-implementation-handoff.png
 - Generated visual prompt sidecar: .harness/media/2026-07-09-skills-sdk-menubar-review-popover-implementation-handoff.prompt.md
+- App-rendered implementation snapshot: .harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png
+- Implementation snapshot evidence: .harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.md
 - Prior visual target: .harness/media/2026-07-09-skills-sdk-menubar-final-mockup.png
 - Three-lane review synthesis: .harness/reviews/2026-07-09-review-popover-3lane-synthesis.md
 - Pass-three review synthesis: .harness/reviews/2026-07-09-review-popover-pass3-synthesis.md
@@ -455,7 +462,7 @@ scope: approved UI spec slice for Skills SDK menubar review popover.
 
 safe_to_continue: true for implementation planning; false for runtime closeout until implementation and live proof exist.
 
-blocked_reason: not_applicable for implementation planning; runtime proof remains blocked until the deterministic fixture and live app checks exist.
+blocked_reason: runtime proof remains blocked until the app opens from a normal user session and clipboard, focus, reduced-motion, and anchored-popover checks run.
 
 spec_path: .harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md
 
@@ -473,7 +480,7 @@ linear_mutation_status: not_needed
 
 linear_action_required: not_applicable
 
-confidence: high for the spec and visual handoff decisions because the command and repository icon sources were checked; runtime confidence remains blocked because no product implementation or live MenuBarExtra validation occurred in this artifact pass.
+confidence: high for the implemented model, snapshot, and visual hierarchy because tests, builds, validators, and the deterministic app render passed; live MenuBarExtra interaction confidence remains blocked by LaunchServices in the Codex process.
 
 blackboard_delta:
 - Implementation-handoff mockup supersedes earlier generated mockups as the visual target.

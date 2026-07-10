@@ -1,0 +1,12 @@
+{
+  "result": {
+    "name": "jscraik/improve-agent-native",
+    "latestVersion": "0.2.0",
+    "visibility": "private",
+    "aggregate": 66,
+    "quality": 1.0,
+    "impact": 0.63,
+    "security": "Passed",
+    "count": 68
+  }
+}

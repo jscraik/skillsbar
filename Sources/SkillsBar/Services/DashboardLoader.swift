@@ -238,6 +238,7 @@ struct DashboardLoader {
                 registrySecurityLabel: nil,
                 registryEvalCount: nil,
                 registryImprovementMultiplier: nil,
+                registryVisibility: nil,
                 recoveryCommand: "tessl doctor"
             )
         }
@@ -261,6 +262,7 @@ struct DashboardLoader {
                 registrySecurityLabel: nil,
                 registryEvalCount: nil,
                 registryImprovementMultiplier: nil,
+                registryVisibility: nil,
                 recoveryCommand: "tessl login"
             )
         }
@@ -282,58 +284,29 @@ struct DashboardLoader {
                 registrySecurityLabel: nil,
                 registryEvalCount: nil,
                 registryImprovementMultiplier: nil,
+                registryVisibility: nil,
                 recoveryCommand: "tessl search --type skills \(registryPath)"
             )
         }
-        let payload = search.json
-        let registryScore = registryScore(from: payload)
-        let registryVersion = payload?.firstString(for: ["latestVersion", "version", "latest_version", "published_version", "package_version"])
-        let registryQualityScore = registryPercent(from: payload, key: "quality")
-        let registryImpactScore = registryPercent(from: payload, key: "impact")
-        let registrySecurityLabel = payload?.firstString(for: ["security"])
-        let registryEvalCount = payload?.firstInt(for: ["count"])
-        let registryImprovementMultiplier = payload?.firstDouble(for: ["improvementMultiplier"])
+        let metadata = TesslRegistryMetadata(payload: search.json)
 
         return TesslSignal(
             ok: true,
             cliAvailable: true,
             authenticated: true,
-            displayStatus: registryScore == nil ? "Connected" : "Scored",
-            detail: registryScore.map { "Registry returned score \($0); local evidence remains separate." } ?? "Registry search returned metadata for this authenticated Tessl session.",
+            displayStatus: metadata.score == nil ? "Connected" : "Scored",
+            detail: metadata.score.map { "Registry returned score \($0); local evidence remains separate." } ?? "Registry search returned metadata for this authenticated Tessl session.",
             cliVersion: version.isEmpty ? nil : version,
-            registryScore: registryScore,
-            registryVersion: registryVersion,
-            registryQualityScore: registryQualityScore,
-            registryImpactScore: registryImpactScore,
-            registrySecurityLabel: registrySecurityLabel,
-            registryEvalCount: registryEvalCount,
-            registryImprovementMultiplier: registryImprovementMultiplier,
+            registryScore: metadata.score,
+            registryVersion: metadata.version,
+            registryQualityScore: metadata.qualityScore,
+            registryImpactScore: metadata.impactScore,
+            registrySecurityLabel: metadata.securityLabel,
+            registryEvalCount: metadata.evalCount,
+            registryImprovementMultiplier: metadata.improvementMultiplier,
+            registryVisibility: metadata.visibility,
             recoveryCommand: "tessl install \(registryPath)"
         )
-    }
-
-    private func registryScore(from payload: JSONNode?) -> Int? {
-        guard let payload else { return nil }
-        for key in ["aggregate", "validated_score", "validation_score", "quality_score", "score", "rating"] {
-            if let rawScore = payload.firstDouble(for: [key]) {
-                let normalizedScore = rawScore <= 1.0 ? rawScore * 100.0 : rawScore
-                let score = Int(normalizedScore.rounded())
-                if (0...100).contains(score) { return score }
-            }
-        }
-        for key in ["validated_score", "validation_score", "quality_score", "score", "rating"] {
-            if let score = payload.firstInt(for: [key]), (0...100).contains(score) {
-                return score
-            }
-        }
-        return nil
-    }
-
-    private func registryPercent(from payload: JSONNode?, key: String) -> Int? {
-        guard let rawValue = payload?.firstDouble(for: [key]) else { return nil }
-        let normalizedValue = rawValue <= 1.0 ? rawValue * 100.0 : rawValue
-        let value = Int(normalizedValue.rounded())
-        return (0...100).contains(value) ? value : nil
     }
 
     private func tesslFixtureSignal(registryPath: String) -> TesslSignal? {
@@ -356,6 +329,7 @@ struct DashboardLoader {
             registrySecurityLabel: environment["TESSL_REGISTRY_FIXTURE_SECURITY"],
             registryEvalCount: environment["TESSL_REGISTRY_FIXTURE_EVALS"].flatMap(Int.init),
             registryImprovementMultiplier: environment["TESSL_REGISTRY_FIXTURE_MULTIPLIER"].flatMap(Double.init),
+            registryVisibility: environment["TESSL_REGISTRY_FIXTURE_VISIBILITY"] ?? "Private",
             recoveryCommand: "tessl install \(registryPath)"
         )
     }

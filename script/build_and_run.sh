@@ -13,7 +13,7 @@ stop_existing() {
 }
 
 launch_app() {
-  (cd "$ROOT_DIR" && ./Launch.command)
+  "$ROOT_DIR/Launch.command"
 }
 
 case "$MODE" in

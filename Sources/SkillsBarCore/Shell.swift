@@ -60,11 +60,12 @@ public enum Shell {
     public static func run(_ command: String, cwd: URL, timeout: TimeInterval) -> CommandResult {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-lc", command]
+        process.arguments = ["-f", "-c", command]
         process.currentDirectoryURL = cwd
         let existingPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         process.environment = ProcessInfo.processInfo.environment.merging([
             "PATH": existingPath + ":/Users/jamiecraik/.local/bin:/opt/homebrew/bin:/usr/local/bin",
+            "ZDOTDIR": "/private/tmp/skillsbar-zdotdir",
             "XDG_CACHE_HOME": "/private/tmp/skillsbar-xdg",
             "MISE_TRUSTED_CONFIG_PATHS": cwd.appendingPathComponent(".mise.toml").path,
             "MISE_STATE_DIR": "/private/tmp/skillsbar-mise-state",

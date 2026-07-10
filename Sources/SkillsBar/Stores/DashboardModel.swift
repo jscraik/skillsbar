@@ -2,14 +2,20 @@ import Foundation
 
 @MainActor
 final class DashboardModel: ObservableObject {
-    @Published var dashboard = SkillDashboard.placeholder
+    @Published var dashboard: SkillDashboard
     @Published var isRefreshing = false
     private let refreshIntervalNanoseconds: UInt64 = 5 * 60 * 1_000_000_000
     private var refreshLoopTask: Task<Void, Never>?
+    private let source: DashboardDataSource
 
-    init(dashboard: SkillDashboard = .placeholder, autorefresh: Bool = true) {
-        self.dashboard = dashboard
-        if autorefresh {
+    init(
+        dashboard: SkillDashboard? = nil,
+        autorefresh: Bool = true,
+        source: DashboardDataSource = DashboardDataSource()
+    ) {
+        self.source = source
+        self.dashboard = dashboard ?? source.initialDashboard
+        if autorefresh && !source.usesReviewFixture {
             Task { await refresh() }
             startRefreshLoop()
         }
@@ -28,7 +34,7 @@ final class DashboardModel: ObservableObject {
         isRefreshing = true
         defer { isRefreshing = false }
         do {
-            dashboard = try await DashboardLoader().load()
+            dashboard = try await source.load()
         } catch {
             dashboard = SkillDashboard.placeholder.withError(error.localizedDescription)
         }

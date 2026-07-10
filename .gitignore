@@ -6,5 +6,6 @@
 /*.dSYM/
 *.xcuserstate
 /dist/
+/dist-local/
 /artifacts/
 /.codex/config.toml

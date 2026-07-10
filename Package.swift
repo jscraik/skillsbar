@@ -19,6 +19,11 @@ let package = Package(
         .testTarget(
             name: "SkillsBarCoreTests",
             dependencies: ["SkillsBarCore"]
+        ),
+        .testTarget(
+            name: "SkillsBarTests",
+            dependencies: ["SkillsBar", "SkillsBarCore"],
+            resources: [.process("Fixtures")]
         )
     ]
 )

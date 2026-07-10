@@ -1,0 +1,12 @@
+{
+  "result": {
+    "name": "example/public-skill",
+    "latestVersion": "1.0.0",
+    "visibility": "public",
+    "aggregate": 92,
+    "quality": 0.95,
+    "impact": 0.88,
+    "security": "Passed",
+    "count": 24
+  }
+}
