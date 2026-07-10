@@ -2,18 +2,40 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-/Users/jamiecraik/.codex/usage-data/skillsbar}"
+BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-$HOME/.codex/usage-data/skillsbar}"
 APP_DIR="$BUILD_ROOT/SkillsBar.app"
-CONTENTS_DIR="$APP_DIR/Contents"
-MACOS_DIR="$CONTENTS_DIR/MacOS"
-RESOURCES_DIR="$CONTENTS_DIR/Resources"
-EXECUTABLE="$MACOS_DIR/SkillsBar"
-MODULE_CACHE="$BUILD_ROOT/clang-module-cache"
-SWIFTPM_BUILD="$BUILD_ROOT/swiftpm-build"
+EXECUTABLE="$APP_DIR/Contents/MacOS/SkillsBar"
 LAUNCH_RECEIPT="$BUILD_ROOT/SkillsBar.launch-receipt.json"
+LOCK_DIR="$BUILD_ROOT/launch.lock"
+LOCK_PID_FILE="$LOCK_DIR/pid"
+LOCK_OWNED=0
 
-rm -rf "$APP_DIR" "$MODULE_CACHE"
-mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$MODULE_CACHE"
+mkdir -p "$BUILD_ROOT"
+# shellcheck disable=SC2329 # Invoked by the trap below.
+cleanup() {
+  if [[ "$LOCK_OWNED" == "1" ]]; then
+    lock_pid="$(cat "$LOCK_PID_FILE" 2>/dev/null || true)"
+    if [[ -z "$lock_pid" || "$lock_pid" == "$$" ]]; then
+      rm -rf "$LOCK_DIR"
+    fi
+  fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+  existing_pid="$(cat "$LOCK_PID_FILE" 2>/dev/null || true)"
+  if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+    echo "Another SkillsBar build is running (pid $existing_pid); waiting..."
+    sleep 1
+  else
+    rm -rf "$LOCK_DIR"
+  fi
+done
+LOCK_OWNED=1
+printf '%s\n' "$$" > "$LOCK_PID_FILE"
+rm -f "$LAUNCH_RECEIPT"
 
 stop_existing() {
   if command -v pkill >/dev/null 2>&1; then
@@ -25,66 +47,18 @@ stop_existing() {
 
 stop_existing
 
-cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleExecutable</key>
-  <string>SkillsBar</string>
-  <key>CFBundleDevelopmentRegion</key>
-  <string>en</string>
-  <key>CFBundleIdentifier</key>
-  <string>local.jscraik.skillsbar</string>
-  <key>CFBundleInfoDictionaryVersion</key>
-  <string>6.0</string>
-  <key>CFBundleName</key>
-  <string>SkillsBar</string>
-  <key>CFBundlePackageType</key>
-  <string>APPL</string>
-  <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
-  <key>CFBundleVersion</key>
-  <string>1</string>
-  <key>LSMinimumSystemVersion</key>
-  <string>14.0</string>
-  <key>LSUIElement</key>
-  <true/>
-  <key>NSHumanReadableCopyright</key>
-  <string>Local prototype</string>
-  <key>NSPrincipalClass</key>
-  <string>NSApplication</string>
-</dict>
-</plist>
-PLIST
-printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
-
-pushd "$SCRIPT_DIR" >/dev/null
-HOME="$BUILD_ROOT/home" \
-XDG_CACHE_HOME="$BUILD_ROOT/xdg-cache" \
-XDG_STATE_HOME="$BUILD_ROOT/xdg-state" \
-MISE_CACHE_DIR="$BUILD_ROOT/mise-cache" \
-MISE_STATE_DIR="$BUILD_ROOT/mise-state" \
-CLANG_MODULE_CACHE_PATH="$MODULE_CACHE" \
-swift build --build-system native --disable-sandbox --build-path "$SWIFTPM_BUILD"
-popd >/dev/null
-BUILD_EXECUTABLE="$SWIFTPM_BUILD/debug/SkillsBar"
-if [[ ! -x "$BUILD_EXECUTABLE" ]]; then
-  BUILD_EXECUTABLE="$(find "$SWIFTPM_BUILD" -path "*/debug/SkillsBar" -type f -perm -111 -print -quit)"
-fi
-if [[ -z "$BUILD_EXECUTABLE" || ! -x "$BUILD_EXECUTABLE" ]]; then
-  echo "SwiftPM build completed but SkillsBar executable was not found under $SWIFTPM_BUILD" >&2
-  exit 1
-fi
-cp "$BUILD_EXECUTABLE" "$EXECUTABLE"
-chmod +x "$EXECUTABLE"
-cp "$SCRIPT_DIR/Sources/SkillsBar/Resources/TesslLogo.png" "$RESOURCES_DIR/TesslLogo.png"
-cp "$SCRIPT_DIR/Sources/SkillsBar/Resources/SkillsSDKIcon.png" "$RESOURCES_DIR/SkillsSDKIcon.png"
-/usr/bin/codesign --force --sign - "$APP_DIR" >/dev/null
-
-echo "Built $APP_DIR"
+"$SCRIPT_DIR/script/package_app.sh" debug
 
 if [[ "${NO_OPEN:-0}" == "1" ]]; then
+  cat > "$LAUNCH_RECEIPT" <<JSON
+{
+  "schema_version": "skillsbar-launch/v1",
+  "status": "built_not_launched",
+  "launch_method": "none",
+  "app_path": "$APP_DIR",
+  "executable_path": "$EXECUTABLE"
+}
+JSON
   exit 0
 fi
 
@@ -100,10 +74,47 @@ if /usr/bin/open -n "$APP_DIR" >"$OPEN_OUTPUT" 2>&1; then
   "executable_path": "$EXECUTABLE"
 }
 JSON
-  exit 0
+  for _ in {1..10}; do
+    if pgrep -x SkillsBar >/dev/null 2>&1; then
+      exit 0
+    fi
+    sleep 0.4
+  done
 fi
 
 OPEN_ERROR="$(tr '\n' ' ' < "$OPEN_OUTPUT" | sed 's/"/\\"/g')"
+DIRECT_FALLBACK_STATUS="disabled"
+if [[ "${SKILLSBAR_DIRECT_LAUNCH_FALLBACK:-1}" == "1" && "${SKILLSBAR_REQUIRE_LAUNCHSERVICES:-0}" != "1" ]]; then
+  DIRECT_FALLBACK_STATUS="attempted"
+  "$EXECUTABLE" >"$BUILD_ROOT/SkillsBar.direct-launch.log" 2>&1 &
+  direct_pid=$!
+  sleep 0.4
+  direct_alive=1
+  for _ in {1..10}; do
+    if ! kill -0 "$direct_pid" 2>/dev/null; then
+      direct_alive=0
+      break
+    fi
+    sleep 0.4
+  done
+  if [[ "$direct_alive" == "1" ]]; then
+    cat > "$LAUNCH_RECEIPT" <<JSON
+{
+  "schema_version": "skillsbar-launch/v1",
+  "status": "launched",
+  "launch_method": "direct_executable_fallback",
+  "app_path": "$APP_DIR",
+  "executable_path": "$EXECUTABLE",
+  "launchservices_error": "$OPEN_ERROR"
+}
+JSON
+    exit 0
+  fi
+  DIRECT_FALLBACK_STATUS="exited"
+elif [[ "${SKILLSBAR_REQUIRE_LAUNCHSERVICES:-0}" == "1" ]]; then
+  DIRECT_FALLBACK_STATUS="disabled_for_live_verify"
+fi
+
 cat > "$LAUNCH_RECEIPT" <<JSON
 {
   "schema_version": "skillsbar-launch/v1",
@@ -112,6 +123,8 @@ cat > "$LAUNCH_RECEIPT" <<JSON
   "app_path": "$APP_DIR",
   "executable_path": "$EXECUTABLE",
   "open_error": "$OPEN_ERROR",
+  "direct_launch_fallback": "$DIRECT_FALLBACK_STATUS",
+  "direct_launch_log": "$BUILD_ROOT/SkillsBar.direct-launch.log",
   "manual_open_command": "open -n '$APP_DIR'"
 }
 JSON

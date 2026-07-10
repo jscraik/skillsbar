@@ -1,0 +1,11 @@
+{
+  "result": {
+    "name": "example/legacy-skill",
+    "latestVersion": "0.8.0",
+    "aggregate": 74,
+    "quality": 0.82,
+    "impact": 0.66,
+    "security": "Flagged",
+    "count": 12
+  }
+}

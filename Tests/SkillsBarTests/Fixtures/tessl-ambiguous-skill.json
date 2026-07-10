@@ -1,0 +1,18 @@
+{
+  "telemetry": {
+    "access": "private",
+    "count": 999,
+    "security": "Failed",
+    "version": "telemetry-v1"
+  },
+  "result": {
+    "name": "example/ambiguous-skill",
+    "latestVersion": "2.0.0",
+    "visibility": "public",
+    "aggregate": 78,
+    "quality": 0.91,
+    "impact": 0.64,
+    "security": "Advisory",
+    "count": 42
+  }
+}
