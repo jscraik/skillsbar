@@ -13,8 +13,8 @@ struct DashboardView: View {
 
         ZStack {
             PopoverInteriorBackdrop(
-                reduceTransparency: reduceTransparency || reduceTransparencyOverride == true,
-                increasedContrast: colorSchemeContrast == .increased || increasedContrastOverride == true
+                reduceTransparency: reduceTransparencyOverride ?? reduceTransparency,
+                increasedContrast: increasedContrastOverride ?? (colorSchemeContrast == .increased)
             )
 
             ScrollView {
