@@ -63,8 +63,11 @@ public enum Shell {
         process.arguments = ["-f", "-c", command]
         process.currentDirectoryURL = cwd
         let existingPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+        let localBin = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local/bin")
+            .path
         process.environment = ProcessInfo.processInfo.environment.merging([
-            "PATH": existingPath + ":/Users/jamiecraik/.local/bin:/opt/homebrew/bin:/usr/local/bin",
+            "PATH": existingPath + ":\(localBin):/opt/homebrew/bin:/usr/local/bin",
             "ZDOTDIR": "/private/tmp/skillsbar-zdotdir",
             "XDG_CACHE_HOME": "/private/tmp/skillsbar-xdg",
             "MISE_TRUSTED_CONFIG_PATHS": cwd.appendingPathComponent(".mise.toml").path,

@@ -1,0 +1,40 @@
+{
+  "results": [
+    {
+      "type": "tile",
+      "fullName": "other/workspace-skill",
+      "latestVersion": "9.9.9",
+      "scores": {
+        "aggregate": 0.12,
+        "quality": 0.12,
+        "impact": 0.12,
+        "security": "HIGH",
+        "evals": {
+          "count": 2,
+          "improvementMultiplier": 0.4
+        }
+      }
+    },
+    {
+      "type": "tile",
+      "fullName": "jscraik/improve-agent-native",
+      "workspaceName": "jscraik",
+      "tileName": "improve-agent-native",
+      "description": "Private live eval plugin for improve-agent-native.",
+      "latestVersion": "0.2.0",
+      "scores": {
+        "aggregate": 0.667,
+        "quality": 1,
+        "impact": 0.63,
+        "security": "LOW",
+        "evals": {
+          "average": 0.63,
+          "baseline": 0.49,
+          "improvement": 0.14,
+          "improvementMultiplier": 1.28,
+          "count": 68
+        }
+      }
+    }
+  ]
+}

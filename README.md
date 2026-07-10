@@ -21,6 +21,8 @@ These lanes are intentionally independent. A clean registry result does not prov
 - A local agent-skills checkout. The default is `/Users/jamiecraik/dev/agent-skills`.
 - Optional: `tessl` CLI access for live registry status.
 
+SkillsBar is not App-Sandboxed: it reads the configured Skills SDK checkout and runs its read-only SDK checks locally. For Tessl, it prefers `TESSL_BIN` when set, then the current user's `~/.local/bin/tessl`, then `PATH`. Keep `SKILLSBAR_REVIEW_FIXTURE` unset for normal use; that variable is reserved for deterministic tests and mockup work.
+
 ## Run
 
 ```bash
@@ -93,6 +95,14 @@ AGENT_SKILL_PATH=Skills/agent-ops/technical-writer/SKILL.md ./Launch.command
 ```
 
 `SELECTED_SKILL_PATH` is also accepted for the selected skill path. Paths must point to an existing `Skills/**/SKILL.md` file in the configured root; otherwise the app falls back to the default skill.
+
+When no launch-time skill path is set, use the circular-arrow chooser beside the skill name to select any local `Skills/**/SKILL.md`; SkillsBar persists that choice. A launch-time `AGENT_SKILL_PATH` or `SELECTED_SKILL_PATH` intentionally pins the selection. The app refreshes the selected skill immediately after its directory changes, and also refreshes on its five-minute live-data interval.
+
+If Tessl is installed outside the normal user-local location, point the app at it explicitly:
+
+```bash
+TESSL_BIN=/absolute/path/to/tessl ./Launch.command
+```
 
 For fixture-based Tessl UI work, set `TESSL_REGISTRY_FIXTURE=1` or `TESSL_REGISTRY_FIXTURE_SCORE=<0-100>` with the optional fixture variables used in `DashboardLoader.swift`.
 

@@ -187,6 +187,22 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(metadata.visibility, "public")
     }
 
+    func testLiveTesslSearchSchemaUsesTheRequestedRegistryResult() throws {
+        let metadata = try registryMetadata(
+            fixture: "tessl-live-search-result",
+            registryPath: "jscraik/improve-agent-native"
+        )
+
+        XCTAssertEqual(metadata.score, 67)
+        XCTAssertEqual(metadata.version, "0.2.0")
+        XCTAssertEqual(metadata.qualityScore, 100)
+        XCTAssertEqual(metadata.impactScore, 63)
+        XCTAssertEqual(metadata.securityLabel, "LOW")
+        XCTAssertEqual(metadata.evalCount, 68)
+        XCTAssertEqual(metadata.improvementMultiplier, 1.28)
+        XCTAssertNil(metadata.visibility)
+    }
+
     @MainActor
     func testReviewFixtureRenderMatchesRetainedBaseline() throws {
         let outputURL = FileManager.default.temporaryDirectory
@@ -265,6 +281,60 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(liveLoadCount, 1)
     }
 
+    func testTesslCommandPrefersAnExplicitConfiguredBinary() {
+        let command = DashboardLoader.tesslCommand(
+            environment: ["TESSL_BIN": "/Applications/Tessl/bin/tessl"]
+        )
+
+        XCTAssertEqual(command, "'/Applications/Tessl/bin/tessl'")
+    }
+
+    func testTesslVisibilityUsesTheRegistryDetailField() {
+        let output = """
+        Name            jscraik/improve-agent-native
+        Latest Version  0.2.0
+        Visibility      Private
+        Security        Passed
+        """
+
+        XCTAssertEqual(DashboardLoader.tesslVisibility(fromPluginInfo: output), "private")
+        XCTAssertNil(DashboardLoader.tesslVisibility(fromPluginInfo: "Registry lookup unavailable"))
+    }
+
+    func testSkillDiscoveryListsOnlyLocalSkillMarkdownFiles() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-skill-discovery-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("Skills/agent-ops/alpha"),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("Skills/frontend/beta"),
+            withIntermediateDirectories: true
+        )
+        try "# Alpha".write(
+            to: root.appendingPathComponent("Skills/agent-ops/alpha/SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "# Beta".write(
+            to: root.appendingPathComponent("Skills/frontend/beta/SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "Ignore me".write(
+            to: root.appendingPathComponent("Skills/frontend/beta/README.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        XCTAssertEqual(
+            DashboardLoader.discoverSkillPaths(root: root),
+            ["Skills/agent-ops/alpha/SKILL.md", "Skills/frontend/beta/SKILL.md"]
+        )
+    }
+
     func testMenuBarTemplateUsesApprovedPointMetrics() {
         XCTAssertEqual(MenuBarTemplateMetrics.width, 404)
         XCTAssertEqual(MenuBarTemplateMetrics.height, 720)
@@ -296,10 +366,10 @@ final class ReviewPopoverTests: XCTestCase {
 
 }
 
-private func registryMetadata(fixture: String) throws -> TesslRegistryMetadata {
+private func registryMetadata(fixture: String, registryPath: String? = nil) throws -> TesslRegistryMetadata {
     let url = try XCTUnwrap(Bundle.module.url(forResource: fixture, withExtension: "json"))
     let object = try JSONSerialization.jsonObject(with: Data(contentsOf: url))
-    return TesslRegistryMetadata(payload: JSONNode(object))
+    return TesslRegistryMetadata(payload: JSONNode(object), registryPath: registryPath)
 }
 
 private func pixelDifference(_ lhsURL: URL, _ rhsURL: URL) throws -> Double {

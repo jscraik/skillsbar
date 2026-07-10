@@ -53,6 +53,22 @@ Command: `find /Users/jamiecraik/.codex/usage-data/skillsbar/SkillsBar.app -maxd
 - Canonical-path registry parsing rejects unrelated nested access/count/security/version fields.
 - Adaptive rendering covers semantic variants plus accessibility-sized text, Reduce Transparency, and Increased Contrast.
 - Shell execution disables zsh startup files so command evidence is not contaminated by workstation profile output.
+- The selected local skill can be changed through the compact chooser beside its identity; the persisted choice refreshes immediately.
+- A selected skill directory change is detected within three seconds, while the normal live-data refresh remains five minutes.
+- Tessl search selects the exact requested registry path and reads nested `scores` and `scores.evals` fields.
+- Tessl visibility is read only from the authenticated `tessl plugin info` detail response. Missing detail does not create a visibility claim.
+
+## Live Source Refresh
+
+Command: `tessl whoami` -> pass (authenticated Tessl session for `jscraik`)
+
+Command: `tessl search --json --type skills jscraik/improve-agent-native` -> pass (the live tile returned aggregate `0.667`, quality `1`, impact `0.63`, security `LOW`, and `68` evaluations under nested scores fields)
+
+Command: `tessl plugin info jscraik/improve-agent-native` -> pass (the authoritative detail response reported `Visibility Private`, version `0.2.0`, quality `100%`, uplift `1.28x`, and passed security)
+
+Command: `HOME=/private/tmp/skillsbar-live-final2-home XDG_CACHE_HOME=/private/tmp/skillsbar-live-final2-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-live-final2-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-live-final2-build -Xswiftc -gnone` -> pass (24 tests, 0 failures)
+
+The app executes the Skills SDK package, scenario, and security commands from the configured local checkout by default. Codex session policy blocked an independent direct invocation against the live source skill; this is a tooling-policy restriction, not an app runtime restriction.
 
 ## Remaining Live Proof
 

@@ -485,8 +485,8 @@ struct TesslRegistryMetadata {
     let improvementMultiplier: Double?
     let visibility: String?
 
-    init(payload: JSONNode?) {
-        let containers = Self.canonicalContainers(from: payload?.value)
+    init(payload: JSONNode?, registryPath: String? = nil) {
+        let containers = Self.canonicalContainers(from: payload?.value, registryPath: registryPath)
         score = Self.score(from: containers)
         version = Self.string(in: containers, keys: ["latestVersion", "version", "latest_version", "published_version", "package_version"])
         qualityScore = Self.percent(from: containers, key: "quality")
@@ -515,15 +515,31 @@ struct TesslRegistryMetadata {
         return (0...100).contains(value) ? value : nil
     }
 
-    private static func canonicalContainers(from value: Any?) -> [[String: Any]] {
+    private static func canonicalContainers(from value: Any?, registryPath: String?) -> [[String: Any]] {
         guard let root = value as? [String: Any] else { return [] }
         var containers: [[String: Any]] = []
-        if let data = root["data"] as? [String: Any], let result = data["result"] as? [String: Any] {
+
+        func appendResult(_ result: [String: Any]) {
             containers.append(result)
+            if let scores = result["scores"] as? [String: Any] {
+                containers.append(scores)
+                if let evaluations = scores["evals"] as? [String: Any] {
+                    containers.append(evaluations)
+                }
+            }
         }
-        if let result = root["result"] as? [String: Any] { containers.append(result) }
+
+        if let data = root["data"] as? [String: Any], let result = data["result"] as? [String: Any] {
+            appendResult(result)
+        }
+        if let result = root["result"] as? [String: Any] { appendResult(result) }
         if let data = root["data"] as? [String: Any] { containers.append(data) }
-        if let results = root["results"] as? [[String: Any]], let first = results.first { containers.append(first) }
+        if let results = root["results"] as? [[String: Any]] {
+            let selected = registryPath.flatMap { requested in
+                results.first { ($0["fullName"] as? String)?.caseInsensitiveCompare(requested) == .orderedSame }
+            } ?? results.first
+            if let selected { appendResult(selected) }
+        }
         containers.append(root)
         return containers
     }

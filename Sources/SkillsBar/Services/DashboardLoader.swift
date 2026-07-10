@@ -4,6 +4,7 @@ import SkillsBarCore
 struct DashboardLoader {
     static let defaultRepoRoot = URL(fileURLWithPath: "/Users/jamiecraik/dev/agent-skills")
     static let defaultSkillPath = "Skills/agent-ops/improve-agent-native/SKILL.md"
+    static let selectedSkillDefaultsKey = "selectedSkillPath"
     static let packageCommand = "./bin/ask skills package verify Skills/agent-ops/improve-agent-native --json --robot"
     static let impactCommand = "./bin/ask sdk eval scenario-quality Skills/agent-ops/improve-agent-native --preview --json --robot"
     static let securityCommand = "./bin/ask sdk security risk-modes Skills/agent-ops/improve-agent-native --preview --json --robot"
@@ -30,6 +31,50 @@ struct DashboardLoader {
 
     static func copyCommand(root: URL, command: String) -> String {
         "cd \(shellQuoted(root.path)) && \(command)"
+    }
+
+    static func tesslCommand(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        fileManager: FileManager = .default
+    ) -> String {
+        if let configured = environment["TESSL_BIN"], !configured.isEmpty {
+            return shellQuoted(configured)
+        }
+        let localBinary = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local/bin/tessl")
+        if fileManager.isExecutableFile(atPath: localBinary.path) {
+            return shellQuoted(localBinary.path)
+        }
+        return "tessl"
+    }
+
+    static func tesslVisibility(fromPluginInfo output: String) -> String? {
+        guard let line = output.split(separator: "\n").first(where: {
+            $0.trimmingCharacters(in: .whitespaces).lowercased().hasPrefix("visibility")
+        }) else { return nil }
+        let value = line.dropFirst("Visibility".count).trimmingCharacters(in: .whitespaces).lowercased()
+        return value == "private" || value == "public" ? value : nil
+    }
+
+    static var selectionIsPinnedByEnvironment: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return !(environment["AGENT_SKILL_PATH"] ?? environment["SELECTED_SKILL_PATH"] ?? "").isEmpty
+    }
+
+    static func discoverSkillPaths(root: URL) -> [String] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: root.appendingPathComponent("Skills"),
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+        return enumerator.compactMap { $0 as? URL }
+            .filter { $0.lastPathComponent == "SKILL.md" }
+            .compactMap { url in
+                let components = url.pathComponents
+                guard let skillsIndex = components.lastIndex(of: "Skills") else { return nil }
+                return components[skillsIndex...].joined(separator: "/")
+            }
+            .sorted()
     }
 
     private static func shellQuoted(_ value: String) -> String {
@@ -132,7 +177,10 @@ struct DashboardLoader {
 
     private func findSelectedSkillPath(root: URL) throws -> String {
         let environment = ProcessInfo.processInfo.environment
-        let rawPath = environment["AGENT_SKILL_PATH"] ?? environment["SELECTED_SKILL_PATH"] ?? Self.defaultSkillPath
+        let rawPath = environment["AGENT_SKILL_PATH"]
+            ?? environment["SELECTED_SKILL_PATH"]
+            ?? UserDefaults.standard.string(forKey: Self.selectedSkillDefaultsKey)
+            ?? Self.defaultSkillPath
         let relativePath = rawPath.hasPrefix(root.path + "/")
             ? String(rawPath.dropFirst(root.path.count + 1))
             : rawPath
@@ -222,8 +270,9 @@ struct DashboardLoader {
             return fixture
         }
 
-        let cli = Shell.run("command -v tessl", cwd: root, timeout: 5)
-        guard cli.exitCode == 0 else {
+        let tessl = Self.tesslCommand()
+        let versionResult = Shell.run("\(tessl) --version", cwd: root, timeout: 5)
+        guard versionResult.exitCode == 0 else {
             return TesslSignal(
                 ok: false,
                 cliAvailable: false,
@@ -243,8 +292,8 @@ struct DashboardLoader {
             )
         }
 
-        let version = Shell.run("tessl --version", cwd: root, timeout: 5).stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-        let whoami = Shell.run("tessl whoami", cwd: root, timeout: 15)
+        let version = versionResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        let whoami = Shell.run("\(tessl) whoami", cwd: root, timeout: 15)
         guard whoami.exitCode == 0 else {
             let authExpired = whoami.combinedOutput.localizedCaseInsensitiveContains("401")
                 || whoami.combinedOutput.localizedCaseInsensitiveContains("login")
@@ -267,7 +316,7 @@ struct DashboardLoader {
             )
         }
 
-        let searchCommand = "tessl search --json --type skills \(Self.shellQuoted(registryPath))"
+        let searchCommand = "\(tessl) search --json --type skills \(Self.shellQuoted(registryPath))"
         let search = Shell.run(searchCommand, cwd: root, timeout: 20)
         guard search.exitCode == 0 else {
             return TesslSignal(
@@ -288,7 +337,9 @@ struct DashboardLoader {
                 recoveryCommand: "tessl search --type skills \(registryPath)"
             )
         }
-        let metadata = TesslRegistryMetadata(payload: search.json)
+        let metadata = TesslRegistryMetadata(payload: search.json, registryPath: registryPath)
+        let detail = Shell.run("\(tessl) plugin info \(Self.shellQuoted(registryPath))", cwd: root, timeout: 20)
+        let detailVisibility = detail.exitCode == 0 ? Self.tesslVisibility(fromPluginInfo: detail.stdout) : nil
 
         return TesslSignal(
             ok: true,
@@ -304,7 +355,7 @@ struct DashboardLoader {
             registrySecurityLabel: metadata.securityLabel,
             registryEvalCount: metadata.evalCount,
             registryImprovementMultiplier: metadata.improvementMultiplier,
-            registryVisibility: metadata.visibility,
+            registryVisibility: detailVisibility ?? metadata.visibility,
             recoveryCommand: "tessl install \(registryPath)"
         )
     }

@@ -21,7 +21,7 @@ struct DashboardView: View {
                 VStack(spacing: 0) {
                     ReviewHeader(dashboard: model.dashboard)
                     QuietDivider()
-                    PackageIdentity(dashboard: model.dashboard, presentation: presentation)
+                    PackageIdentity(model: model, dashboard: model.dashboard, presentation: presentation)
                     ReviewTriggerCard(dashboard: model.dashboard)
                         .padding(.top, 10)
                     RegistryEvidenceRow(dashboard: model.dashboard)
@@ -140,6 +140,7 @@ private struct ScoreHex: View {
 }
 
 private struct PackageIdentity: View {
+    @ObservedObject var model: DashboardModel
     let dashboard: SkillDashboard
     let presentation: ReviewPresentation
 
@@ -150,6 +151,29 @@ private struct PackageIdentity: View {
                     .scaledSystemFont(size: 17, weight: .medium, relativeTo: .headline)
                     .foregroundStyle(.primaryText)
                     .lineLimit(2)
+
+                Spacer(minLength: 8)
+
+                Menu {
+                    ForEach(model.availableSkillPaths, id: \.self) { skillPath in
+                        Button {
+                            model.selectSkill(path: skillPath)
+                        } label: {
+                            if skillPath == dashboard.fleet.selectedSkillPath {
+                                Label(skillPath, systemImage: "checkmark")
+                            } else {
+                                Text(skillPath)
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 13, weight: .medium))
+                        .frame(width: 28, height: 28)
+                }
+                .disabled(model.availableSkillPaths.isEmpty || model.isSkillSelectionPinned)
+                .help(model.isSkillSelectionPinned ? "Skill selection is pinned by AGENT_SKILL_PATH" : "Select local skill")
+                .accessibilityLabel("Select local skill")
 
             }
 
