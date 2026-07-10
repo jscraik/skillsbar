@@ -7,7 +7,7 @@ source "$ROOT_DIR/version.env"
 
 APP_NAME="SkillsBar"
 BUNDLE_ID="${SKILLSBAR_BUNDLE_ID:-local.jscraik.skillsbar}"
-BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-/Users/jamiecraik/.codex/usage-data/skillsbar}"
+BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-$ROOT_DIR/dist-local}"
 CONFIGURATION="${1:-debug}"
 ARCHES_VALUE="${ARCHES:-$(uname -m)}"
 SIGNING_MODE="${SKILLSBAR_SIGNING:-adhoc}"
