@@ -10,13 +10,14 @@ LOCK_DIR="$BUILD_ROOT/launch.lock"
 LOCK_PID_FILE="$LOCK_DIR/pid"
 
 mkdir -p "$BUILD_ROOT"
-rm -f "$LAUNCH_RECEIPT"
-
-# shellcheck disable=SC2329 # Invoked by the trap below.
 cleanup() {
-  rm -rf "$LOCK_DIR"
+  if [[ "$(cat "$LOCK_PID_FILE" 2>/dev/null || true)" == "$$" ]]; then
+    rm -rf "$LOCK_DIR"
+  fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 while ! mkdir "$LOCK_DIR" 2>/dev/null; do
   existing_pid="$(cat "$LOCK_PID_FILE" 2>/dev/null || true)"
@@ -28,6 +29,7 @@ while ! mkdir "$LOCK_DIR" 2>/dev/null; do
   fi
 done
 printf '%s\n' "$$" > "$LOCK_PID_FILE"
+rm -f "$LAUNCH_RECEIPT"
 
 stop_existing() {
   if command -v pkill >/dev/null 2>&1; then
