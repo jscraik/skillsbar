@@ -169,6 +169,36 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(presentation.emphasisTone, .warning)
     }
 
+    func testFailedSecurityUsesDangerTone() {
+        var dashboard = SkillDashboard.reviewFixture
+        dashboard.security.status = "Failed"
+
+        let presentation = ReviewPresentation(dashboard: dashboard)
+
+        XCTAssertEqual(presentation.state, .reviewRequired)
+        XCTAssertEqual(presentation.emphasisTone, .danger)
+    }
+
+    func testLowLocalScoreIsNotPresentedAsHealthy() {
+        var dashboard = SkillDashboard.reviewFixture
+        dashboard.quality.score = 50
+        dashboard.impact.score = 50
+        dashboard.security = SecuritySignal(
+            score: 100,
+            status: "Passed",
+            detail: "No known issues.",
+            sourceLabel: "Local SDK risk-modes",
+            segmentCount: 3,
+            inspectCommand: expectedCommand
+        )
+
+        let presentation = ReviewPresentation(dashboard: dashboard)
+
+        XCTAssertNotEqual(presentation.state, .healthy)
+        XCTAssertEqual(presentation.emphasisTone, .warning)
+        XCTAssertEqual(presentation.triggerSystemName, "exclamationmark.triangle")
+    }
+
     func testRegistryFindingIsNotDescribedAsClean() {
         var dashboard = SkillDashboard.reviewFixture
         dashboard.tessl.registrySecurityLabel = "Flagged"
@@ -395,6 +425,107 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertFalse(model.copy(expectedCommand))
         XCTAssertNil(model.copiedCommand)
         XCTAssertEqual(model.copyError, "Could not copy inspect command")
+    }
+
+    @MainActor
+    func testSelectingSkillDuringAnActiveLoadQueuesAnotherRefresh() async {
+        let gate = RefreshLoadGate()
+        let source = DashboardDataSource(
+            environment: [:],
+            liveLoadAsync: { await gate.load() }
+        )
+        let model = DashboardModel(autorefresh: false, source: source)
+        let previousSelection = UserDefaults.standard.object(forKey: DashboardLoader.selectedSkillDefaultsKey)
+        defer {
+            if let previousSelection {
+                UserDefaults.standard.set(previousSelection, forKey: DashboardLoader.selectedSkillDefaultsKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: DashboardLoader.selectedSkillDefaultsKey)
+            }
+        }
+
+        let initialRefresh = Task { @MainActor in await model.refresh() }
+        await gate.waitForBlockedLoad()
+        model.selectSkill(path: "Skills/testing/alternate/SKILL.md")
+        await Task.yield()
+        await gate.releaseBlockedLoad()
+        await initialRefresh.value
+        try? await Task.sleep(for: .milliseconds(50))
+
+        let loadCount = await gate.loadCount
+        XCTAssertEqual(loadCount, 2)
+    }
+
+    @MainActor
+    func testSourceChangeDuringAnActiveLoadIsReloadedAfterThatLoad() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-source-change-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let skillPath = "Skills/testing/alternate/SKILL.md"
+        let skillURL = root.appendingPathComponent(skillPath)
+        try FileManager.default.createDirectory(at: skillURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "# Alternate".write(to: skillURL, atomically: true, encoding: .utf8)
+
+        var dashboard = SkillDashboard.reviewFixture
+        dashboard.repoPath = root.path
+        dashboard.fleet.selectedSkillPath = skillPath
+        let gate = RefreshLoadGate(dashboard: dashboard, blockOnCall: 2)
+        let source = DashboardDataSource(environment: [:], liveLoadAsync: { await gate.load() })
+        let model = DashboardModel(dashboard: dashboard, autorefresh: false, source: source)
+
+        await model.refresh()
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSinceNow: 2)],
+            ofItemAtPath: skillURL.path
+        )
+
+        let activeRefresh = Task { @MainActor in await model.refresh() }
+        await gate.waitForBlockedLoad()
+        await model.refreshIfSelectedSkillChanged()
+        await gate.releaseBlockedLoad()
+        await activeRefresh.value
+        try? await Task.sleep(for: .milliseconds(50))
+
+        let loadCount = await gate.loadCount
+        XCTAssertEqual(loadCount, 3)
+    }
+
+}
+
+private actor RefreshLoadGate {
+    private let dashboard: SkillDashboard
+    private let blockOnCall: Int
+    private var calls = 0
+    private var blockedLoadStarted = false
+    private var startWaiter: CheckedContinuation<Void, Never>?
+    private var releaseWaiter: CheckedContinuation<Void, Never>?
+
+    init(dashboard: SkillDashboard = .reviewFixture, blockOnCall: Int = 1) {
+        self.dashboard = dashboard
+        self.blockOnCall = blockOnCall
+    }
+
+    var loadCount: Int { calls }
+
+    func load() async -> SkillDashboard {
+        calls += 1
+        if calls == blockOnCall {
+            blockedLoadStarted = true
+            startWaiter?.resume()
+            startWaiter = nil
+            await withCheckedContinuation { releaseWaiter = $0 }
+        }
+        return dashboard
+    }
+
+    func waitForBlockedLoad() async {
+        guard !blockedLoadStarted else { return }
+        await withCheckedContinuation { startWaiter = $0 }
+    }
+
+    func releaseBlockedLoad() {
+        releaseWaiter?.resume()
+        releaseWaiter = nil
     }
 
 }

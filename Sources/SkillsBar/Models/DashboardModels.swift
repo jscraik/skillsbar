@@ -141,7 +141,7 @@ struct SkillDashboard {
         "cd \(globalShellQuoted(repoPath)) && sed -n '1,120p' \(globalShellQuoted(fleet.selectedSkillPath))"
     }
     var emblemBadgeLabel: String {
-        if security.status.localizedCaseInsensitiveContains("flag") {
+        if security.disposition.requiresReview {
             return security.statusDisplay
         }
         if score == nil {
@@ -150,7 +150,7 @@ struct SkillDashboard {
         return "Local score"
     }
     var emblemBadgeSystemName: String {
-        if security.status.localizedCaseInsensitiveContains("flag") {
+        if security.disposition.requiresReview || scoreTone != .positive {
             return "exclamationmark.shield.fill"
         }
         if score == nil {
@@ -159,7 +159,7 @@ struct SkillDashboard {
         return "checkmark.seal.fill"
     }
     var emblemBadgeTone: StatusTone {
-        if security.status.localizedCaseInsensitiveContains("flag") {
+        if security.disposition.requiresReview {
             return security.tone
         }
         if score == nil {
@@ -174,6 +174,7 @@ struct SkillDashboard {
         case .pending, .passed: break
         }
         if score == nil { return "Local pending" }
+        if scoreTone != .positive { return "Needs review" }
         return "Skills SDK"
     }
     var verdictDetail: String {
@@ -185,6 +186,9 @@ struct SkillDashboard {
         }
         if security.disposition == .flagged || security.disposition == .failed {
             return "\(security.statusDisplay) need inspection"
+        }
+        if scoreTone != .positive {
+            return "Local score needs review"
         }
         if !tessl.ok {
             return "Current improve-agent-native run · \(tessl.blockerSummary)"
@@ -360,12 +364,13 @@ struct ReviewPresentation {
         case loading
         case reviewRequired
         case advisory
+        case degradedLocalEvidence
         case healthy
         case registryUnavailable
     }
 
     var isReviewState: Bool {
-        dashboard.security.disposition.requiresReview
+        dashboard.security.disposition.requiresReview || state == .degradedLocalEvidence
     }
 
     var state: State {
@@ -375,14 +380,16 @@ struct ReviewPresentation {
         if dashboard.security.disposition == .advisory { return .advisory }
         if dashboard.score == nil { return .loading }
         if !dashboard.tessl.ok { return .registryUnavailable }
+        if dashboard.scoreTone != .positive { return .degradedLocalEvidence }
         return .healthy
     }
 
     var emphasisTone: StatusTone {
         switch state {
         case .loading: return .pending
-        case .reviewRequired: return .warning
+        case .reviewRequired: return dashboard.security.tone
         case .advisory: return .advisory
+        case .degradedLocalEvidence: return dashboard.scoreTone
         case .healthy: return .positive
         case .registryUnavailable: return .pending
         }
@@ -393,6 +400,7 @@ struct ReviewPresentation {
         case .loading: return "Evidence pending"
         case .reviewRequired: return "Review trigger"
         case .advisory: return "Advisory review"
+        case .degradedLocalEvidence: return "Local score needs review"
         case .healthy: return "Local evidence"
         case .registryUnavailable: return "Registry unavailable"
         }
@@ -403,6 +411,7 @@ struct ReviewPresentation {
         case .loading: return "clock"
         case .reviewRequired: return "exclamationmark.triangle"
         case .advisory: return "info.circle"
+        case .degradedLocalEvidence: return "exclamationmark.triangle"
         case .healthy: return "checkmark.seal"
         case .registryUnavailable: return "network.slash"
         }

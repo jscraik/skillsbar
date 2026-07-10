@@ -11,6 +11,7 @@ final class DashboardModel: ObservableObject {
     private var sourceChangeTask: Task<Void, Never>?
     private var observedSkillDirectory: String?
     private var observedSkillSourceModificationDate: Date?
+    private var refreshQueued = false
     private let source: DashboardDataSource
 
     init(
@@ -37,16 +38,22 @@ final class DashboardModel: ObservableObject {
     }
 
     func refresh() async {
-        guard !isRefreshing else { return }
+        guard !isRefreshing else {
+            refreshQueued = true
+            return
+        }
         isRefreshing = true
         defer { isRefreshing = false }
-        do {
-            dashboard = try await source.load()
-            availableSkillPaths = DashboardLoader.discoverSkillPaths(root: URL(fileURLWithPath: dashboard.repoPath))
-            recordSelectedSkillDirectory()
-        } catch {
-            dashboard = SkillDashboard.placeholder.withError(error.localizedDescription)
-        }
+        repeat {
+            refreshQueued = false
+            do {
+                dashboard = try await source.load()
+                availableSkillPaths = DashboardLoader.discoverSkillPaths(root: URL(fileURLWithPath: dashboard.repoPath))
+                recordSelectedSkillDirectory()
+            } catch {
+                dashboard = SkillDashboard.placeholder.withError(error.localizedDescription)
+            }
+        } while refreshQueued
     }
 
     var isSkillSelectionPinned: Bool {
@@ -83,7 +90,7 @@ final class DashboardModel: ObservableObject {
         }
     }
 
-    private func refreshIfSelectedSkillChanged() async {
+    func refreshIfSelectedSkillChanged() async {
         guard let directory = selectedSkillDirectory(),
               let currentDate = selectedSkillSourceModificationDate(in: directory) else { return }
         guard observedSkillDirectory == directory.path,
@@ -93,7 +100,6 @@ final class DashboardModel: ObservableObject {
             return
         }
         guard currentDate > previousDate else { return }
-        observedSkillSourceModificationDate = currentDate
         await refresh()
     }
 
