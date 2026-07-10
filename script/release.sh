@@ -37,6 +37,8 @@ rm -f "$NOTARY_ZIP" "$ZIP_PATH"
 /usr/bin/ditto --norsrc -c -k --keepParent "$APP_BUNDLE" "$NOTARY_ZIP"
 xcrun notarytool submit "$NOTARY_ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
 xcrun stapler staple "$APP_BUNDLE"
+/usr/bin/xattr -cr "$APP_BUNDLE"
+find "$APP_BUNDLE" -name '._*' -delete
 xcrun stapler validate "$APP_BUNDLE"
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
@@ -46,8 +48,6 @@ else
   /usr/sbin/spctl --assess --type execute --verbose=2 "$APP_BUNDLE"
 fi
 
-/usr/bin/xattr -cr "$APP_BUNDLE"
-find "$APP_BUNDLE" -name '._*' -delete
 /usr/bin/ditto --norsrc -c -k --keepParent "$APP_BUNDLE" "$ZIP_PATH"
 rm -f "$NOTARY_ZIP"
 printf 'Created notarized release: %s\n' "$ZIP_PATH"
