@@ -26,8 +26,9 @@ final class CopyFeedbackModel: ObservableObject {
         _ = pasteboard.clearContents()
         guard pasteboard.setString(command, forType: .string) else {
             copiedCommand = nil
-            copyError = "Could not copy inspect command"
-            AccessibilityNotification.Announcement(copyError!).post()
+            let message = "Could not copy inspect command"
+            copyError = message
+            AccessibilityNotification.Announcement(message).post()
             return false
         }
         copyError = nil
