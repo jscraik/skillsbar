@@ -7,7 +7,7 @@ source "$ROOT_DIR/version.env"
 
 APP_NAME="SkillsBar"
 BUNDLE_ID="${SKILLSBAR_BUNDLE_ID:-local.jscraik.skillsbar}"
-BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-$ROOT_DIR/dist-local}"
+BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-$HOME/.codex/usage-data/skillsbar}"
 CONFIGURATION="${1:-debug}"
 ARCHES_VALUE="${ARCHES:-$(uname -m)}"
 SIGNING_MODE="${SKILLSBAR_SIGNING:-adhoc}"
@@ -107,6 +107,17 @@ done
 
 cp "$ROOT_DIR/Sources/SkillsBar/Resources/TesslLogo.png" "$RESOURCES_DIR/TesslLogo.png"
 cp "$ROOT_DIR/Sources/SkillsBar/Resources/SkillsSDKIcon.png" "$RESOURCES_DIR/SkillsSDKIcon.png"
+
+PREFERRED_BUILD_DIR="$(dirname "${BUILT_BINARIES[0]}")"
+shopt -s nullglob
+SWIFTPM_BUNDLES=("$PREFERRED_BUILD_DIR/"*.bundle)
+shopt -u nullglob
+if [[ ${#SWIFTPM_BUNDLES[@]} -eq 0 ]]; then
+  fail "SwiftPM resource bundle was not found next to $APP_NAME"
+fi
+for bundle in "${SWIFTPM_BUNDLES[@]}"; do
+  cp -R "$bundle" "$RESOURCES_DIR/"
+done
 
 /usr/bin/xattr -cr "$STAGE_DIR"
 find "$STAGE_DIR" -name '._*' -delete

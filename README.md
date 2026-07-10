@@ -35,7 +35,7 @@ You can also double-click `Launch.command` in Finder.
 The launcher serializes concurrent builds, stops an existing instance, delegates bundle construction to `script/package_app.sh`, signs the development app ad hoc, opens it through LaunchServices, and verifies that the process remains running. If LaunchServices is unavailable in the caller's session, it falls back to launching the bundled executable directly and records which path was used. The default build root is:
 
 ```text
-/Users/jamiecraik/.codex/usage-data/skillsbar
+~/.codex/usage-data/skillsbar
 ```
 
 For a build-only check that does not open the app:
@@ -44,7 +44,7 @@ For a build-only check that does not open the app:
 NO_OPEN=1 ./Launch.command
 ```
 
-Every launch attempt writes `SkillsBar.launch-receipt.json` in the build root. The receipt distinguishes a LaunchServices launch, a direct-executable fallback, and a blocked launch. A direct fallback is useful for headless development automation, but a normal Terminal or Finder launch remains the meaningful menu-bar UI path.
+Every launch attempt writes `SkillsBar.launch-receipt.json` in the build root. The receipt distinguishes a LaunchServices launch, a direct-executable fallback, and a blocked launch. A direct fallback is useful for headless development automation, but `script/build_and_run.sh --verify` accepts only a sustained LaunchServices launch as live MenuBarExtra evidence.
 
 To package without launching:
 
@@ -61,10 +61,7 @@ Set `ARCHES="arm64 x86_64"` and use the `release` configuration to create a univ
 Store notarization credentials in a keychain profile once:
 
 ```bash
-xcrun notarytool store-credentials skillsbar-notary \
-  --apple-id "you@example.com" \
-  --team-id "YOURTEAMID" \
-  --password "app-specific-password"
+xcrun notarytool store-credentials skillsbar-notary
 ```
 
 Then release with the exact Developer ID identity installed in Keychain Access:
@@ -76,7 +73,7 @@ SKILLSBAR_BUNDLE_ID="com.yourcompany.skillsbar" \
 script/release.sh
 ```
 
-The script fails before publication when the identity or keychain profile is absent. It does not create a GitHub release, update feed, Homebrew cask, or automatic-update channel; those are deliberately deferred until SkillsBar has a stable public bundle identifier and a first notarized artifact.
+The interactive prompts store the Apple ID, team ID, and app-specific password in the login keychain. The script fails before publication when the identity or keychain profile is absent. It does not create a GitHub release, update feed, Homebrew cask, or automatic-update channel; those are deliberately deferred until SkillsBar has a stable public bundle identifier and a first notarized artifact.
 
 ## Configure The Data Source
 
@@ -139,24 +136,24 @@ swift test --build-system native --disable-sandbox --build-path /private/tmp/ski
 
 ## Project Layout
 
-| Path                                                                                     | Purpose                                                                                                |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `Package.swift`                                                                          | Swift package definition for the app, core library, and tests.                                         |
-| `Launch.command`                                                                         | Build, bundle, sign, and LaunchServices entrypoint.                                                    |
-| `script/package_app.sh`                                                                  | Deterministic development/release bundle assembly, architecture verification, and signing boundary.    |
-| `script/release.sh`                                                                      | Universal Developer ID signing, notarization, stapling, verification, and release-zip boundary.        |
-| `script/build_and_run.sh`                                                                | Convenience wrapper for run, debug, logs, telemetry, and live verify modes.                            |
-| `version.env`                                                                            | Shared marketing version and monotonically increasing build number.                                   |
-| `Sources/SkillsBar`                                                                      | SwiftUI app, models, services, stores, resources, and views.                                           |
-| `Sources/SkillsBarCore`                                                                  | Shared shell execution and JSON parsing helpers.                                                       |
-| `Tests/SkillsBarCoreTests`                                                               | Unit tests for core shell behavior.                                                                    |
-| `.harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md`                    | Implementation-handoff visual and behavior spec for the review popover.                                |
-| `.harness/reviews/2026-07-09-review-popover-3lane-synthesis.md`                          | Three-lane implementation handoff for the final-polish review popover refactor.                        |
-| `.harness/reviews/2026-07-09-review-popover-pass3-synthesis.md`                          | Pass-three review closeout separating spec/doc handoff defects from remaining implementation blockers. |
-| `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-implementation-handoff.png` | Current full-height implementation-handoff mockup referenced by the review popover spec.               |
+| Path                                                                                     | Purpose                                                                                                  |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `Package.swift`                                                                          | Swift package definition for the app, core library, and tests.                                           |
+| `Launch.command`                                                                         | Build, bundle, sign, and LaunchServices entrypoint.                                                      |
+| `script/package_app.sh`                                                                  | Deterministic development/release bundle assembly, architecture verification, and signing boundary.      |
+| `script/release.sh`                                                                      | Universal Developer ID signing, notarization, stapling, verification, and release-zip boundary.          |
+| `script/build_and_run.sh`                                                                | Convenience wrapper for run, debug, logs, telemetry, and live verify modes.                              |
+| `version.env`                                                                            | Shared marketing version and monotonically increasing build number.                                      |
+| `Sources/SkillsBar`                                                                      | SwiftUI app, models, services, stores, resources, and views.                                             |
+| `Sources/SkillsBarCore`                                                                  | Shared shell execution and JSON parsing helpers.                                                         |
+| `Tests/SkillsBarCoreTests`                                                               | Unit tests for core shell behavior.                                                                      |
+| `.harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md`                    | Implementation-handoff visual and behavior spec for the review popover.                                  |
+| `.harness/reviews/2026-07-09-review-popover-3lane-synthesis.md`                          | Three-lane implementation handoff for the final-polish review popover refactor.                          |
+| `.harness/reviews/2026-07-09-review-popover-pass3-synthesis.md`                          | Pass-three review closeout separating spec/doc handoff defects from remaining implementation blockers.   |
+| `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-implementation-handoff.png` | Current full-height implementation-handoff mockup referenced by the review popover spec.                 |
 | `.harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png`              | Deterministic `404 x 720` app-rendered implementation snapshot; not live MenuBarExtra interaction proof. |
-| `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-final-polish.png`           | Earlier final-polish mockup retained as historical comparison evidence.                                |
-| `.harness/media/2026-07-09-skills-sdk-menubar-final-mockup.png`                          | Earlier persisted mockup retained as historical comparison evidence.                                   |
+| `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-final-polish.png`           | Earlier final-polish mockup retained as historical comparison evidence.                                  |
+| `.harness/media/2026-07-09-skills-sdk-menubar-final-mockup.png`                          | Earlier persisted mockup retained as historical comparison evidence.                                     |
 
 ## Development Notes
 

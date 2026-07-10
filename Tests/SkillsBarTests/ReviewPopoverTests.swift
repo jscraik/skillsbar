@@ -50,7 +50,7 @@ final class ReviewPopoverTests: XCTestCase {
 
         XCTAssertTrue(presentation.isReviewState)
         XCTAssertEqual(presentation.packageIdentity, "jscraik/improve-agent-native")
-        XCTAssertEqual(presentation.bridgeTitle, "Registry clean. Local source has findings.")
+        XCTAssertEqual(presentation.bridgeTitle, "Local and registry evidence need review.")
         XCTAssertEqual(presentation.bridgeDetail, "68 registry eval scenarios")
         XCTAssertEqual(presentation.actionTitle, "Copy inspect command")
         XCTAssertEqual(presentation.actionDetail, "Inspect 1 critical, 2 high in SKILL.md")
@@ -85,9 +85,9 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(presentation.state, .healthy)
         XCTAssertEqual(presentation.triggerTitle, "Local evidence")
         XCTAssertEqual(presentation.emphasisTone, .positive)
-        XCTAssertEqual(presentation.bridgeTitle, "Local and registry evidence are available.")
-        XCTAssertEqual(presentation.bridgeSystemName, "checkmark.seal")
-        XCTAssertFalse(presentation.showsBridgeWarningBadge)
+        XCTAssertEqual(presentation.bridgeTitle, "Registry evidence needs review.")
+        XCTAssertEqual(presentation.bridgeSystemName, "exclamationmark.triangle")
+        XCTAssertTrue(presentation.showsBridgeWarningBadge)
     }
 
     func testUnavailableRegistryDoesNotRenderSuccessBridge() {
@@ -154,6 +154,39 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(presentation.emphasisTone, .advisory)
         XCTAssertEqual(presentation.triggerTitle, "Advisory review")
         XCTAssertTrue(presentation.isReviewState)
+    }
+
+    func testSecurityFindingOutranksMissingQualityAndImpactScores() {
+        var dashboard = SkillDashboard.reviewFixture
+        dashboard.quality.score = nil
+        dashboard.impact.score = nil
+
+        let presentation = ReviewPresentation(dashboard: dashboard)
+
+        XCTAssertNil(dashboard.score)
+        XCTAssertEqual(presentation.state, .reviewRequired)
+        XCTAssertEqual(presentation.triggerTitle, "Review trigger")
+        XCTAssertEqual(presentation.emphasisTone, .warning)
+    }
+
+    func testRegistryFindingIsNotDescribedAsClean() {
+        var dashboard = SkillDashboard.reviewFixture
+        dashboard.tessl.registrySecurityLabel = "Flagged"
+        dashboard.tessl.registryScore = 35
+
+        let presentation = ReviewPresentation(dashboard: dashboard)
+
+        XCTAssertTrue(dashboard.tessl.evidenceRequiresReview)
+        XCTAssertEqual(presentation.bridgeTitle, "Local and registry evidence need review.")
+        XCTAssertEqual(presentation.bridgeTone, .warning)
+        XCTAssertEqual(presentation.bridgeSystemName, "exclamationmark.triangle")
+    }
+
+    func testRegistryVersionDoesNotFallBackToLocalSkillVersion() {
+        var tessl = SkillDashboard.reviewFixture.tessl
+        tessl.registryVersion = nil
+
+        XCTAssertEqual(tessl.registryVersionDisplay, "version --")
     }
 
     func testSanitizedTesslPayloadMapsRegistryContract() throws {

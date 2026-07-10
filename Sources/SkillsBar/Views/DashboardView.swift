@@ -333,7 +333,7 @@ private struct RegistryEvidenceRow: View {
                 }
 
                 HStack(spacing: 7) {
-                    Text("\(dashboard.tessl.registryVersion.map { "v\($0)" } ?? "version --")  •  score \(dashboard.tessl.registryResultLabel)")
+                    Text("\(dashboard.tessl.registryVersionDisplay)  •  score \(dashboard.tessl.registryResultLabel)")
                         .scaledSystemFont(size: 12, weight: .regular, relativeTo: .caption)
                         .foregroundStyle(.bodyText)
                     if let visibility = dashboard.tessl.registryVisibilityDisplay {

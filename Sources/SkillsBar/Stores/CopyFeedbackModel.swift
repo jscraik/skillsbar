@@ -21,6 +21,8 @@ final class CopyFeedbackModel: ObservableObject {
         self.pasteboard = pasteboard
     }
 
+    deinit {}
+
     @discardableResult
     func copy(_ command: String) -> Bool {
         _ = pasteboard.clearContents()

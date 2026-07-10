@@ -2,17 +2,22 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-/Users/jamiecraik/.codex/usage-data/skillsbar}"
+BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-$HOME/.codex/usage-data/skillsbar}"
 APP_DIR="$BUILD_ROOT/SkillsBar.app"
 EXECUTABLE="$APP_DIR/Contents/MacOS/SkillsBar"
 LAUNCH_RECEIPT="$BUILD_ROOT/SkillsBar.launch-receipt.json"
 LOCK_DIR="$BUILD_ROOT/launch.lock"
 LOCK_PID_FILE="$LOCK_DIR/pid"
+LOCK_OWNED=0
 
 mkdir -p "$BUILD_ROOT"
+# shellcheck disable=SC2329 # Invoked by the trap below.
 cleanup() {
-  if [[ "$(cat "$LOCK_PID_FILE" 2>/dev/null || true)" == "$$" ]]; then
-    rm -rf "$LOCK_DIR"
+  if [[ "$LOCK_OWNED" == "1" ]]; then
+    lock_pid="$(cat "$LOCK_PID_FILE" 2>/dev/null || true)"
+    if [[ -z "$lock_pid" || "$lock_pid" == "$$" ]]; then
+      rm -rf "$LOCK_DIR"
+    fi
   fi
 }
 trap cleanup EXIT
@@ -28,6 +33,7 @@ while ! mkdir "$LOCK_DIR" 2>/dev/null; do
     rm -rf "$LOCK_DIR"
   fi
 done
+LOCK_OWNED=1
 printf '%s\n' "$$" > "$LOCK_PID_FILE"
 rm -f "$LAUNCH_RECEIPT"
 
@@ -78,14 +84,21 @@ fi
 
 OPEN_ERROR="$(tr '\n' ' ' < "$OPEN_OUTPUT" | sed 's/"/\\"/g')"
 DIRECT_FALLBACK_STATUS="disabled"
-if [[ "${SKILLSBAR_DIRECT_LAUNCH_FALLBACK:-1}" == "1" ]]; then
+if [[ "${SKILLSBAR_DIRECT_LAUNCH_FALLBACK:-1}" == "1" && "${SKILLSBAR_REQUIRE_LAUNCHSERVICES:-0}" != "1" ]]; then
   DIRECT_FALLBACK_STATUS="attempted"
   "$EXECUTABLE" >"$BUILD_ROOT/SkillsBar.direct-launch.log" 2>&1 &
   direct_pid=$!
   sleep 0.4
+  direct_alive=1
   for _ in {1..10}; do
-    if kill -0 "$direct_pid" 2>/dev/null; then
-      cat > "$LAUNCH_RECEIPT" <<JSON
+    if ! kill -0 "$direct_pid" 2>/dev/null; then
+      direct_alive=0
+      break
+    fi
+    sleep 0.4
+  done
+  if [[ "$direct_alive" == "1" ]]; then
+    cat > "$LAUNCH_RECEIPT" <<JSON
 {
   "schema_version": "skillsbar-launch/v1",
   "status": "launched",
@@ -95,11 +108,11 @@ if [[ "${SKILLSBAR_DIRECT_LAUNCH_FALLBACK:-1}" == "1" ]]; then
   "launchservices_error": "$OPEN_ERROR"
 }
 JSON
-      exit 0
-    fi
-    sleep 0.4
-  done
+    exit 0
+  fi
   DIRECT_FALLBACK_STATUS="exited"
+elif [[ "${SKILLSBAR_REQUIRE_LAUNCHSERVICES:-0}" == "1" ]]; then
+  DIRECT_FALLBACK_STATUS="disabled_for_live_verify"
 fi
 
 cat > "$LAUNCH_RECEIPT" <<JSON

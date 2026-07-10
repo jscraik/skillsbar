@@ -41,7 +41,7 @@ Command: `find /Users/jamiecraik/.codex/usage-data/skillsbar/SkillsBar.app -maxd
 - The top-right details control is absent.
 - The local review trigger is expanded without a chevron.
 - Tessl Registry is visually secondary to local evidence.
-- The mixed bridge combines a success check with an amber finding marker.
+- The bridge surfaces review-required registry metrics or security states and does not describe unhealthy registry evidence as clean.
 - The canonical command is displayed in a stable three-line monospace field.
 - Pending, healthy, and registry-unavailable semantics are covered by presentation tests and no longer inherit review-state success or warning claims.
 - The status-item asset is an `18 x 18 pt` template image, and copy failures do not report success.
@@ -66,7 +66,11 @@ Command: `tessl search --json --type skills jscraik/improve-agent-native` -> pas
 
 Command: `tessl plugin info jscraik/improve-agent-native` -> pass (the authoritative detail response reported `Visibility Private`, version `0.2.0`, quality `100%`, uplift `1.28x`, and passed security)
 
-Command: `HOME=/private/tmp/skillsbar-live-final2-home XDG_CACHE_HOME=/private/tmp/skillsbar-live-final2-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-live-final2-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-live-final2-build -Xswiftc -gnone` -> pass (24 tests, 0 failures)
+Command: `HOME=/private/tmp/skillsbar-review-final-home XDG_CACHE_HOME=/private/tmp/skillsbar-review-final-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-review-final-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-review-final-build -Xswiftc -gnone` -> pass (27 tests, 0 failures)
+
+Command: `SKILLSBAR_BUILD_ROOT=/private/tmp/skillsbar-review-launch DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer NO_OPEN=1 ./Launch.command` -> pass (the packaged application contains the required `SkillsBar_SkillsBar.bundle` SwiftPM resource bundle and passes strict code-sign verification)
+
+Command: `SKILLSBAR_BUILD_ROOT=/private/tmp/skillsbar-review-verify DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer script/build_and_run.sh --verify` -> blocked (Codex-session LaunchServices returned `kLSNoExecutableErr`; the receipt records `direct_launch_fallback: disabled_for_live_verify`, so raw process execution cannot satisfy live MenuBarExtra proof)
 
 The app executes the Skills SDK package, scenario, and security commands from the configured local checkout by default. Codex session policy blocked an independent direct invocation against the live source skill; this is a tooling-policy restriction, not an app runtime restriction.
 

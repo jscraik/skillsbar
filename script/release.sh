@@ -8,7 +8,7 @@ source "$ROOT_DIR/version.env"
 APP_NAME="SkillsBar"
 BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-$ROOT_DIR/dist}"
 APP_BUNDLE="$BUILD_ROOT/$APP_NAME.app"
-ARCHES_VALUE="${ARCHES:-arm64 x86_64}"
+ARCHES_VALUE="arm64 x86_64"
 BUNDLE_ID="${SKILLSBAR_BUNDLE_ID:-}"
 ZIP_PATH="$BUILD_ROOT/${APP_NAME}-macos-universal-${MARKETING_VERSION}.zip"
 NOTARY_ZIP="$BUILD_ROOT/${APP_NAME}-notarization.zip"
@@ -36,6 +36,8 @@ ARCHES="$ARCHES_VALUE" SKILLSBAR_BUILD_ROOT="$BUILD_ROOT" \
 rm -f "$NOTARY_ZIP" "$ZIP_PATH"
 /usr/bin/ditto --norsrc -c -k --keepParent "$APP_BUNDLE" "$NOTARY_ZIP"
 xcrun notarytool submit "$NOTARY_ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+/usr/bin/xattr -cr "$APP_BUNDLE"
+find "$APP_BUNDLE" -name '._*' -delete
 xcrun stapler staple "$APP_BUNDLE"
 /usr/bin/xattr -cr "$APP_BUNDLE"
 find "$APP_BUNDLE" -name '._*' -delete

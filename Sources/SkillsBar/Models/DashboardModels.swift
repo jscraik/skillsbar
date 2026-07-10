@@ -369,11 +369,11 @@ struct ReviewPresentation {
     }
 
     var state: State {
-        if dashboard.score == nil { return .loading }
         if dashboard.security.disposition == .failed || dashboard.security.disposition == .flagged {
             return .reviewRequired
         }
         if dashboard.security.disposition == .advisory { return .advisory }
+        if dashboard.score == nil { return .loading }
         if !dashboard.tessl.ok { return .registryUnavailable }
         return .healthy
     }
@@ -384,7 +384,7 @@ struct ReviewPresentation {
         case .reviewRequired: return .warning
         case .advisory: return .advisory
         case .healthy: return .positive
-        case .registryUnavailable: return isReviewState ? .warning : .pending
+        case .registryUnavailable: return .pending
         }
     }
 
@@ -394,7 +394,7 @@ struct ReviewPresentation {
         case .reviewRequired: return "Review trigger"
         case .advisory: return "Advisory review"
         case .healthy: return "Local evidence"
-        case .registryUnavailable: return isReviewState ? "Review trigger" : "Registry unavailable"
+        case .registryUnavailable: return "Registry unavailable"
         }
     }
 
@@ -404,7 +404,7 @@ struct ReviewPresentation {
         case .reviewRequired: return "exclamationmark.triangle"
         case .advisory: return "info.circle"
         case .healthy: return "checkmark.seal"
-        case .registryUnavailable: return isReviewState ? "exclamationmark.triangle" : "network.slash"
+        case .registryUnavailable: return "network.slash"
         }
     }
 
@@ -425,15 +425,17 @@ struct ReviewPresentation {
 
     var bridgeSystemName: String {
         if !dashboard.tessl.ok { return "network.slash" }
+        if dashboard.tessl.evidenceRequiresReview { return "exclamationmark.triangle" }
         return isReviewState ? "checkmark" : "checkmark.seal"
     }
 
     var bridgeTone: StatusTone {
-        dashboard.tessl.ok ? .positive : .pending
+        guard dashboard.tessl.ok else { return .pending }
+        return dashboard.tessl.evidenceRequiresReview ? .warning : .positive
     }
 
     var showsBridgeWarningBadge: Bool {
-        dashboard.tessl.ok && isReviewState
+        dashboard.tessl.ok && (isReviewState || dashboard.tessl.evidenceRequiresReview)
     }
 
     var packageIdentity: String {
@@ -442,7 +444,11 @@ struct ReviewPresentation {
 
     var bridgeTitle: String {
         if !dashboard.tessl.ok { return "Registry evidence unavailable." }
-        if isReviewState { return "Registry clean. Local source has findings." }
+        if isReviewState && dashboard.tessl.evidenceRequiresReview {
+            return "Local and registry evidence need review."
+        }
+        if isReviewState { return "Registry evidence healthy. Local source has findings." }
+        if dashboard.tessl.evidenceRequiresReview { return "Registry evidence needs review." }
         return "Local and registry evidence are available."
     }
 
@@ -851,6 +857,9 @@ struct TesslSignal {
         if !authenticated { return "Locked" }
         return "Blocked"
     }
+    var registryVersionDisplay: String {
+        registryVersion.map { "v\($0)" } ?? "version --"
+    }
     var registryScoreTone: StatusTone {
         guard let registryScore else { return ok ? .pending : tone }
         if registryScore >= 80 { return .positive }
@@ -889,6 +898,13 @@ struct TesslSignal {
     var registrySecurityTone: StatusTone {
         guard ok else { return tone }
         return SecurityDisposition(label: registrySecurityLabel).tone
+    }
+    var evidenceRequiresReview: Bool {
+        guard ok else { return false }
+        if SecurityDisposition(label: registrySecurityLabel).requiresReview { return true }
+        return [registryScore, registryQualityScore, registryImpactScore]
+            .compactMap { $0 }
+            .contains { $0 < 80 }
     }
     func driftLabel(localScore: Int?) -> String {
         guard let localScore else { return "--" }
