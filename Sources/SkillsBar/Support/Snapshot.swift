@@ -44,6 +44,7 @@ enum SnapshotRenderer {
     @MainActor
     static func render(to outputURL: URL) {
         do {
+            _ = NSApplication.shared
             let dashboard = try DashboardDataSource().loadSync()
             try render(dashboard: dashboard, to: outputURL)
             print("Wrote snapshot \(outputURL.path)")
@@ -77,6 +78,9 @@ enum SnapshotRenderer {
             size: NSSize(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
         )
         hostingView.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        hostingView.layoutSubtreeIfNeeded()
+        hostingView.displayIfNeeded()
         guard let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds) else {
             throw SnapshotError.bitmapUnavailable
         }

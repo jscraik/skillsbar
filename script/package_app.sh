@@ -55,6 +55,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
   <key>CFBundleName</key><string>${APP_NAME}</string>
   <key>CFBundleDisplayName</key><string>${APP_NAME}</string>
+  <key>CFBundleIconFile</key><string>SkillsSDKIcon.png</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${MARKETING_VERSION}</string>
   <key>CFBundleVersion</key><string>${BUILD_NUMBER}</string>

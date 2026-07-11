@@ -1,6 +1,7 @@
 import Foundation
 import SkillsBarCore
 import SwiftUI
+import CryptoKit
 
 enum StatusTone: Equatable {
     case positive
@@ -82,6 +83,211 @@ enum SecurityDisposition: Equatable {
     }
 }
 
+enum PipelineStage: String, CaseIterable, Identifiable {
+    case candidateBaseline
+    case securityReview
+    case ossLocal
+    case ossCloud
+    case tesslStaging
+    case liveScoreAndRuntime
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .candidateBaseline: return "Candidate baseline"
+        case .securityReview: return "Security review"
+        case .ossLocal: return "Local eval proof"
+        case .ossCloud: return "Cloud eval proof"
+        case .tesslStaging: return "Tessl staging"
+        case .liveScoreAndRuntime: return "Live score and runtime"
+        }
+    }
+
+    var weight: Int {
+        switch self {
+        case .candidateBaseline: return 15
+        case .securityReview: return 25
+        case .ossLocal, .ossCloud: return 20
+        case .tesslStaging, .liveScoreAndRuntime: return 10
+        }
+    }
+}
+
+enum PipelineEvidenceStatus: Equatable {
+    case passed
+    case reviewRequired
+    case blocked
+    case unproven
+    case stale
+
+    var isCurrentEvidence: Bool {
+        self == .passed || self == .reviewRequired || self == .blocked
+    }
+
+    var label: String {
+        switch self {
+        case .passed: return "Passed"
+        case .reviewRequired: return "Review required"
+        case .blocked: return "Blocked"
+        case .unproven: return "Unproven"
+        case .stale: return "Stale"
+        }
+    }
+
+    var tone: StatusTone {
+        switch self {
+        case .passed: return .positive
+        case .reviewRequired: return .warning
+        case .blocked: return .danger
+        case .unproven, .stale: return .pending
+        }
+    }
+}
+
+struct PipelineStageReceipt: Equatable, Identifiable {
+    let stage: PipelineStage
+    let candidateFingerprint: String
+    let evidenceStatus: PipelineEvidenceStatus
+    let stageScore: Int?
+    let command: String
+    let receiptPath: String?
+    let modelProfile: String?
+    let observedAt: Date?
+    let nextAction: String
+
+    var id: PipelineStage { stage }
+}
+
+struct PipelineCandidate: Equatable {
+    let fingerprint: String
+    let governedInputPaths: [String]
+    let observedAt: Date
+    let stageReceipts: [PipelineStageReceipt]
+
+    init(
+        fingerprint: String,
+        governedInputPaths: [String],
+        observedAt: Date,
+        stageReceipts: [PipelineStageReceipt]
+    ) {
+        self.fingerprint = fingerprint
+        self.governedInputPaths = governedInputPaths.sorted()
+        self.observedAt = observedAt
+        self.stageReceipts = Self.gatedReceipts(
+            fingerprint: fingerprint,
+            receipts: stageReceipts
+        )
+    }
+
+    var postureScore: Int {
+        orderedReceipts.reduce(0) { total, receipt in
+            total + contribution(for: receipt)
+        }
+    }
+
+    var evidencedStageCount: Int {
+        orderedReceipts.filter(isCurrent).count
+    }
+
+    var activeReceipt: PipelineStageReceipt? {
+        orderedReceipts.first { $0.evidenceStatus != .passed }
+    }
+
+    var orderedReceipts: [PipelineStageReceipt] {
+        PipelineStage.allCases.compactMap { stage in
+            stageReceipts.first(where: { $0.stage == stage })
+        }
+    }
+
+    func isCurrent(_ receipt: PipelineStageReceipt) -> Bool {
+        receipt.candidateFingerprint == fingerprint && receipt.evidenceStatus.isCurrentEvidence
+    }
+
+    func contribution(for receipt: PipelineStageReceipt) -> Int {
+        guard isCurrent(receipt), let score = receipt.stageScore else { return 0 }
+        return Int((Double(receipt.stage.weight * min(max(score, 0), 100)) / 100.0).rounded())
+    }
+
+    private static func gatedReceipts(
+        fingerprint: String,
+        receipts: [PipelineStageReceipt]
+    ) -> [PipelineStageReceipt] {
+        var receiptByStage = Dictionary(uniqueKeysWithValues: receipts.map { ($0.stage, $0) })
+        var earlierStagePassed = true
+
+        for stage in PipelineStage.allCases {
+            guard var receipt = receiptByStage[stage] else { continue }
+            let receiptMatchesCandidate = receipt.candidateFingerprint == fingerprint
+            if !receiptMatchesCandidate {
+                receipt = PipelineStageReceipt(
+                    stage: stage,
+                    candidateFingerprint: receipt.candidateFingerprint,
+                    evidenceStatus: .stale,
+                    stageScore: receipt.stageScore,
+                    command: receipt.command,
+                    receiptPath: receipt.receiptPath,
+                    modelProfile: receipt.modelProfile,
+                    observedAt: receipt.observedAt,
+                    nextAction: receipt.nextAction
+                )
+            } else if !earlierStagePassed {
+                receipt = PipelineStageReceipt(
+                    stage: stage,
+                    candidateFingerprint: receipt.candidateFingerprint,
+                    evidenceStatus: .unproven,
+                    stageScore: nil,
+                    command: receipt.command,
+                    receiptPath: receipt.receiptPath,
+                    modelProfile: receipt.modelProfile,
+                    observedAt: nil,
+                    nextAction: receipt.nextAction
+                )
+            }
+            receiptByStage[stage] = receipt
+            earlierStagePassed = earlierStagePassed && receipt.evidenceStatus == .passed
+        }
+        return PipelineStage.allCases.compactMap { receiptByStage[$0] }
+    }
+
+    static func fingerprint(for paths: [URL], root: URL) -> String {
+        let records = paths.sorted { $0.path < $1.path }.map { path -> String in
+            let relative = path.path.replacingOccurrences(of: root.path + "/", with: "")
+            let contents = (try? Data(contentsOf: path)) ?? Data()
+            return relative + "\u{0}" + SHA256.hash(data: contents).map { String(format: "%02x", $0) }.joined()
+        }
+        return SHA256.hash(data: Data(records.joined(separator: "\n").utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    static func unproven(
+        fingerprint: String = "pending-candidate",
+        governedInputPaths: [String] = [],
+        observedAt: Date = Date(),
+        commands: [PipelineStage: String] = [:]
+    ) -> PipelineCandidate {
+        PipelineCandidate(
+            fingerprint: fingerprint,
+            governedInputPaths: governedInputPaths,
+            observedAt: observedAt,
+            stageReceipts: PipelineStage.allCases.map { stage in
+                PipelineStageReceipt(
+                    stage: stage,
+                    candidateFingerprint: fingerprint,
+                    evidenceStatus: .unproven,
+                    stageScore: nil,
+                    command: commands[stage] ?? "",
+                    receiptPath: nil,
+                    modelProfile: nil,
+                    observedAt: nil,
+                    nextAction: "Establish \(stage.title.lowercased())."
+                )
+            }
+        )
+    }
+}
+
 struct SkillDashboard {
     var displayName: String
     var version: String
@@ -97,6 +303,7 @@ struct SkillDashboard {
     var security: SecuritySignal
     var tessl: TesslSignal
     var fleet: FleetSignal
+    var pipeline: PipelineCandidate
     var refreshedAt: Date
     var error: String?
 
@@ -286,6 +493,7 @@ struct SkillDashboard {
             recoveryCommand: "tessl doctor"
         ),
         fleet: FleetSignal.placeholder,
+        pipeline: .unproven(),
         refreshedAt: Date(),
         error: nil
     )
@@ -337,7 +545,7 @@ struct SkillDashboard {
             registryImpactScore: 63,
             registrySecurityLabel: "Passed",
             registryEvalCount: 68,
-            registryImprovementMultiplier: nil,
+            registryImprovementMultiplier: 1.28,
             registryVisibility: "Private",
             recoveryCommand: "tessl install jscraik/improve-agent-native"
         ),
@@ -351,6 +559,86 @@ struct SkillDashboard {
             evalsCount: 1,
             selectedSkillPath: DashboardLoader.defaultSkillPath,
             inventoryCommand: DashboardLoader.copyCommand(root: DashboardLoader.defaultRepoRoot, command: DashboardLoader.allSkillsInventoryCommand)
+        ),
+        pipeline: PipelineCandidate(
+            fingerprint: "review-fixture-v1",
+            governedInputPaths: [
+                "Skills/agent-ops/improve-agent-native/SKILL.md",
+                "Skills/agent-ops/improve-agent-native/references/risk-modes.md",
+                "Skills/agent-ops/improve-agent-native/evals/scenarios.json"
+            ],
+            observedAt: Date(timeIntervalSince1970: 0),
+            stageReceipts: [
+                PipelineStageReceipt(
+                    stage: .candidateBaseline,
+                    candidateFingerprint: "review-fixture-v1",
+                    evidenceStatus: .passed,
+                    stageScore: 100,
+                    command: DashboardLoader.copyCommand(root: DashboardLoader.defaultRepoRoot, command: DashboardLoader.packageCommand),
+                    receiptPath: "fixture:package-verify",
+                    modelProfile: "local-package",
+                    observedAt: Date(timeIntervalSince1970: 0),
+                    nextAction: "Candidate baseline is current."
+                ),
+                PipelineStageReceipt(
+                    stage: .securityReview,
+                    candidateFingerprint: "review-fixture-v1",
+                    evidenceStatus: .reviewRequired,
+                    stageScore: 35,
+                    command: DashboardLoader.copyCommand(
+                        root: DashboardLoader.defaultRepoRoot,
+                        command: DashboardLoader.securityCommand(for: DashboardLoader.defaultSkillPath)
+                    ),
+                    receiptPath: "fixture:risk-modes",
+                    modelProfile: "local-security",
+                    observedAt: Date(timeIntervalSince1970: 0),
+                    nextAction: "Inspect 1 critical, 2 high in SKILL.md."
+                ),
+                PipelineStageReceipt(
+                    stage: .ossLocal,
+                    candidateFingerprint: "review-fixture-v1",
+                    evidenceStatus: .unproven,
+                    stageScore: nil,
+                    command: "",
+                    receiptPath: nil,
+                    modelProfile: "oss-local",
+                    observedAt: nil,
+                    nextAction: "Resolve security review before local eval proof."
+                ),
+                PipelineStageReceipt(
+                    stage: .ossCloud,
+                    candidateFingerprint: "review-fixture-v1",
+                    evidenceStatus: .unproven,
+                    stageScore: nil,
+                    command: "",
+                    receiptPath: nil,
+                    modelProfile: "oss-cloud",
+                    observedAt: nil,
+                    nextAction: "Resolve earlier stages before cloud eval proof."
+                ),
+                PipelineStageReceipt(
+                    stage: .tesslStaging,
+                    candidateFingerprint: "review-fixture-v1",
+                    evidenceStatus: .unproven,
+                    stageScore: nil,
+                    command: "",
+                    receiptPath: nil,
+                    modelProfile: "tessl-staging",
+                    observedAt: nil,
+                    nextAction: "Establish Tessl staging proof after local evidence."
+                ),
+                PipelineStageReceipt(
+                    stage: .liveScoreAndRuntime,
+                    candidateFingerprint: "review-fixture-v1",
+                    evidenceStatus: .unproven,
+                    stageScore: nil,
+                    command: "",
+                    receiptPath: nil,
+                    modelProfile: "live-runtime",
+                    observedAt: nil,
+                    nextAction: "Observe the installed runtime after staging."
+                )
+            ]
         ),
         refreshedAt: Date(timeIntervalSince1970: 0),
         error: nil
