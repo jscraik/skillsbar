@@ -353,6 +353,27 @@ final class ReviewPopoverTests: XCTestCase {
     }
 
     @MainActor
+    func testAsyncNoCLIFixtureBypassesLiveLoader() async throws {
+        var liveLoadCount = 0
+        let source = DashboardDataSource(
+            environment: ["SKILLSBAR_REVIEW_FIXTURE": "no-cli"],
+            liveLoad: { .placeholder },
+            liveLoadAsync: {
+                liveLoadCount += 1
+                return .reviewFixture
+            }
+        )
+
+        let dashboard = try await source.load()
+
+        XCTAssertEqual(liveLoadCount, 0)
+        XCTAssertEqual(
+            dashboard.registryEvidenceCaption,
+            "Historical external baseline · not proof for this candidate."
+        )
+    }
+
+    @MainActor
     func testAsyncLoadUsesLiveLoaderWhenFixtureIsDisabled() async throws {
         var liveLoadCount = 0
         let source = DashboardDataSource(
