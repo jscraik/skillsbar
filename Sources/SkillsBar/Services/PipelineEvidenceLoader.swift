@@ -182,7 +182,9 @@ struct PipelineEvidenceLoader {
             receiptPath: nil,
             modelProfile: "local-package",
             observedAt: packagePassed || auditPassed ? observedAt : nil,
-            nextAction: "Package verify \(packagePassed ? "passed" : "missing") · strict audit \(auditPassed ? "passed" : "missing")"
+            nextAction: "Package verify \(packagePassed ? "passed" : "missing") · strict audit \(auditPassed ? "passed" : "missing")",
+            completedChecks: [packagePassed, auditPassed].filter { $0 }.count,
+            requiredChecks: 2
         )
     }
 
@@ -316,7 +318,9 @@ struct PipelineEvidenceLoader {
             receiptPath: nil,
             modelProfile: "eval-preparation",
             observedAt: passedCount == 0 ? nil : observedAt,
-            nextAction: "Scenario \(scenario ? "passed" : "missing") · scorer \(scorer ? "passed" : "missing") · calibration \(calibration ? "passed" : "missing")"
+            nextAction: "Scenario \(scenario ? "passed" : "missing") · scorer \(scorer ? "passed" : "missing") · calibration \(calibration ? "passed" : "missing")",
+            completedChecks: passedCount,
+            requiredChecks: 3
         )
     }
 
@@ -417,6 +421,12 @@ struct PipelineEvidenceLoader {
     private func publicationGate(digest: String) -> ReceiptState {
         let combined = releaseReceipt(named: "tessl_live_registry", digest: digest)
         if case .passed = combined {
+            guard registryReceiptBindsCandidate(digest: digest) else {
+                return .blocked(
+                    path: path(from: combined) ?? "",
+                    reason: "Live Tessl registry receipt lacks an explicit candidate package digest"
+                )
+            }
             return registryObservationBlocker().map {
                 .blocked(path: path(from: combined) ?? "", reason: $0)
             } ?? combined
@@ -439,6 +449,19 @@ struct PipelineEvidenceLoader {
             path: [publicationPath, scorePath].joined(separator: ", "),
             scenarioIDs: Array(Set(publicationIDs + scoreIDs)).sorted()
         )
+    }
+
+    private func registryReceiptBindsCandidate(digest: String) -> Bool {
+        let receiptURL = handoffDirectory.appendingPathComponent("release-gate-tessl_live_registry.json")
+        guard let receipt = loadObject(receiptURL),
+              let refs = receipt["evidence_refs"] as? [String] else { return false }
+        var documents: [Any] = [receipt]
+        for ref in refs {
+            guard let url = safeURL(ref), let object = loadObject(url) else { return false }
+            documents.append(object)
+        }
+        let registryDigests = Set(documents.flatMap { collectStrings(named: "registry_package_digest", in: $0) })
+        return registryDigests == [digest]
     }
 
     private func releaseReceipt(named gateID: String, digest: String) -> ReceiptState {
@@ -678,8 +701,10 @@ struct PipelineEvidenceLoader {
             "oss_cloud", "tessl_local_proof", "tessl_dry_run", "handoff_readiness"
         ]
         guard let targetIndex = canonical.firstIndex(of: gateID) else { return false }
-        let ids = gates.compactMap { $0["id"] as? String }
-        return Array(ids.prefix(targetIndex + 1)) == Array(canonical.prefix(targetIndex + 1))
+        let required = Array(gates.prefix(targetIndex + 1))
+        let ids = required.compactMap { $0["id"] as? String }
+        return ids == Array(canonical.prefix(targetIndex + 1))
+            && required.allSatisfy { ($0["status"] as? String)?.lowercased() == "pass" }
     }
 
     private func registryObservationBlocker() -> String? {

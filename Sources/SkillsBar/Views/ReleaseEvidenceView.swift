@@ -195,7 +195,7 @@ private struct NextRequiredCard: View {
                 Text(receipt.nextAction)
                     .releaseFont(10.5, weight: .medium, relativeTo: .caption)
                     .foregroundStyle(receipt.evidenceStatus.tone.color)
-                Text("Local watcher fingerprint is not sufficient")
+                Text(receipt.stage.supportingText)
                     .releaseFont(10, weight: .regular, relativeTo: .caption2)
                     .foregroundStyle(.bodyText)
             }
@@ -244,7 +244,11 @@ private struct ReleaseGateRow: View {
     let securityBadge: String?
 
     private var trailingLabel: String {
-        if receipt.stage == .mechanicalValidation { return "1 of 2 receipts" }
+        if receipt.stage == .mechanicalValidation,
+           let completedChecks = receipt.completedChecks,
+           let requiredChecks = receipt.requiredChecks {
+            return "\(completedChecks) of \(requiredChecks) receipts"
+        }
         if receipt.evidenceStatus == .held { return "HELD" }
         if receipt.evidenceStatus == .passed { return "PASS" }
         if receipt.evidenceStatus == .unproven { return "UNPROVEN" }
@@ -274,7 +278,7 @@ private struct ReleaseGateRow: View {
                     .foregroundStyle(isActive ? receipt.evidenceStatus.tone.color : .bodyText)
                     .fixedSize(horizontal: false, vertical: true)
                 if isActive {
-                    Text("Local watcher fingerprint is not sufficient")
+                    Text(receipt.stage.supportingText)
                         .releaseFont(10, weight: .regular, relativeTo: .caption2)
                         .foregroundStyle(.bodyText)
                 }
@@ -375,7 +379,19 @@ private struct TesslEvidenceCard: View {
     let dashboard: SkillDashboard
 
     private var isLive: Bool { dashboard.tessl.dataOrigin == .liveCLI }
-    private var isHistorical: Bool { dashboard.tessl.dataOrigin == .cached || !dashboard.tessl.cliAvailable }
+    private var isHistorical: Bool {
+        dashboard.tessl.dataOrigin == .cached || dashboard.tessl.dataOrigin == .fixture || !dashboard.tessl.cliAvailable
+    }
+    private var statusLabel: String {
+        if isLive { return "● LIVE" }
+        if isHistorical { return "☁︎ CLI UNAVAILABLE" }
+        return "⚠ REGISTRY UNAVAILABLE"
+    }
+    private var statusTone: StatusTone {
+        if isLive { return .advisory }
+        if isHistorical { return .pending }
+        return .warning
+    }
     private var versionText: String {
         guard let version = dashboard.tessl.registryVersion, !version.isEmpty else { return "version unavailable" }
         return (isHistorical ? "last known v" : "v") + version.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
@@ -391,8 +407,8 @@ private struct TesslEvidenceCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 7) {
                         ReleasePill(
-                            text: isLive ? "● LIVE" : "☁︎ CLI UNAVAILABLE",
-                            tone: isLive ? .advisory : .pending
+                            text: statusLabel,
+                            tone: statusTone
                         )
                     }
                     HStack(spacing: 6) {
@@ -430,7 +446,7 @@ private struct TesslEvidenceCard: View {
                     label: "Quality",
                     value: dashboard.tessl.registryQualityScore.map { "\($0)%" } ?? "—",
                     progress: dashboard.tessl.registryQualityScore.map { Double($0) / 100 },
-                    tone: .positive,
+                    tone: RegistryMetricPresentation.percentTone(dashboard.tessl.registryQualityScore),
                     muted: !isLive
                 )
                 RegistryVerticalDivider()
@@ -438,7 +454,7 @@ private struct TesslEvidenceCard: View {
                     label: "Impact",
                     value: dashboard.tessl.registryImpactScore.map { "\($0)%" } ?? "—",
                     progress: dashboard.tessl.registryImpactScore.map { Double($0) / 100 },
-                    tone: .warning,
+                    tone: RegistryMetricPresentation.percentTone(dashboard.tessl.registryImpactScore),
                     muted: !isLive
                 )
                 RegistryVerticalDivider()
@@ -474,7 +490,7 @@ private struct TesslEvidenceCard: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "Tessl Registry. \(isLive ? "Live registry data" : "CLI unavailable, last known registry data"). "
+            "Tessl Registry. \(isLive ? "Live registry data" : (isHistorical ? "CLI unavailable, last known registry data" : "Registry comparison unavailable")). "
                 + dashboard.registryEvidenceCaption
         )
     }

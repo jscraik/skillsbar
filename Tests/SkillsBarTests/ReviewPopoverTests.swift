@@ -352,6 +352,24 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(dashboard.reviewInspectCommand, expectedCommand)
     }
 
+    @MainActor
+    func testAsyncLoadUsesLiveLoaderWhenFixtureIsDisabled() async throws {
+        var liveLoadCount = 0
+        let source = DashboardDataSource(
+            environment: [:],
+            liveLoad: { .placeholder },
+            liveLoadAsync: {
+                liveLoadCount += 1
+                return .reviewFixture
+            }
+        )
+
+        let dashboard = try await source.load()
+
+        XCTAssertEqual(liveLoadCount, 1)
+        XCTAssertEqual(dashboard.registryPath, SkillDashboard.reviewFixture.registryPath)
+    }
+
     func testPipelinePostureReconcilesVisibleFixtureContributions() {
         let candidate = SkillDashboard.reviewFixture.pipeline
 
@@ -390,7 +408,10 @@ final class ReviewPopoverTests: XCTestCase {
             }
         )
 
-        let securityIndex = try! XCTUnwrap(PipelineStage.allCases.firstIndex(of: .securityReview))
+        guard let securityIndex = PipelineStage.allCases.firstIndex(of: .securityReview) else {
+            XCTFail("Security review must remain a canonical pipeline stage")
+            return
+        }
         XCTAssertTrue(candidate.orderedReceipts.prefix(securityIndex).allSatisfy { $0.evidenceStatus == .passed })
         XCTAssertEqual(candidate.orderedReceipts[securityIndex].evidenceStatus, .reviewRequired)
         XCTAssertTrue(candidate.orderedReceipts.dropFirst(securityIndex + 1).allSatisfy { $0.evidenceStatus == .held })
@@ -663,9 +684,9 @@ final class ReviewPopoverTests: XCTestCase {
             renderedSnapshots.append(snapshot)
         }
 
-        XCTAssertNotEqual(
-            renderedSnapshots[0],
-            renderedSnapshots[1],
+        XCTAssertGreaterThan(
+            try pixelDifference(renderedSnapshots[0], renderedSnapshots[1]),
+            0.0005,
             "The fixed Tessl baseline must make live and no-CLI states visibly distinct without scrolling"
         )
     }
@@ -907,8 +928,12 @@ private func registryMetadata(fixture: String, registryPath: String? = nil) thro
 }
 
 private func pixelDifference(_ lhsURL: URL, _ rhsURL: URL) throws -> Double {
-    let lhs = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: lhsURL)))
-    let rhs = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: rhsURL)))
+    try pixelDifference(Data(contentsOf: lhsURL), Data(contentsOf: rhsURL))
+}
+
+private func pixelDifference(_ lhsData: Data, _ rhsData: Data) throws -> Double {
+    let lhs = try XCTUnwrap(NSBitmapImageRep(data: lhsData))
+    let rhs = try XCTUnwrap(NSBitmapImageRep(data: rhsData))
     XCTAssertEqual(lhs.pixelsWide, rhs.pixelsWide)
     XCTAssertEqual(lhs.pixelsHigh, rhs.pixelsHigh)
     let lhsData = try XCTUnwrap(lhs.bitmapData)

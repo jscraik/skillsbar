@@ -114,6 +114,29 @@ enum PipelineStage: String, CaseIterable, Identifiable {
         Self.allCases.firstIndex(of: self).map { $0 + 1 } ?? 0
     }
 
+    var supportingText: String {
+        switch self {
+        case .candidateBaseline:
+            return "Canonical package identity is required before downstream proof."
+        case .mechanicalValidation:
+            return "Package verification and strict audit receipts are required."
+        case .securityReview:
+            return "Governed risk-mode evidence must be current for this candidate."
+        case .evalPreparation:
+            return "Scenario inputs, scorer quality, and calibration must be ready."
+        case .ossLocal:
+            return "Eval local proof must be bound to the candidate digest."
+        case .ossCloud:
+            return "Eval cloud proof must use the same scenario identities."
+        case .tesslStaging:
+            return "Staging requires local proof, a dry run, and handoff readiness."
+        case .tesslLiveRegistry:
+            return "Publication and live registry observation remain separate proofs."
+        case .liveScoreAndRuntime:
+            return "Installed digest, doctor status, and observed behavior must agree."
+        }
+    }
+
     var weight: Int {
         switch self {
         case .candidateBaseline, .mechanicalValidation, .evalPreparation, .tesslStaging, .tesslLiveRegistry:
@@ -169,6 +192,34 @@ struct PipelineStageReceipt: Equatable, Identifiable {
     let modelProfile: String?
     let observedAt: Date?
     let nextAction: String
+    let completedChecks: Int?
+    let requiredChecks: Int?
+
+    init(
+        stage: PipelineStage,
+        candidateFingerprint: String,
+        evidenceStatus: PipelineEvidenceStatus,
+        stageScore: Int?,
+        command: String,
+        receiptPath: String?,
+        modelProfile: String?,
+        observedAt: Date?,
+        nextAction: String,
+        completedChecks: Int? = nil,
+        requiredChecks: Int? = nil
+    ) {
+        self.stage = stage
+        self.candidateFingerprint = candidateFingerprint
+        self.evidenceStatus = evidenceStatus
+        self.stageScore = stageScore
+        self.command = command
+        self.receiptPath = receiptPath
+        self.modelProfile = modelProfile
+        self.observedAt = observedAt
+        self.nextAction = nextAction
+        self.completedChecks = completedChecks
+        self.requiredChecks = requiredChecks
+    }
 
     var id: PipelineStage { stage }
 }
@@ -243,7 +294,9 @@ struct PipelineCandidate: Equatable {
                     receiptPath: receipt.receiptPath,
                     modelProfile: receipt.modelProfile,
                     observedAt: receipt.observedAt,
-                    nextAction: receipt.nextAction
+                    nextAction: receipt.nextAction,
+                    completedChecks: receipt.completedChecks,
+                    requiredChecks: receipt.requiredChecks
                 )
             } else if !earlierStagePassed,
                       receipt.evidenceStatus == .passed
@@ -258,7 +311,9 @@ struct PipelineCandidate: Equatable {
                     receiptPath: receipt.receiptPath,
                     modelProfile: receipt.modelProfile,
                     observedAt: receipt.observedAt,
-                    nextAction: receipt.nextAction
+                    nextAction: receipt.nextAction,
+                    completedChecks: receipt.completedChecks,
+                    requiredChecks: receipt.requiredChecks
                 )
             }
             receiptByStage[stage] = receipt
@@ -270,7 +325,7 @@ struct PipelineCandidate: Equatable {
     static func fingerprint(for paths: [URL], root: URL) -> String {
         let records = paths.sorted { $0.path < $1.path }.map { path -> String in
             let relative = path.path.replacingOccurrences(of: root.path + "/", with: "")
-            let contents = (try? Data(contentsOf: path)) ?? Data()
+            let contents = (try? Data(contentsOf: path)) ?? Data("<unreadable>".utf8)
             return relative + "\u{0}" + SHA256.hash(data: contents).map { String(format: "%02x", $0) }.joined()
         }
         return SHA256.hash(data: Data(records.joined(separator: "\n").utf8))
@@ -660,7 +715,9 @@ struct SkillDashboard {
                     receiptPath: "fixture:package-verify",
                     modelProfile: "local-package",
                     observedAt: Date(timeIntervalSince1970: 0),
-                    nextAction: "Package verify passed · Strict audit missing"
+                    nextAction: "Package verify passed · Strict audit missing",
+                    completedChecks: 1,
+                    requiredChecks: 2
                 ),
                 PipelineStageReceipt(
                     stage: .securityReview,
@@ -688,7 +745,9 @@ struct SkillDashboard {
                     receiptPath: "fixture:scenario-quality",
                     modelProfile: "eval-preparation",
                     observedAt: Date(timeIntervalSince1970: 0),
-                    nextAction: "Scenario readiness 71 / 71 · scorer & calibration missing"
+                    nextAction: "Scenario readiness 71 / 71 · scorer & calibration missing",
+                    completedChecks: 1,
+                    requiredChecks: 3
                 ),
                 PipelineStageReceipt(
                     stage: .ossLocal,

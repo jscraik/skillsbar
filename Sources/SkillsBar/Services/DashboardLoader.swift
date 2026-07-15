@@ -476,7 +476,12 @@ struct DashboardLoader {
     }
 
     private static func governedInputURLs(root: URL, selectedSkillPath: String) -> [URL] {
+        let resolvedRoot = root.standardizedFileURL.resolvingSymlinksInPath()
         let skillURL = root.appendingPathComponent(selectedSkillPath)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let rootPrefix = resolvedRoot.path.hasSuffix("/") ? resolvedRoot.path : resolvedRoot.path + "/"
+        guard skillURL.path.hasPrefix(rootPrefix) else { return [] }
         let skillDirectory = skillURL.deletingLastPathComponent()
         guard let enumerator = FileManager.default.enumerator(
             at: skillDirectory,
@@ -487,7 +492,8 @@ struct DashboardLoader {
             "reference", "scenario", "criteria", "rubric", "scorer", "model", "eval",
             "package", "identity", "manifest", "metadata"
         ]
-        return ([skillURL] + enumerator.compactMap { $0 as? URL }.filter { url in
+        return ([skillURL] + enumerator.compactMap { $0 as? URL }.map { $0.standardizedFileURL.resolvingSymlinksInPath() }.filter { url in
+            guard url.path.hasPrefix(rootPrefix) else { return false }
             guard url.lastPathComponent != "SKILL.md" else { return false }
             let relative = url.path.replacingOccurrences(of: skillDirectory.path + "/", with: "").lowercased()
             return governedNames.contains { relative.contains($0) }

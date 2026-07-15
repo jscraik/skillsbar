@@ -5,7 +5,7 @@ schema: bounded-child-lane/v1
 artifact_id: worker-2026-07-10-skillsbar-pipeline-posture-repair
 date: 2026-07-10
 task: Worker-SkillsBar Pipeline Posture Repair
-status: repaired_with_environment_validation_blockers
+status: superseded_by-2026-07-15-pr2-follow-up
 repair_findings:
   - QA-001
   - QA-002
@@ -18,6 +18,10 @@ preserved_allowed_file:
 ```
 
 ## Repair summary
+
+This historical Worker handoff is retained for provenance. Its validation and
+stage-language observations are superseded by the current PR #2 follow-up
+receipt; it is not current proof for the checked-out candidate.
 
 QA-001 is repaired at the loader/evidence boundary for both asynchronous and
 synchronous loading. `collectEvidenceAsync` and `collectEvidence` compute the

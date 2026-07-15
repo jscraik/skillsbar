@@ -57,3 +57,26 @@ coverage, and creation of a signed local debug bundle. It does not prove a live
 menu-bar interaction or close-button click in this session, a current authenticated Tessl response,
 canonical package-digest equality, installed-runtime behavior, packaging for
 distribution, notarization, publication, or release readiness.
+
+## PR #2 follow-up validation
+
+The historical 48-test counts above are superseded for the current candidate by
+the focused follow-up below. The follow-up includes the async data-source,
+candidate-bound Tessl registry, dynamic stage-count, and decoded-pixel
+regressions added during PR triage.
+
+Command: `HOME=/private/tmp/skillsbar-pr2-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-pr2-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-pr2-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-pr2-test-build -Xswiftc -gnone --filter "ReviewPopoverTests|PipelineEvidenceLoaderTests"` -> pass (60 tests executed, 1 integration test skipped, 0 failures)
+
+Command: `HOME=/private/tmp/skillsbar-pr2-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-pr2-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-pr2-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-pr2-full-build -Xswiftc -gnone` -> pass (60 tests executed, 1 integration test skipped, 0 failures)
+
+Command: `NO_OPEN=1 SKILLSBAR_BUILD_ROOT=/private/tmp/skillsbar-pr2-package ./Launch.command` -> pass (debug arm64 app bundle built and ad-hoc signed)
+
+Command: `/usr/bin/plutil -p /private/tmp/skillsbar-pr2-package/SkillsBar.app/Contents/Info.plist | rg "CFBundleIconFile|CFBundleIdentifier"` -> pass (bundle metadata points to the packaged SkillsSDKIcon.png resource)
+
+Command: `codesign --verify --deep --strict --verbose=2 /private/tmp/skillsbar-pr2-package/SkillsBar.app` -> pass (bundle is valid on disk and satisfies its designated requirement)
+
+Command: `git diff --check` -> pass (no whitespace diagnostics)
+
+This follow-up proves the current source and focused regressions only; it does
+not prove hosted review approval, remote merge, installed-app runtime, or Tessl
+publication.

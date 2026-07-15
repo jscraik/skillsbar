@@ -100,6 +100,23 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
         }
     }
 
+    func testGateChainRequiresEveryPrecedingGateToPass() throws {
+        try withRepo { root in
+            try writeGateChain(root: root, gates: ["oss_local"], digest: digest, scenarioIDs: ["scenario-a"])
+            let gateChain = handoffDirectory(root).appendingPathComponent("gate-chain.json")
+            var object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: gateChain)) as? [String: Any])
+            var gates = try XCTUnwrap(object["gates"] as? [[String: Any]])
+            gates[0]["status"] = "blocked"
+            object["gates"] = gates
+            try writeJSON(object, to: gateChain)
+
+            let local = makeLoader(root: root).stageReceipts().first { $0.stage == .ossLocal }
+
+            XCTAssertEqual(local?.evidenceStatus, .unproven)
+            XCTAssertTrue(local?.nextAction.contains("gate-chain") == true)
+        }
+    }
+
     func testEvalCloudRequiresTheSameScenarioIdentitiesAsEvalLocal() throws {
         try withRepo { root in
             try writeGateChain(
@@ -258,7 +275,10 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
     }
 
     private func result(_ object: [String: Any]) -> CommandResult {
-        let data = try! JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else {
+            XCTFail("Test fixture must serialize as JSON")
+            return CommandResult(exitCode: 1, stdout: "", stderr: "fixture serialization failed")
+        }
         return CommandResult(exitCode: 0, stdout: String(decoding: data, as: UTF8.self), stderr: "")
     }
 
@@ -363,14 +383,15 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
         let handoff = handoffDirectory(root)
         try FileManager.default.createDirectory(at: handoff, withIntermediateDirectories: true)
         let evidenceRelative = ".harness/evidence/handoff/example/evidence-\(gate).json"
-        try writeJSON(
-            [
-                "status": "pass",
-                "package_digest": digest,
-                "scenario_ids": scenarioIDs
-            ],
-            to: root.appendingPathComponent(evidenceRelative)
-        )
+        var evidence: [String: Any] = [
+            "status": "pass",
+            "package_digest": digest,
+            "scenario_ids": scenarioIDs
+        ]
+        if gate == "tessl_live_registry" {
+            evidence["registry_package_digest"] = digest
+        }
+        try writeJSON(evidence, to: root.appendingPathComponent(evidenceRelative))
         let receiptRelative = ".harness/evidence/handoff/example/release-gate-\(gate).json"
         try writeJSON(
             [
