@@ -77,6 +77,12 @@ Command: `codesign --verify --deep --strict --verbose=2 /private/tmp/skillsbar-p
 
 Command: `git diff --check` -> pass (no whitespace diagnostics)
 
+Command: `HOME=/private/tmp/skillsbar-pr2-final-home XDG_CACHE_HOME=/private/tmp/skillsbar-pr2-final-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-pr2-final-clang DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-pr2-final-build -Xswiftc -gnone` -> pass (62 tests executed, 1 opt-in integration test skipped, 0 failures)
+
+Command: `NO_OPEN=1 SKILLSBAR_BUILD_ROOT=/private/tmp/skillsbar-pr2-final-package ./Launch.command` -> pass (final debug arm64 app bundle built and ad-hoc signed)
+
+Command: `codesign --verify --deep --strict --verbose=2 /private/tmp/skillsbar-pr2-final-package/SkillsBar.app` -> pass (final bundle is valid on disk and satisfies its designated requirement)
+
 This follow-up proves the current source and focused regressions only; it does
 not prove hosted review approval, remote merge, installed-app runtime, or Tessl
 publication.
