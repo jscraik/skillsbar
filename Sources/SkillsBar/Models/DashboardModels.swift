@@ -333,6 +333,13 @@ struct PipelineCandidate: Equatable {
             .joined()
     }
 
+    static func allReadable(_ paths: [URL]) -> Bool {
+        paths.allSatisfy { url in
+            FileManager.default.isReadableFile(atPath: url.path)
+                && (try? Data(contentsOf: url)) != nil
+        }
+    }
+
     static func unproven(
         fingerprint: String = "pending-candidate",
         governedInputPaths: [String] = [],
@@ -428,7 +435,14 @@ struct SkillDashboard {
             return "Historical external baseline · not proof for this candidate."
         case .unavailable:
             if !tessl.cliAvailable {
-                return "Historical external baseline · not proof for this candidate."
+                let hasCachedRegistryData = tessl.registryScore != nil
+                    || tessl.registryVersion != nil
+                    || tessl.registryQualityScore != nil
+                    || tessl.registryImpactScore != nil
+                    || tessl.registrySecurityLabel != nil
+                return hasCachedRegistryData
+                    ? "Historical external baseline · not proof for this candidate."
+                    : "Tessl CLI unavailable · no registry evidence cached."
             }
             return "Registry comparison unavailable · not proof for this candidate."
         }

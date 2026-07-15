@@ -720,6 +720,22 @@ final class ReviewPopoverTests: XCTestCase {
         )
     }
 
+    func testUnavailableRegistryWithoutCacheDoesNotClaimHistoricalEvidence() {
+        var dashboard = SkillDashboard.placeholder
+        dashboard.tessl.dataOrigin = .unavailable
+        dashboard.tessl.cliAvailable = false
+        dashboard.tessl.registryScore = nil
+        dashboard.tessl.registryVersion = nil
+        dashboard.tessl.registryQualityScore = nil
+        dashboard.tessl.registryImpactScore = nil
+        dashboard.tessl.registrySecurityLabel = nil
+
+        XCTAssertEqual(
+            dashboard.registryEvidenceCaption,
+            "Tessl CLI unavailable · no registry evidence cached."
+        )
+    }
+
     func testLiveSourceUsesLoaderWhenFixtureIsDisabled() throws {
         var liveLoadCount = 0
         let source = DashboardDataSource(

@@ -65,7 +65,7 @@ the focused follow-up below. The follow-up includes the async data-source,
 candidate-bound Tessl registry, dynamic stage-count, and decoded-pixel
 regressions added during PR triage.
 
-Command: `HOME=/private/tmp/skillsbar-pr2-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-pr2-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-pr2-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-pr2-test-build -Xswiftc -gnone --filter "ReviewPopoverTests|PipelineEvidenceLoaderTests"` -> pass (60 tests executed, 1 integration test skipped, 0 failures)
+Command: `HOME=/private/tmp/skillsbar-pr2-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-pr2-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-pr2-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-pr2-test-build -Xswiftc -gnone --filter "ReviewPopoverTests|PipelineEvidenceLoaderTests"` -> pass (61 tests executed, 1 integration test skipped, 0 failures)
 
 Command: `HOME=/private/tmp/skillsbar-pr2-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-pr2-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-pr2-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-pr2-full-build -Xswiftc -gnone` -> pass (60 tests executed, 1 integration test skipped, 0 failures)
 

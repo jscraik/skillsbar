@@ -70,7 +70,7 @@ private struct ReleaseHeader: View {
         .padding(.trailing, 30)
         .overlay(alignment: .bottomLeading) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(active == nil ? "Local candidate is current" : "Local candidate needs identity")
+                Text(active.map { "Local candidate needs \($0.stage.title.lowercased())" } ?? "Local candidate is current")
                     .releaseFont(18, weight: .medium, relativeTo: .title3)
                     .foregroundStyle(.primaryText)
                     .lineLimit(1)

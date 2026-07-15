@@ -290,6 +290,19 @@ struct DashboardLoader {
         let packageCommand = copyCommand(root: root, command: Self.packageCommand(for: selectedSkillPath))
         let impactCommand = copyCommand(root: root, command: Self.impactCommand(for: selectedSkillPath))
         let securityCommand = copyCommand(root: root, command: Self.securityCommand(for: selectedSkillPath))
+        guard PipelineCandidate.allReadable(governedInputs) else {
+            return .unproven(
+                fingerprint: fingerprint,
+                governedInputPaths: governedPaths,
+                observedAt: observedAt,
+                commands: [
+                    .candidateBaseline: identityCommand,
+                    .mechanicalValidation: packageCommand,
+                    .securityReview: securityCommand,
+                    .evalPreparation: impactCommand
+                ]
+            )
+        }
         let mechanicalStatus: PipelineEvidenceStatus
         if quality.score == 100 {
             mechanicalStatus = .passed
@@ -409,6 +422,9 @@ struct DashboardLoader {
             $0.path.replacingOccurrences(of: root.path + "/", with: "")
         }
         let fingerprint = PipelineCandidate.fingerprint(for: governedInputs, root: root)
+        guard PipelineCandidate.allReadable(governedInputs) else {
+            return .unproven(fingerprint: fingerprint, governedInputPaths: governedPaths, observedAt: observedAt)
+        }
         let evidence = PipelineEvidenceLoader(
             root: root,
             selectedSkillPath: selectedSkillPath,
@@ -488,17 +504,19 @@ struct DashboardLoader {
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) else { return [skillURL] }
-        let governedNames = [
-            "reference", "scenario", "criteria", "rubric", "scorer", "model", "eval",
-            "package", "identity", "manifest", "metadata"
-        ]
-        return ([skillURL] + enumerator.compactMap { $0 as? URL }.map { $0.standardizedFileURL.resolvingSymlinksInPath() }.filter { url in
-            guard url.path.hasPrefix(rootPrefix) else { return false }
-            guard url.lastPathComponent != "SKILL.md" else { return false }
-            let relative = url.path.replacingOccurrences(of: skillDirectory.path + "/", with: "").lowercased()
-            return governedNames.contains { relative.contains($0) }
-        })
+        let packageFiles = enumerator.compactMap { $0 as? URL }
+            .map { $0.standardizedFileURL.resolvingSymlinksInPath() }
+            .filter { url in
+                guard url.path.hasPrefix(rootPrefix),
+                      let values = try? url.resourceValues(forKeys: [.isRegularFileKey]),
+                      values.isRegularFile == true else { return false }
+                return url != skillURL
+            }
+        return ([skillURL] + packageFiles)
         .filter { FileManager.default.fileExists(atPath: $0.path) }
+        .reduce(into: [URL]()) { result, url in
+            if !result.contains(where: { $0.path == url.path }) { result.append(url) }
+        }
         .sorted { $0.path < $1.path }
     }
 
