@@ -85,31 +85,43 @@ enum SecurityDisposition: Equatable {
 
 enum PipelineStage: String, CaseIterable, Identifiable {
     case candidateBaseline
+    case mechanicalValidation
     case securityReview
+    case evalPreparation
     case ossLocal
     case ossCloud
     case tesslStaging
+    case tesslLiveRegistry
     case liveScoreAndRuntime
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .candidateBaseline: return "Candidate baseline"
-        case .securityReview: return "Security review"
-        case .ossLocal: return "Local eval proof"
-        case .ossCloud: return "Cloud eval proof"
+        case .candidateBaseline: return "Candidate identity"
+        case .mechanicalValidation: return "Mechanical validation"
+        case .securityReview: return "Security & guardrails"
+        case .evalPreparation: return "Eval preparation"
+        case .ossLocal: return "Eval local proof"
+        case .ossCloud: return "Eval cloud proof"
         case .tesslStaging: return "Tessl staging"
-        case .liveScoreAndRuntime: return "Live score and runtime"
+        case .tesslLiveRegistry: return "Tessl publication & registry"
+        case .liveScoreAndRuntime: return "Runtime truth"
         }
+    }
+
+    var number: Int {
+        Self.allCases.firstIndex(of: self).map { $0 + 1 } ?? 0
     }
 
     var weight: Int {
         switch self {
-        case .candidateBaseline: return 15
-        case .securityReview: return 25
-        case .ossLocal, .ossCloud: return 20
-        case .tesslStaging, .liveScoreAndRuntime: return 10
+        case .candidateBaseline, .mechanicalValidation, .evalPreparation, .tesslStaging, .tesslLiveRegistry:
+            return 10
+        case .securityReview, .ossLocal, .ossCloud:
+            return 15
+        case .liveScoreAndRuntime:
+            return 5
         }
     }
 }
@@ -118,6 +130,7 @@ enum PipelineEvidenceStatus: Equatable {
     case passed
     case reviewRequired
     case blocked
+    case held
     case unproven
     case stale
 
@@ -130,6 +143,7 @@ enum PipelineEvidenceStatus: Equatable {
         case .passed: return "Passed"
         case .reviewRequired: return "Review required"
         case .blocked: return "Blocked"
+        case .held: return "Held"
         case .unproven: return "Unproven"
         case .stale: return "Stale"
         }
@@ -140,7 +154,7 @@ enum PipelineEvidenceStatus: Equatable {
         case .passed: return .positive
         case .reviewRequired: return .warning
         case .blocked: return .danger
-        case .unproven, .stale: return .pending
+        case .held, .unproven, .stale: return .pending
         }
     }
 }
@@ -231,16 +245,19 @@ struct PipelineCandidate: Equatable {
                     observedAt: receipt.observedAt,
                     nextAction: receipt.nextAction
                 )
-            } else if !earlierStagePassed {
+            } else if !earlierStagePassed,
+                      receipt.evidenceStatus == .passed
+                        || receipt.evidenceStatus == .reviewRequired
+                        || receipt.evidenceStatus == .blocked {
                 receipt = PipelineStageReceipt(
                     stage: stage,
                     candidateFingerprint: receipt.candidateFingerprint,
-                    evidenceStatus: .unproven,
-                    stageScore: nil,
+                    evidenceStatus: .held,
+                    stageScore: receipt.stageScore,
                     command: receipt.command,
                     receiptPath: receipt.receiptPath,
                     modelProfile: receipt.modelProfile,
-                    observedAt: nil,
+                    observedAt: receipt.observedAt,
                     nextAction: receipt.nextAction
                 )
             }
@@ -340,6 +357,30 @@ struct SkillDashboard {
     }
     var registrySearchCommand: String {
         "tessl search --json --type skills \(registryPath)"
+    }
+    var registryEvidenceCaption: String {
+        switch tessl.dataOrigin {
+        case .liveCLI:
+            guard let registryVersion = tessl.registryVersion?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !registryVersion.isEmpty else {
+                return "Live Tessl registry data · candidate identity not verified."
+            }
+            if normalizedVersion(registryVersion) == normalizedVersion(version) {
+                return "Version matches local declaration · package identity unverified."
+            }
+            return "Live Tessl registry · v\(normalizedVersion(registryVersion)) differs from local v\(normalizedVersion(version))."
+        case .cached, .fixture:
+            return "Historical external baseline · not proof for this candidate."
+        case .unavailable:
+            if !tessl.cliAvailable {
+                return "Historical external baseline · not proof for this candidate."
+            }
+            return "Registry comparison unavailable · not proof for this candidate."
+        }
+    }
+    var registryVersionMatchesCandidate: Bool {
+        guard tessl.dataOrigin == .liveCLI, let registryVersion = tessl.registryVersion else { return false }
+        return normalizedVersion(registryVersion) == normalizedVersion(version)
     }
     var reviewInspectCommand: String {
         security.inspectCommand
@@ -498,7 +539,50 @@ struct SkillDashboard {
         error: nil
     )
 
-    static let reviewFixture = SkillDashboard(
+    static let reviewFixture = makeReviewFixture(
+        tessl: TesslSignal(
+            ok: true,
+            cliAvailable: true,
+            authenticated: true,
+            displayStatus: "Scored",
+            detail: "Registry metadata loaded from the Tessl CLI; local evidence remains separate.",
+            cliVersion: "fixture",
+            registryScore: 66,
+            registryVersion: "0.2.0",
+            registryQualityScore: 100,
+            registryImpactScore: 63,
+            registrySecurityLabel: "Passed",
+            registryEvalCount: 68,
+            registryImprovementMultiplier: 1.28,
+            registryVisibility: "Private",
+            dataOrigin: .liveCLI,
+            recoveryCommand: "tessl install jscraik/improve-agent-native"
+        )
+    )
+
+    static let reviewNoCLIFixture = makeReviewFixture(
+        tessl: TesslSignal(
+            ok: false,
+            cliAvailable: false,
+            authenticated: false,
+            displayStatus: "CLI unavailable",
+            detail: "The Tessl CLI is unavailable; showing the last known registry snapshot.",
+            cliVersion: nil,
+            registryScore: 66,
+            registryVersion: "0.2.0",
+            registryQualityScore: 100,
+            registryImpactScore: 63,
+            registrySecurityLabel: "Passed",
+            registryEvalCount: 68,
+            registryImprovementMultiplier: 1.28,
+            registryVisibility: "Private",
+            dataOrigin: .cached,
+            recoveryCommand: "tessl doctor"
+        )
+    )
+
+    private static func makeReviewFixture(tessl: TesslSignal) -> SkillDashboard {
+        SkillDashboard(
         displayName: "improve-agent-native",
         version: "0.2.0",
         description: "Live eval plugin for improve-agent-native.",
@@ -532,23 +616,7 @@ struct SkillDashboard {
                 command: DashboardLoader.securityCommand(for: DashboardLoader.defaultSkillPath)
             )
         ),
-        tessl: TesslSignal(
-            ok: true,
-            cliAvailable: true,
-            authenticated: true,
-            displayStatus: "Scored",
-            detail: "Registry metadata loaded; local evidence remains separate.",
-            cliVersion: "fixture",
-            registryScore: 66,
-            registryVersion: "0.2.0",
-            registryQualityScore: 100,
-            registryImpactScore: 63,
-            registrySecurityLabel: "Passed",
-            registryEvalCount: 68,
-            registryImprovementMultiplier: 1.28,
-            registryVisibility: "Private",
-            recoveryCommand: "tessl install jscraik/improve-agent-native"
-        ),
+        tessl: tessl,
         fleet: FleetSignal(
             skillCount: 1,
             groupCount: 1,
@@ -572,13 +640,27 @@ struct SkillDashboard {
                 PipelineStageReceipt(
                     stage: .candidateBaseline,
                     candidateFingerprint: "review-fixture-v1",
+                    evidenceStatus: .reviewRequired,
+                    stageScore: nil,
+                    command: DashboardLoader.copyCommand(
+                        root: DashboardLoader.defaultRepoRoot,
+                        command: DashboardLoader.sdkStartCommand(for: DashboardLoader.defaultSkillPath)
+                    ),
+                    receiptPath: nil,
+                    modelProfile: "local-identity",
+                    observedAt: Date(timeIntervalSince1970: 0),
+                    nextAction: "Canonical package digest missing"
+                ),
+                PipelineStageReceipt(
+                    stage: .mechanicalValidation,
+                    candidateFingerprint: "review-fixture-v1",
                     evidenceStatus: .passed,
-                    stageScore: 100,
+                    stageScore: 50,
                     command: DashboardLoader.copyCommand(root: DashboardLoader.defaultRepoRoot, command: DashboardLoader.packageCommand),
                     receiptPath: "fixture:package-verify",
                     modelProfile: "local-package",
                     observedAt: Date(timeIntervalSince1970: 0),
-                    nextAction: "Candidate baseline is current."
+                    nextAction: "Package verify passed · Strict audit missing"
                 ),
                 PipelineStageReceipt(
                     stage: .securityReview,
@@ -592,7 +674,21 @@ struct SkillDashboard {
                     receiptPath: "fixture:risk-modes",
                     modelProfile: "local-security",
                     observedAt: Date(timeIntervalSince1970: 0),
-                    nextAction: "Inspect 1 critical, 2 high in SKILL.md."
+                    nextAction: "Risk taxonomy observed early · full receipt missing"
+                ),
+                PipelineStageReceipt(
+                    stage: .evalPreparation,
+                    candidateFingerprint: "review-fixture-v1",
+                    evidenceStatus: .passed,
+                    stageScore: 50,
+                    command: DashboardLoader.copyCommand(
+                        root: DashboardLoader.defaultRepoRoot,
+                        command: DashboardLoader.impactCommand(for: DashboardLoader.defaultSkillPath)
+                    ),
+                    receiptPath: "fixture:scenario-quality",
+                    modelProfile: "eval-preparation",
+                    observedAt: Date(timeIntervalSince1970: 0),
+                    nextAction: "Scenario readiness 71 / 71 · scorer & calibration missing"
                 ),
                 PipelineStageReceipt(
                     stage: .ossLocal,
@@ -603,7 +699,7 @@ struct SkillDashboard {
                     receiptPath: nil,
                     modelProfile: "oss-local",
                     observedAt: nil,
-                    nextAction: "Resolve security review before local eval proof."
+                    nextAction: "Eval local profile · Unproven"
                 ),
                 PipelineStageReceipt(
                     stage: .ossCloud,
@@ -614,7 +710,7 @@ struct SkillDashboard {
                     receiptPath: nil,
                     modelProfile: "oss-cloud",
                     observedAt: nil,
-                    nextAction: "Resolve earlier stages before cloud eval proof."
+                    nextAction: "Eval cloud profile · Same scenario IDs required"
                 ),
                 PipelineStageReceipt(
                     stage: .tesslStaging,
@@ -625,7 +721,18 @@ struct SkillDashboard {
                     receiptPath: nil,
                     modelProfile: "tessl-staging",
                     observedAt: nil,
-                    nextAction: "Establish Tessl staging proof after local evidence."
+                    nextAction: "Local proof · dry run · handoff"
+                ),
+                PipelineStageReceipt(
+                    stage: .tesslLiveRegistry,
+                    candidateFingerprint: "review-fixture-v1",
+                    evidenceStatus: .unproven,
+                    stageScore: nil,
+                    command: "",
+                    receiptPath: nil,
+                    modelProfile: "tessl-live",
+                    observedAt: nil,
+                    nextAction: "Publish receipt · registry visibility"
                 ),
                 PipelineStageReceipt(
                     stage: .liveScoreAndRuntime,
@@ -636,13 +743,20 @@ struct SkillDashboard {
                     receiptPath: nil,
                     modelProfile: "live-runtime",
                     observedAt: nil,
-                    nextAction: "Observe the installed runtime after staging."
+                    nextAction: "Installed digest · doctor · observed behavior"
                 )
             ]
         ),
         refreshedAt: Date(timeIntervalSince1970: 0),
         error: nil
-    )
+        )
+    }
+}
+
+private func normalizedVersion(_ value: String) -> String {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.lowercased().hasPrefix("v") else { return trimmed }
+    return String(trimmed.dropFirst())
 }
 
 struct ReviewPresentation {
@@ -1052,6 +1166,13 @@ struct SecuritySignal {
     }
 }
 
+enum TesslDataOrigin: Equatable {
+    case unavailable
+    case liveCLI
+    case cached
+    case fixture
+}
+
 struct TesslSignal {
     var ok: Bool
     var cliAvailable: Bool
@@ -1067,6 +1188,7 @@ struct TesslSignal {
     var registryEvalCount: Int?
     var registryImprovementMultiplier: Double?
     var registryVisibility: String?
+    var dataOrigin: TesslDataOrigin = .unavailable
     var recoveryCommand: String
 
     var registryVisibilityDisplay: String? {
@@ -1182,8 +1304,7 @@ struct TesslSignal {
         return .danger
     }
     var registrySecurityDisplay: String {
-        guard ok else { return displayStatus }
-        guard let registrySecurityLabel else { return "Loaded" }
+        guard let registrySecurityLabel else { return ok ? "Loaded" : displayStatus }
         if registrySecurityLabel.localizedCaseInsensitiveContains("pass") {
             return "Passed"
         }
@@ -1193,7 +1314,7 @@ struct TesslSignal {
         return registrySecurityLabel.capitalized
     }
     var registrySecurityTone: StatusTone {
-        guard ok else { return tone }
+        guard registrySecurityLabel != nil else { return tone }
         return SecurityDisposition(label: registrySecurityLabel).tone
     }
     var evidenceRequiresReview: Bool {

@@ -7,35 +7,27 @@ struct DashboardView: View {
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.skillsBarReduceTransparencyOverride) private var reduceTransparencyOverride
     @Environment(\.skillsBarIncreasedContrastOverride) private var increasedContrastOverride
+    @Environment(\.skillsBarSnapshotMode) private var snapshotMode
 
     var body: some View {
         ZStack {
             PopoverInteriorBackdrop(
                 reduceTransparency: reduceTransparencyOverride ?? reduceTransparency,
-                increasedContrast: increasedContrastOverride ?? (colorSchemeContrast == .increased)
+                increasedContrast: increasedContrastOverride ?? (colorSchemeContrast == .increased),
+                snapshotMode: snapshotMode
             )
 
-            ScrollView {
-                VStack(spacing: 0) {
-                    PipelinePostureHeader(dashboard: model.dashboard)
-                    QuietDivider()
-                    PipelineStageCard(dashboard: model.dashboard)
-                        .padding(.top, 8)
-                    HistoricalTesslCard(dashboard: model.dashboard)
-                        .padding(.top, 8)
-                    PipelineAction(receipt: model.dashboard.pipeline.activeReceipt)
-                        .padding(.top, 8)
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
-            }
-            .scrollIndicators(.hidden)
-            .scrollBounceBehavior(.basedOnSize)
+            ReleaseEvidenceView(dashboard: model.dashboard, isRefreshing: model.isRefreshing)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
         }
         .frame(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
         .foregroundStyle(.primaryText)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(alignment: .topTrailing) {
+            PopoverCloseButton()
+                .padding(10)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(
@@ -48,12 +40,48 @@ struct DashboardView: View {
                 )
         )
         .shadow(color: Color.black.opacity(0.30), radius: 18, y: 9)
+        .preferredColorScheme(.dark)
         .accessibilityElement(children: .contain)
     }
 }
 
+private struct PopoverCloseButton: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var hover = PopoverCloseHoverModel()
+
+    var body: some View {
+        Button { closePopover() } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .semibold))
+                .frame(width: 30, height: 30)
+                .background(Color.white.opacity(hover.isHovering ? 0.075 : 0.025))
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.white.opacity(hover.isHovering ? 0.16 : 0.06), lineWidth: 1))
+        }
+        .buttonStyle(ImmediateFeedbackButtonStyle())
+        .keyboardShortcut(.cancelAction)
+        .foregroundStyle(.bodyText)
+        .contentShape(Rectangle())
+        .onHover { hover.isHovering = $0 }
+        .help("Close SkillsBar")
+        .accessibilityLabel("Close SkillsBar")
+    }
+
+    private func closePopover() {
+        let popoverWindow = NSApp.keyWindow
+        dismiss()
+        popoverWindow?.orderOut(nil)
+    }
+}
+
+@MainActor
+private final class PopoverCloseHoverModel: ObservableObject {
+    @Published var isHovering = false
+}
+
 private struct PipelinePostureHeader: View {
     let dashboard: SkillDashboard
+    let isRefreshing: Bool
 
     private var candidate: PipelineCandidate { dashboard.pipeline }
     private var active: PipelineStageReceipt? { candidate.activeReceipt }
@@ -77,6 +105,8 @@ private struct PipelinePostureHeader: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer(minLength: 8)
+
+            RefreshStatus(isRefreshing: isRefreshing)
 
             PipelineReadinessSummary(candidate: candidate)
                 .frame(width: 112)
@@ -267,6 +297,7 @@ private struct PipelineStageRow: View {
         case .passed: return "checkmark.circle"
         case .reviewRequired: return "exclamationmark.triangle"
         case .blocked: return "xmark.octagon.fill"
+        case .held: return "pause.circle"
         case .unproven: return "lock.fill"
         case .stale: return "clock.fill"
         }
@@ -276,7 +307,7 @@ private struct PipelineStageRow: View {
         switch receipt.evidenceStatus {
         case .passed: return 20
         case .reviewRequired, .blocked: return 22
-        case .unproven, .stale: return 15
+        case .held, .unproven, .stale: return 15
         }
     }
 
@@ -312,6 +343,7 @@ private struct PipelineStageRow: View {
                     Image(systemName: feedback.copiedCommand == receipt.command ? "checkmark" : "doc.on.doc")
                         .font(.system(size: 17, weight: .medium))
                         .frame(width: 32, height: 32)
+                        .copyConfirmationMotion(isConfirmed: feedback.copiedCommand == receipt.command)
                 }
                 .buttonStyle(ImmediateFeedbackButtonStyle())
                 .foregroundStyle(feedback.copiedCommand == receipt.command ? Color.successAccent : Color.primaryText)
@@ -368,7 +400,7 @@ private struct PipelineStageRow: View {
     }
 }
 
-private struct HistoricalTesslCard: View {
+private struct TesslRegistryCard: View {
     let dashboard: SkillDashboard
 
     var body: some View {
@@ -443,7 +475,7 @@ private struct HistoricalTesslCard: View {
                 )
             }
 
-            Text("Historical registry baseline - not proof for current local candidate.")
+            Text(dashboard.registryEvidenceCaption)
                 .scaledSystemFont(size: 10.5, weight: .regular, relativeTo: .caption)
                 .foregroundStyle(Color.teal.opacity(0.82))
         }
@@ -473,7 +505,7 @@ private struct HistoricalTesslCard: View {
         )
         .shadow(color: Color.black.opacity(0.18), radius: 8, y: 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Tessl Registry historical baseline, not proof for current local candidate. Score \(dashboard.tessl.registryResultLabel).")
+        .accessibilityLabel("Tessl Registry. \(dashboard.registryEvidenceCaption) Score \(dashboard.tessl.registryResultLabel).")
     }
 }
 
@@ -560,6 +592,7 @@ private struct PipelineAction: View {
                         Image(systemName: feedback.copiedCommand == command ? "checkmark" : "doc.on.doc")
                             .font(.system(size: 16, weight: .semibold))
                             .frame(width: 36, height: 36)
+                            .copyConfirmationMotion(isConfirmed: feedback.copiedCommand == command)
                     }
                     .buttonStyle(ImmediateFeedbackButtonStyle())
                     .foregroundStyle(feedback.copiedCommand == command ? Color.successAccent : Color.primaryText)
@@ -613,14 +646,17 @@ private struct PipelineAction: View {
 private struct PopoverInteriorBackdrop: View {
     let reduceTransparency: Bool
     let increasedContrast: Bool
+    let snapshotMode: Bool
 
     var body: some View {
-        Rectangle()
-            .fill(
-                reduceTransparency || increasedContrast
-                    ? AnyShapeStyle(Color(red: 0.025, green: 0.04, blue: 0.05))
-                    : AnyShapeStyle(.ultraThinMaterial)
-            )
+        ZStack {
+            Color(red: 0.025, green: 0.04, blue: 0.05)
+            if !reduceTransparency && !increasedContrast && !snapshotMode {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.52)
+            }
+        }
             .overlay(
                 LinearGradient(
                     colors: reduceTransparency || increasedContrast
@@ -774,6 +810,38 @@ private struct PackageIdentity: View {
         .frame(minHeight: 58, alignment: .center)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+}
+
+private struct RefreshStatus: View {
+    let isRefreshing: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Group {
+            if isRefreshing {
+                HStack(spacing: 4) {
+                    if reduceMotion {
+                        Image(systemName: "arrow.clockwise")
+                    } else {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+
+                    Text("Refreshing")
+                }
+                .scaledSystemFont(size: 10, weight: .medium, relativeTo: .caption2)
+                .foregroundStyle(.secondaryText)
+                .transition(.opacity)
+            } else {
+                Color.clear
+            }
+        }
+        .frame(width: 74, height: 24, alignment: .trailing)
+        .opacity(isRefreshing ? 1 : 0)
+        .accessibilityHidden(!isRefreshing)
+        .accessibilityLabel(isRefreshing ? "Refreshing evidence" : "")
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: isRefreshing)
     }
 }
 
@@ -1063,6 +1131,7 @@ private struct ReviewAction: View {
                         Text(copied ? "Inspect command copied" : feedback.copyError ?? presentation.actionTitle)
                             .scaledSystemFont(size: 14, weight: .medium, relativeTo: .subheadline)
                             .foregroundStyle(.primaryText)
+                            .copyConfirmationMotion(isConfirmed: copied)
                         Text(presentation.actionDetail)
                             .scaledSystemFont(size: 11, weight: .regular, relativeTo: .caption)
                             .foregroundStyle(.bodyText)
@@ -1077,6 +1146,7 @@ private struct ReviewAction: View {
                             .font(.system(size: 15, weight: .semibold))
                             .frame(width: 38, height: 38)
                             .contentShape(Rectangle())
+                            .copyConfirmationMotion(isConfirmed: copied)
                     }
                     .buttonStyle(ImmediateFeedbackButtonStyle())
                     .foregroundStyle(copyFailed ? Color.dangerAccent : copied ? Color.successAccent : .primaryText)
@@ -1119,10 +1189,14 @@ private struct ReviewAction: View {
 }
 
 private struct ImmediateFeedbackButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(Color.white.opacity(configuration.isPressed ? 0.10 : 0))
             .opacity(configuration.isPressed ? 0.78 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .animation(.easeOut(duration: reduceMotion ? 0 : 0.10), value: configuration.isPressed)
     }
 }
 
@@ -1150,6 +1224,26 @@ private extension View {
         relativeTo textStyle: Font.TextStyle
     ) -> some View {
         modifier(ScaledSystemFontModifier(size: size, weight: weight, design: design, relativeTo: textStyle))
+    }
+
+    func copyConfirmationMotion(isConfirmed: Bool) -> some View {
+        modifier(CopyConfirmationMotion(isConfirmed: isConfirmed))
+    }
+}
+
+private struct CopyConfirmationMotion: ViewModifier {
+    let isConfirmed: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+        } else {
+            content
+                .contentTransition(.opacity)
+                .animation(.easeOut(duration: 0.14), value: isConfirmed)
+        }
     }
 }
 

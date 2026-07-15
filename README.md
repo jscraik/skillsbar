@@ -1,18 +1,21 @@
 # SkillsBar
 
-SkillsBar is a native macOS menu-bar app for watching local Skills SDK evidence without flattening separate proof lanes. It renders the selected skill's local package, scenario, security, inventory, and Tessl registry state in a compact SwiftUI popover.
+SkillsBar is a native macOS menu-bar app for watching local Skills SDK evidence without flattening separate proof lanes. It renders the selected skill's canonical package identity, validation, security, eval preparation, durable downstream receipts, runtime proof, inventory, and Tessl registry state in a compact SwiftUI popover.
 
 The app is currently a local prototype with a release-capable packaging path. It builds and launches from this checkout, reads the agent-skills repository on disk, and keeps local SDK evidence separate from Tessl registry evidence. A public release still requires Jamie's Developer ID certificate and Apple notarization credentials.
 
 ## What It Shows
 
-- **Local package quality** from `./bin/ask skills package verify <skill> --json --robot`.
-- **Local scenario impact** from `./bin/ask sdk eval scenario-quality <skill> --preview --json --robot`.
-- **Local security posture** from `./bin/ask sdk security risk-modes <skill> --preview --json --robot`.
+- **Candidate identity** from the non-mutating `./bin/ask sdk package build <skill> --json --robot` receipt and its canonical `package_digest`.
+- **Mechanical validation** from both `./bin/ask skills package verify <skill> --json --robot` and `./bin/ask skills audit <skill> --level strict --json --robot`.
+- **Local security posture** from the candidate-bound `./bin/ask sdk security risk-modes <skill> --preview --json --robot` receipt.
+- **Eval preparation** from scenario-quality, scorer-quality, and scorer-calibration preview receipts collected in the same refresh window.
+- **Eval local, Eval cloud, and Tessl staging proof** from the canonical `.harness/evidence/handoff/<skill>/gate-chain.json` and its governed release receipts.
+- **Runtime truth** from `.harness/evidence/runtime-proof/<skill>/<runtime>/runtime-card.json` only when the card proves the installed digest, doctor result, and observed behavior for the current package digest.
 - **Skill inventory coverage** by scanning `Skills/**/SKILL.md` in the configured agent-skills repository.
 - **Tessl registry status** when the `tessl` CLI is available, authenticated, and registry search succeeds.
 
-These lanes are intentionally independent. A clean registry result does not prove local source safety, and local build or test proof does not prove hosted CI, registry publication, notarization, or review readiness.
+These lanes are intentionally independent. Every downstream receipt must use the canonical gate-chain order, remain inside the configured repository, include its proof and non-proof boundaries, resolve every evidence reference, and carry exactly the current package digest. Eval local, Eval cloud, and Tessl staging must also identify the same scenario set. Missing, malformed, unbound, or mixed-digest evidence stays unproven or stale. A clean registry result does not prove local source safety, and local build or test proof does not prove hosted CI, registry publication, notarization, or review readiness.
 
 ## Requirements
 
@@ -22,6 +25,8 @@ These lanes are intentionally independent. A clean registry result does not prov
 - Optional: `tessl` CLI access for live registry status.
 
 SkillsBar is not App-Sandboxed: it reads the configured Skills SDK checkout and runs its read-only SDK checks locally. For Tessl, it prefers `TESSL_BIN` when set, then the current user's `~/.local/bin/tessl`, then `PATH`. Keep `SKILLSBAR_REVIEW_FIXTURE` unset for normal use; that variable is reserved for deterministic tests and mockup work.
+
+SkillsBar never automatically runs provider-backed `oss-local` or `oss-cloud` evals, Tessl staging/publication, runtime installation, or runtime-proof commands when the menu opens. Those operations may cost money, require credentials, or mutate external/runtime state, so the app consumes their durable governed receipts instead. A live Tessl search remains a registry observation until a candidate-bound publication/score receipt exists, the package and registry versions match, and registry visibility is known.
 
 ## Run
 
@@ -101,9 +106,11 @@ If Tessl is installed outside the normal user-local location, point the app at i
 TESSL_BIN=/absolute/path/to/tessl ./Launch.command
 ```
 
-For fixture-based Tessl UI work, set `TESSL_REGISTRY_FIXTURE=1` or `TESSL_REGISTRY_FIXTURE_SCORE=<0-100>` with the optional fixture variables used in `DashboardLoader.swift`.
+For fixture-based Tessl UI work, set `TESSL_REGISTRY_FIXTURE=1` or `TESSL_REGISTRY_FIXTURE_SCORE=<0-100>` with the optional fixture variables used in `DashboardLoader.swift`. Add `TESSL_REGISTRY_FIXTURE_MODE=cached` to exercise the CLI-unavailable historical treatment.
 
-For the deterministic review-popover implementation state, set `SKILLSBAR_REVIEW_FIXTURE=1`. This bypasses live package, scenario, security, and registry parsing before constructing the model, so snapshots consistently render score 78, impact 71/71, three local risks, registry score 66, and the canonical inspect command.
+For the deterministic nine-gate implementation state, set `SKILLSBAR_REVIEW_FIXTURE=live` (or `1`). This bypasses live package, scenario, security, and registry parsing before constructing the model, so snapshots consistently render candidate identity as the active gate, held mechanical/security/eval-preparation observations, registry score 66, and the canonical SDK-start command. Use `SKILLSBAR_REVIEW_FIXTURE=no-cli` to render the same last-known registry metrics with `CLI UNAVAILABLE` and `Historical external baseline · not proof for this candidate.`
+
+A successful live Tessl CLI search stores only sanitized registry fields (version, score, Quality, Impact, Security, eval count, multiplier, and visibility) in local preferences. If the CLI later becomes unavailable, SkillsBar can show that last-known snapshot as historical context. It does not cache credentials, raw command output, or package contents, and cached registry data never promotes a local pipeline gate.
 
 `Tests/SkillsBarTests/Fixtures/` retains sanitized Tessl responses for Private, Public, and missing-visibility registry records. The focused popover tests also render the production `DashboardView` and compare it with the retained implementation snapshot, so model-contract and visible-layout drift fail together.
 
