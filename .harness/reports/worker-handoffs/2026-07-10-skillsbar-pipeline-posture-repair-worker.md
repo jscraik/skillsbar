@@ -5,7 +5,9 @@ schema: bounded-child-lane/v1
 artifact_id: worker-2026-07-10-skillsbar-pipeline-posture-repair
 date: 2026-07-10
 task: Worker-SkillsBar Pipeline Posture Repair
-status: superseded_by-2026-07-15-pr2-follow-up
+status: superseded
+superseded_by: .harness/reports/2026-07-14-skillsbar-nine-gate-ui-validation.md#pr-2-follow-up-validation
+resolved_by: .harness/reports/qa-proofs/2026-07-11-skillsbar-pipeline-posture-validation-qa.md
 repair_findings:
   - QA-001
   - QA-002

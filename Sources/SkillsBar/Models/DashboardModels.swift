@@ -322,22 +322,17 @@ struct PipelineCandidate: Equatable {
         return PipelineStage.allCases.compactMap { receiptByStage[$0] }
     }
 
-    static func fingerprint(for paths: [URL], root: URL) -> String {
-        let records = paths.sorted { $0.path < $1.path }.map { path -> String in
+    static func fingerprint(for paths: [URL], root: URL) -> String? {
+        var records: [String] = []
+        records.reserveCapacity(paths.count)
+        for path in paths.sorted(by: { $0.path < $1.path }) {
             let relative = path.path.replacingOccurrences(of: root.path + "/", with: "")
-            let contents = (try? Data(contentsOf: path)) ?? Data("<unreadable>".utf8)
-            return relative + "\u{0}" + SHA256.hash(data: contents).map { String(format: "%02x", $0) }.joined()
+            guard let contents = try? Data(contentsOf: path) else { return nil }
+            records.append(relative + "\u{0}" + SHA256.hash(data: contents).map { String(format: "%02x", $0) }.joined())
         }
         return SHA256.hash(data: Data(records.joined(separator: "\n").utf8))
             .map { String(format: "%02x", $0) }
             .joined()
-    }
-
-    static func allReadable(_ paths: [URL]) -> Bool {
-        paths.allSatisfy { url in
-            FileManager.default.isReadableFile(atPath: url.path)
-                && (try? Data(contentsOf: url)) != nil
-        }
     }
 
     static func unproven(

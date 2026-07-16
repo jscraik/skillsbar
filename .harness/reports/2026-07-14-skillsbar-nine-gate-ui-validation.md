@@ -65,6 +65,12 @@ the focused follow-up below. The follow-up includes the async data-source,
 candidate-bound Tessl registry, dynamic stage-count, and decoded-pixel
 regressions added during PR triage.
 
+The earlier 61-test focused, 60-test full, and 62-test final entries in this
+section are retained for provenance from successive triage snapshots. They are
+superseded and are not the current authoritative counts. The current
+authoritative feature-lane run is the 51-test `ReviewPopoverTests` baseline
+check followed by the 65-test full suite recorded under the repair closeout.
+
 Command: `HOME=/private/tmp/skillsbar-pr2-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-pr2-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-pr2-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-pr2-test-build -Xswiftc -gnone --filter "ReviewPopoverTests|PipelineEvidenceLoaderTests"` -> pass (61 tests executed, 1 integration test skipped, 0 failures)
 
 Command: `HOME=/private/tmp/skillsbar-pr2-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-pr2-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-pr2-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-pr2-full-build -Xswiftc -gnone` -> pass (60 tests executed, 1 integration test skipped, 0 failures)
@@ -100,3 +106,18 @@ Command: `SKILLSBAR_REVIEW_FIXTURE=1 timeout 15 /private/tmp/skillsbar-baseline-
 Command: `cp /private/tmp/skillsbar-new-baseline.png .harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png` -> pass (updated the approved retained baseline artifact)
 
 Command: `HOME=/private/tmp/skillsbar-baseline-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-baseline-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-baseline-test-clang DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-baseline-test-build -Xswiftc -gnone --filter "ReviewPopoverTests"` -> pass (51 tests, including `testReviewFixtureRenderMatchesRetainedBaseline`)
+
+## Review follow-up repair closeout
+
+The follow-up repair makes candidate identity fail closed when a governed input
+cannot be read, performs one digest read pass, and keeps an unavailable Tessl
+state distinct from a cached historical snapshot. The superseded worker handoff
+now points to this receipt and the accepted QA proof by path.
+
+Command: `HOME=/private/tmp/skillsbar-repair-test-home2 XDG_CACHE_HOME=/private/tmp/skillsbar-repair-test-xdg2 CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-repair-test-clang2 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer timeout 600 swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-repair-test-build2 -Xswiftc -gnone` -> pass (65 tests executed, 1 opt-in integration test skipped, 0 failures)
+
+Command: `git diff --check` -> pass (no whitespace diagnostics)
+
+This repair closeout proves the candidate fail-closed and Tessl provenance
+semantics locally. It does not prove hosted review approval, remote merge,
+installed-app runtime, or Tessl publication.

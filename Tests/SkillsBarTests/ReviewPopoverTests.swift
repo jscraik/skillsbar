@@ -536,6 +536,48 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(candidate.postureScore, 0)
     }
 
+    func testPipelineCandidateRejectsMissingGovernedInput() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-missing-candidate-\(UUID().uuidString)")
+        let selectedSkillPath = "Skills/example/SKILL.md"
+        let skillURL = root.appendingPathComponent(selectedSkillPath)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: skillURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try "# Candidate before removal".write(to: skillURL, atomically: true, encoding: .utf8)
+
+        let boundEvidence = DashboardLoader.collectEvidence(
+            root: root,
+            selectedSkillPath: selectedSkillPath
+        ) {}
+        try FileManager.default.removeItem(at: skillURL)
+
+        let candidate = DashboardLoader.pipelineCandidate(
+            root: root,
+            selectedSkillPath: selectedSkillPath,
+            evidenceFingerprint: boundEvidence.candidateFingerprint,
+            quality: MetricSignal(
+                score: 100,
+                detail: "Package verified.",
+                source: "Local SDK package verify",
+                command: "verify"
+            ),
+            security: SecuritySignal(
+                score: 100,
+                status: "Passed",
+                detail: "No known issues.",
+                sourceLabel: "Local SDK risk-modes",
+                segmentCount: 0,
+                inspectCommand: "inspect"
+            )
+        )
+
+        XCTAssertEqual(candidate.fingerprint, "unreadable-candidate")
+        XCTAssertTrue(candidate.orderedReceipts.allSatisfy { $0.evidenceStatus == .unproven })
+    }
+
     func testCanonicalIdentityRemainsActiveUntilCanonicalDigestExists() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("skillsbar-active-stage-\(UUID().uuidString)")

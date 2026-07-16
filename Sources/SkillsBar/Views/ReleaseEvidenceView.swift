@@ -379,8 +379,17 @@ private struct TesslEvidenceCard: View {
     let dashboard: SkillDashboard
 
     private var isLive: Bool { dashboard.tessl.dataOrigin == .liveCLI }
+    private var hasRegistrySnapshot: Bool {
+        dashboard.tessl.registryScore != nil
+            || dashboard.tessl.registryVersion != nil
+            || dashboard.tessl.registryQualityScore != nil
+            || dashboard.tessl.registryImpactScore != nil
+            || dashboard.tessl.registrySecurityLabel != nil
+    }
     private var isHistorical: Bool {
-        dashboard.tessl.dataOrigin == .cached || dashboard.tessl.dataOrigin == .fixture || !dashboard.tessl.cliAvailable
+        dashboard.tessl.dataOrigin == .cached
+            || dashboard.tessl.dataOrigin == .fixture
+            || (dashboard.tessl.dataOrigin == .unavailable && hasRegistrySnapshot)
     }
     private var statusLabel: String {
         if isLive { return "● LIVE" }

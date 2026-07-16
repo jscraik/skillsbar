@@ -285,14 +285,14 @@ struct DashboardLoader {
         let governedPaths = governedInputs.map {
             $0.path.replacingOccurrences(of: root.path + "/", with: "")
         }
-        let fingerprint = PipelineCandidate.fingerprint(for: governedInputs, root: root)
         let identityCommand = copyCommand(root: root, command: Self.sdkStartCommand(for: selectedSkillPath))
         let packageCommand = copyCommand(root: root, command: Self.packageCommand(for: selectedSkillPath))
         let impactCommand = copyCommand(root: root, command: Self.impactCommand(for: selectedSkillPath))
         let securityCommand = copyCommand(root: root, command: Self.securityCommand(for: selectedSkillPath))
-        guard PipelineCandidate.allReadable(governedInputs) else {
+        guard !governedInputs.isEmpty,
+              let fingerprint = PipelineCandidate.fingerprint(for: governedInputs, root: root) else {
             return .unproven(
-                fingerprint: fingerprint,
+                fingerprint: "unreadable-candidate",
                 governedInputPaths: governedPaths,
                 observedAt: observedAt,
                 commands: [
@@ -421,9 +421,9 @@ struct DashboardLoader {
         let governedPaths = governedInputs.map {
             $0.path.replacingOccurrences(of: root.path + "/", with: "")
         }
-        let fingerprint = PipelineCandidate.fingerprint(for: governedInputs, root: root)
-        guard PipelineCandidate.allReadable(governedInputs) else {
-            return .unproven(fingerprint: fingerprint, governedInputPaths: governedPaths, observedAt: observedAt)
+        guard !governedInputs.isEmpty,
+              let fingerprint = PipelineCandidate.fingerprint(for: governedInputs, root: root) else {
+            return .unproven(fingerprint: "unreadable-candidate", governedInputPaths: governedPaths, observedAt: observedAt)
         }
         let evidence = PipelineEvidenceLoader(
             root: root,
@@ -488,7 +488,7 @@ struct DashboardLoader {
         PipelineCandidate.fingerprint(
             for: governedInputURLs(root: root, selectedSkillPath: selectedSkillPath),
             root: root
-        )
+        ) ?? "unreadable-candidate"
     }
 
     private static func governedInputURLs(root: URL, selectedSkillPath: String) -> [URL] {
