@@ -86,3 +86,17 @@ Command: `codesign --verify --deep --strict --verbose=2 /private/tmp/skillsbar-p
 This follow-up proves the current source and focused regressions only; it does
 not prove hosted review approval, remote merge, installed-app runtime, or Tessl
 publication.
+
+## Retained baseline refresh
+
+The approved retained baseline was regenerated from the current nine-gate
+`SKILLSBAR_REVIEW_FIXTURE=1` rendering at the existing `404 x 720` canvas. The
+binary artifact remains at:
+
+`.harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png`
+
+Command: `SKILLSBAR_REVIEW_FIXTURE=1 timeout 15 /private/tmp/skillsbar-baseline-build/arm64-apple-macosx/debug/SkillsBar --snapshot /private/tmp/skillsbar-new-baseline.png` -> pass (wrote the current 404 x 720 fixture snapshot)
+
+Command: `cp /private/tmp/skillsbar-new-baseline.png .harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png` -> pass (updated the approved retained baseline artifact)
+
+Command: `HOME=/private/tmp/skillsbar-baseline-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-baseline-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-baseline-test-clang DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-baseline-test-build -Xswiftc -gnone --filter "ReviewPopoverTests"` -> pass (51 tests, including `testReviewFixtureRenderMatchesRetainedBaseline`)

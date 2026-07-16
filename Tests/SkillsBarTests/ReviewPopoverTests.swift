@@ -283,6 +283,23 @@ final class ReviewPopoverTests: XCTestCase {
     }
 
     @MainActor
+    func testReviewFixtureRenderMatchesRetainedBaseline() throws {
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-review-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: outputURL) }
+
+        try SnapshotRenderer.render(dashboard: .reviewFixture, to: outputURL)
+
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let baselineURL = repoRoot.appendingPathComponent(".harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png")
+        let difference = try pixelDifference(baselineURL, outputURL)
+        XCTAssertLessThanOrEqual(difference, 0.0005, "Rendered review fixture drifted from the retained baseline")
+    }
+
+    @MainActor
     func testReviewFixtureRendersPipelinePostureDeterministically() throws {
         let firstURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("skillsbar-review-first-\(UUID().uuidString).png")
