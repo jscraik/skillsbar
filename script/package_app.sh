@@ -55,7 +55,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
   <key>CFBundleName</key><string>${APP_NAME}</string>
   <key>CFBundleDisplayName</key><string>${APP_NAME}</string>
-  <key>CFBundleIconFile</key><string>SkillsSDKIcon.png</string>
+  <key>CFBundleIconFile</key><string>SkillsSDKIcon.icns</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${MARKETING_VERSION}</string>
   <key>CFBundleVersion</key><string>${BUILD_NUMBER}</string>
@@ -107,7 +107,9 @@ for arch in "${ARCH_LIST[@]}"; do
 done
 
 cp "$ROOT_DIR/Sources/SkillsBar/Resources/TesslLogo.png" "$RESOURCES_DIR/TesslLogo.png"
-cp "$ROOT_DIR/Sources/SkillsBar/Resources/SkillsSDKIcon.png" "$RESOURCES_DIR/SkillsSDKIcon.png"
+ICON_SOURCE="$ROOT_DIR/Sources/SkillsBar/Resources/SkillsSDKIcon.png"
+sips -s format icns "$ICON_SOURCE" --out "$RESOURCES_DIR/SkillsSDKIcon.icns" >/dev/null
+cp "$ICON_SOURCE" "$RESOURCES_DIR/SkillsSDKIcon.png"
 
 PREFERRED_BUILD_DIR="$(dirname "${BUILT_BINARIES[0]}")"
 shopt -s nullglob

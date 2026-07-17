@@ -136,13 +136,13 @@ private struct ReleaseGateList: View {
                     .padding(.vertical, 24)
 
                 VStack(spacing: 0) {
-                    ForEach(Array(candidate.orderedReceipts.dropFirst().prefix(5).enumerated()), id: \.element.id) { index, receipt in
+                    ForEach(Array(candidate.orderedReceipts.prefix(6).enumerated()), id: \.element.id) { index, receipt in
                         ReleaseGateRow(
                             receipt: receipt,
                             isActive: false,
                             securityBadge: receipt.stage == .securityReview ? dashboard.security.severityLine : nil
                         )
-                        if index < 4 {
+                        if index < 5 {
                             ReleaseDivider().padding(.leading, 64)
                         }
                     }
