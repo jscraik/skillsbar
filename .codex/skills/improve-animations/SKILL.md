@@ -95,7 +95,7 @@ For every mechanical and feel check, require the exact command or interaction, a
 | `quick` / `deep` | Adjust audit effort (see table); composes with a focus |
 | a category focus (`performance`, `accessibility`, `easing`…) | Recon + audit that category only |
 | `plan <description>` | Skip the audit; recon just enough to specify, then write a single plan for the described improvement |
-| `reconcile` | Re-check `plans/` against the current code: mark done plans DONE, refresh stale file:line references, retire fixed findings |
+| `reconcile` | Resolve the plan directory with the Phase 4 rule, then re-check that directory against current code: mark done plans DONE, refresh stale file:line references, retire fixed findings |
 
 ## Tone
 
