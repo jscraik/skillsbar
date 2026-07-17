@@ -113,7 +113,11 @@ private struct PipelinePostureHeader: View {
         }
         .frame(minHeight: 96, alignment: .top)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Skills SDK. Current local candidate. Pipeline readiness \(candidate.postureScore) out of 100. \(candidate.evidencedStageCount) of \(PipelineStage.allCases.count) stages evidenced.")
+        .accessibilityLabel(
+            "Skills SDK. \(active?.evidenceStatus == .reviewRequired ? "Candidate requires review" : "Current local candidate"). "
+                + "Pipeline readiness \(candidate.postureScore) out of 100. "
+                + "\(candidate.evidencedStageCount) of \(PipelineStage.allCases.count) stages evidenced."
+        )
     }
 
     private var packageIdentityLabel: some View {

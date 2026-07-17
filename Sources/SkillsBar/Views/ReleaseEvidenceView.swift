@@ -97,7 +97,7 @@ private struct ReleaseHeader: View {
         .padding(.bottom, 66)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "Skills SDK. \(active == nil ? "Local candidate is current" : "Local candidate needs identity"). "
+            "Skills SDK. \(active.map { "Local candidate needs \($0.stage.title.lowercased())" } ?? "Local candidate is current"). "
                 + "\(candidate.evidencedStageCount) receipt current. "
                 + (active.map { "Current gate \($0.stage.number), \($0.stage.title)." } ?? "All gates current.")
         )
@@ -209,8 +209,8 @@ private struct NextRequiredCard: View {
             .buttonStyle(ReleasePressButtonStyle(tint: receipt.evidenceStatus.tone.color))
             .foregroundStyle(receipt.evidenceStatus.tone.color)
             .disabled(receipt.command.isEmpty)
-            .help("Copy the local digest command")
-            .accessibilityLabel("Copy the local digest command")
+            .help("Copy the \(receipt.stage.title.lowercased()) command")
+            .accessibilityLabel("Copy the \(receipt.stage.title.lowercased()) command")
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 8)

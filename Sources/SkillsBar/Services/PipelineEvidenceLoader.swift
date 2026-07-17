@@ -722,15 +722,10 @@ struct PipelineEvidenceLoader {
             at: ["data", "skills_sdk_package_build", "version"]
         ),
               let registryVersion = tessl.registryVersion,
-              Self.normalizedVersion(packageVersion) == Self.normalizedVersion(registryVersion) else {
+              normalizeSemanticVersion(packageVersion) == normalizeSemanticVersion(registryVersion) else {
             return "Live Tessl registry version does not match the current package version"
         }
         return nil
-    }
-
-    private static func normalizedVersion(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "^v", with: "", options: .regularExpression)
     }
 
     private static func isPassStatus(_ value: String) -> Bool {

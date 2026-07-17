@@ -131,6 +131,12 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(SecurityDisposition(label: "Failed").tone, .danger)
     }
 
+    func testSemanticVersionNormalizationHandlesUpperAndLowercasePrefixes() {
+        XCTAssertEqual(normalizeSemanticVersion("v1.2.3"), "1.2.3")
+        XCTAssertEqual(normalizeSemanticVersion("V1.2.3"), "1.2.3")
+        XCTAssertEqual(normalizeSemanticVersion(" 1.2.3 "), "1.2.3")
+    }
+
     func testSecurityDispositionUsesSeverityFirstPrecedence() {
         XCTAssertEqual(SecurityDisposition(label: nil), .pending)
         XCTAssertEqual(SecurityDisposition(label: "Passed"), .passed)

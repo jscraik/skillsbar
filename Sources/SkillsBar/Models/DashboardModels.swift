@@ -422,10 +422,10 @@ struct SkillDashboard {
                   !registryVersion.isEmpty else {
                 return "Live Tessl registry data · candidate identity not verified."
             }
-            if normalizedVersion(registryVersion) == normalizedVersion(version) {
+            if normalizeSemanticVersion(registryVersion) == normalizeSemanticVersion(version) {
                 return "Version matches local declaration · package identity unverified."
             }
-            return "Live Tessl registry · v\(normalizedVersion(registryVersion)) differs from local v\(normalizedVersion(version))."
+            return "Live Tessl registry · v\(normalizeSemanticVersion(registryVersion)) differs from local v\(normalizeSemanticVersion(version))."
         case .cached, .fixture:
             return "Historical external baseline · not proof for this candidate."
         case .unavailable:
@@ -444,7 +444,7 @@ struct SkillDashboard {
     }
     var registryVersionMatchesCandidate: Bool {
         guard tessl.dataOrigin == .liveCLI, let registryVersion = tessl.registryVersion else { return false }
-        return normalizedVersion(registryVersion) == normalizedVersion(version)
+        return normalizeSemanticVersion(registryVersion) == normalizeSemanticVersion(version)
     }
     var reviewInspectCommand: String {
         security.inspectCommand
@@ -821,7 +821,7 @@ struct SkillDashboard {
     }
 }
 
-private func normalizedVersion(_ value: String) -> String {
+func normalizeSemanticVersion(_ value: String) -> String {
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     guard trimmed.lowercased().hasPrefix("v") else { return trimmed }
     return String(trimmed.dropFirst())
