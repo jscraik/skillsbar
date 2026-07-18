@@ -64,6 +64,12 @@ Command: markdownlint-cli2 .codex/skills/improve-animations/AUDIT.md .codex/skil
 
 Command: swiftlint lint --strict -> blocked (SwiftLint is not installed in the isolated validation environment)
 
+## CodeRabbit CLI review
+
+Command: `timeout 600 op run --env-file=/Users/jamiecraik/.codex/.env -- coderabbit review --agent --type committed --base main` -> fail/blocked (the CLI authenticated and analyzed the committed diff, emitted review findings, then exceeded the 600-second bounded timeout without a terminal summary; no stored finding set was available afterward)
+
+The bounded CLI run was used as an independent review signal, not as an approval. Valid findings were applied in `fc21cdc` for Reduce Motion, Tessl registry wording and comparison gating, active-receipt action copy, CodeQL job permissions, animation units and plan ownership, superseded evidence labels, and live CLI observation semantics. Historical-handoff and prior-PR-description findings were retained as provenance and not reopened. The CLI did not produce current-head approval evidence.
+
 ## Dirty ownership and cleanup
 
 - The canonical /Users/jamiecraik/dev/skillsbar checkout remains on dirty main and was not switched, staged, reset, cleaned, or merged.
