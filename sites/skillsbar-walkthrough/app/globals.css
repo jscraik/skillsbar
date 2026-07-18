@@ -19,9 +19,9 @@
   --orange-deep: #6c4510;
   --green: #50db88;
   --cyan: #29c6d4;
-  --serif: "Iowan Old Style", "New York", Baskerville, Georgia, serif;
-  --sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-  --mono: var(--font-geist-mono), "SFMono-Regular", Menlo, monospace;
+  --serif: "Iowan Old Style", "New York", baskerville, georgia, serif;
+  --sans: var(--font-geist-sans), -apple-system, blinkmacsystemfont, "SF Pro Display", sans-serif;
+  --mono: var(--font-geist-mono), "SFMono-Regular", menlo, monospace;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-camera: cubic-bezier(0.32, 0.72, 0, 1);
   --camera-response: 520ms;
