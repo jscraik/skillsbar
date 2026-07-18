@@ -31,9 +31,15 @@ npm run lint
 npm test
 ```
 
-The QR assets can be regenerated and independently decoded on macOS with the
-scripts under `scripts/`. Use Xcode Beta through `DEVELOPER_DIR` on this
-workstation.
+The QR assets are generated with the pinned project-local encoder and can be
+independently decoded on macOS with the Vision verifier under `scripts/`:
+
+```bash
+npm run assets:qr
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+  xcrun swift scripts/verify-skillsbar-qr.swift \
+  public/skillsbar-repo-qr-1024.png public/skillsbar-repo-qr-512.png
+```
 
 The thumbnail-safe social cover is generated deterministically from AppKit:
 
