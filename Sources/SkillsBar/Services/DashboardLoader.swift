@@ -2,29 +2,77 @@ import Foundation
 import SkillsBarCore
 
 struct DashboardLoader {
+    struct CandidateEvidenceBinding<Value> {
+        let candidateFingerprint: String
+        let evidence: Value
+    }
+
     static let defaultRepoRoot = URL(fileURLWithPath: "/Users/jamiecraik/dev/agent-skills")
     static let defaultSkillPath = "Skills/agent-ops/improve-agent-native/SKILL.md"
     static let selectedSkillDefaultsKey = "selectedSkillPath"
     static let packageCommand = "./bin/ask skills package verify Skills/agent-ops/improve-agent-native --json --robot"
+    static let packageBuildCommand = "./bin/ask sdk package build Skills/agent-ops/improve-agent-native --json --robot"
+    static let strictAuditCommand = "./bin/ask skills audit Skills/agent-ops/improve-agent-native --level strict --json --robot"
     static let impactCommand = "./bin/ask sdk eval scenario-quality Skills/agent-ops/improve-agent-native --preview --json --robot"
+    static let scorerQualityCommand = "./bin/ask sdk eval scorer-quality Skills/agent-ops/improve-agent-native --preview --json --robot"
+    static let scorerCalibrationCommand = "./bin/ask sdk eval scorer-calibration Skills/agent-ops/improve-agent-native --preview --json --robot"
     static let securityCommand = "./bin/ask sdk security risk-modes Skills/agent-ops/improve-agent-native --preview --json --robot"
     static let allSkillsInventoryCommand = "find Skills -name SKILL.md -print | sort"
     static func packageCommand(for skillPath: String) -> String {
         "./bin/ask skills package verify \(shellQuoted(skillPath)) --json --robot"
     }
 
+    static func packageBuildCommand(for skillPath: String) -> String {
+        "./bin/ask sdk package build \(shellQuoted(skillPackagePath(for: skillPath))) --json --robot"
+    }
+
+    static func strictAuditCommand(for skillPath: String) -> String {
+        "./bin/ask skills audit \(shellQuoted(skillPackagePath(for: skillPath))) --level strict --json --robot"
+    }
+
     static func impactCommand(for skillPath: String) -> String {
         "./bin/ask sdk eval scenario-quality \(shellQuoted(skillPath)) --preview --json --robot"
+    }
+
+    static func scorerQualityCommand(for skillPath: String) -> String {
+        "./bin/ask sdk eval scorer-quality \(shellQuoted(skillPath)) --preview --json --robot"
+    }
+
+    static func scorerCalibrationCommand(for skillPath: String) -> String {
+        "./bin/ask sdk eval scorer-calibration \(shellQuoted(skillPath)) --preview --json --robot"
     }
 
     static func securityCommand(for skillPath: String) -> String {
         "./bin/ask sdk security risk-modes \(shellQuoted(skillPath)) --preview --json --robot"
     }
 
+    static func sdkStartCommand(for skillPath: String) -> String {
+        "./bin/ask sdk start \(shellQuoted(skillPackagePath(for: skillPath))) --json --robot"
+    }
+
+    static func mechanicalEvidenceCommand(for skillPath: String) -> String {
+        labelledCommand([
+            ("package verify", packageCommand(for: skillPath)),
+            ("strict audit", strictAuditCommand(for: skillPath))
+        ])
+    }
+
+    static func evalPreparationCommand(for skillPath: String) -> String {
+        labelledCommand([
+            ("scenario quality", impactCommand(for: skillPath)),
+            ("scorer quality", scorerQualityCommand(for: skillPath)),
+            ("scorer calibration", scorerCalibrationCommand(for: skillPath))
+        ])
+    }
+
     static func localEvidenceCommand(root: URL, skillPath: String = defaultSkillPath) -> String {
         copyCommand(root: root, command: labelledCommand([
+            ("candidate package digest", packageBuildCommand(for: skillPath)),
             ("quality package verify", packageCommand(for: skillPath)),
+            ("quality strict audit", strictAuditCommand(for: skillPath)),
             ("impact scenario-quality", impactCommand(for: skillPath)),
+            ("impact scorer-quality", scorerQualityCommand(for: skillPath)),
+            ("impact scorer-calibration", scorerCalibrationCommand(for: skillPath)),
             ("security risk-modes", securityCommand(for: skillPath))
         ]))
     }
@@ -81,6 +129,12 @@ struct DashboardLoader {
         "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 
+    private static func skillPackagePath(for skillPath: String) -> String {
+        skillPath.hasSuffix("/SKILL.md")
+            ? String(skillPath.dropLast("/SKILL.md".count))
+            : skillPath
+    }
+
     private static func labelledCommand(_ steps: [(String, String)]) -> String {
         steps.map { label, command in
             "printf '\\n== \(label) ==\\n'; \(command)"
@@ -92,19 +146,49 @@ struct DashboardLoader {
         let selectedSkillPath = try findSelectedSkillPath(root: root)
         let metadata = try SkillMetadata.load(from: root.appendingPathComponent(selectedSkillPath))
         let registryPath = "jscraik/\(metadata.name)"
+        let packageBuildCommand = Self.packageBuildCommand(for: selectedSkillPath)
+        let strictAuditCommand = Self.strictAuditCommand(for: selectedSkillPath)
         let packageCommand = Self.packageCommand(for: selectedSkillPath)
         let impactCommand = Self.impactCommand(for: selectedSkillPath)
+        let scorerQualityCommand = Self.scorerQualityCommand(for: selectedSkillPath)
+        let scorerCalibrationCommand = Self.scorerCalibrationCommand(for: selectedSkillPath)
         let securityCommand = Self.securityCommand(for: selectedSkillPath)
 
-        async let packageResult = run(root: root, command: packageCommand)
-        async let scenarioResult = run(root: root, command: impactCommand)
-        async let securityResult = run(root: root, command: securityCommand)
         async let tesslResult = tesslSignal(root: root, registryPath: registryPath)
 
-        let package = await packageResult
-        let scenario = await scenarioResult
-        let security = await securityResult
+        let boundEvidence = await Self.collectEvidenceAsync(
+            root: root,
+            selectedSkillPath: selectedSkillPath
+        ) {
+            async let packageBuildResult = run(root: root, command: packageBuildCommand)
+            async let strictAuditResult = run(root: root, command: strictAuditCommand)
+            async let packageResult = run(root: root, command: packageCommand)
+            async let scenarioResult = run(root: root, command: impactCommand)
+            async let scorerQualityResult = run(root: root, command: scorerQualityCommand)
+            async let scorerCalibrationResult = run(root: root, command: scorerCalibrationCommand)
+            async let securityResult = run(root: root, command: securityCommand)
+            return await PipelineEvidenceLoader.LocalChecks(
+                packageBuild: packageBuildResult,
+                strictAudit: strictAuditResult,
+                packageVerify: packageResult,
+                securityRiskModes: securityResult,
+                scenarioQuality: scenarioResult,
+                scorerQuality: scorerQualityResult,
+                scorerCalibration: scorerCalibrationResult
+            )
+        }
+        let checks = boundEvidence.evidence
+        let quality = qualitySignal(from: checks.packageVerify, root: root, command: packageCommand)
+        let impact = impactSignal(from: checks.scenarioQuality, root: root, command: impactCommand)
+        let securitySignal = securitySignal(from: checks.securityRiskModes, root: root, command: securityCommand)
         let tessl = await tesslResult
+        let pipeline = Self.productionPipelineCandidate(
+            root: root,
+            selectedSkillPath: selectedSkillPath,
+            evidenceFingerprint: boundEvidence.candidateFingerprint,
+            checks: checks,
+            tessl: tessl
+        )
 
         return SkillDashboard(
             displayName: metadata.name,
@@ -116,11 +200,12 @@ struct DashboardLoader {
             localEvidenceCommand: Self.localEvidenceCommand(root: root, skillPath: selectedSkillPath),
             reviewedText: "Local SDK evidence",
             deltaText: tessl.ok ? "Tessl" : "Local SDK",
-            quality: qualitySignal(from: package, root: root, command: packageCommand),
-            impact: impactSignal(from: scenario, root: root, command: impactCommand),
-            security: securitySignal(from: security, root: root, command: securityCommand),
+            quality: quality,
+            impact: impact,
+            security: securitySignal,
             tessl: tessl,
             fleet: fleetSignal(root: root, selectedSkillPath: selectedSkillPath),
+            pipeline: pipeline,
             refreshedAt: Date(),
             error: nil
         )
@@ -131,12 +216,36 @@ struct DashboardLoader {
         let selectedSkillPath = try findSelectedSkillPath(root: root)
         let metadata = try SkillMetadata.load(from: root.appendingPathComponent(selectedSkillPath))
         let registryPath = "jscraik/\(metadata.name)"
+        let packageBuildCommand = Self.packageBuildCommand(for: selectedSkillPath)
+        let strictAuditCommand = Self.strictAuditCommand(for: selectedSkillPath)
         let packageCommand = Self.packageCommand(for: selectedSkillPath)
         let impactCommand = Self.impactCommand(for: selectedSkillPath)
+        let scorerQualityCommand = Self.scorerQualityCommand(for: selectedSkillPath)
+        let scorerCalibrationCommand = Self.scorerCalibrationCommand(for: selectedSkillPath)
         let securityCommand = Self.securityCommand(for: selectedSkillPath)
-        let package = Shell.run(packageCommand, cwd: root, timeout: 45)
-        let scenario = Shell.run(impactCommand, cwd: root, timeout: 45)
-        let security = Shell.run(securityCommand, cwd: root, timeout: 45)
+        let boundEvidence = Self.collectEvidence(root: root, selectedSkillPath: selectedSkillPath) {
+            PipelineEvidenceLoader.LocalChecks(
+                packageBuild: Shell.run(packageBuildCommand, cwd: root, timeout: 45),
+                strictAudit: Shell.run(strictAuditCommand, cwd: root, timeout: 45),
+                packageVerify: Shell.run(packageCommand, cwd: root, timeout: 45),
+                securityRiskModes: Shell.run(securityCommand, cwd: root, timeout: 45),
+                scenarioQuality: Shell.run(impactCommand, cwd: root, timeout: 45),
+                scorerQuality: Shell.run(scorerQualityCommand, cwd: root, timeout: 45),
+                scorerCalibration: Shell.run(scorerCalibrationCommand, cwd: root, timeout: 45)
+            )
+        }
+        let checks = boundEvidence.evidence
+        let quality = qualitySignal(from: checks.packageVerify, root: root, command: packageCommand)
+        let impact = impactSignal(from: checks.scenarioQuality, root: root, command: impactCommand)
+        let security = securitySignal(from: checks.securityRiskModes, root: root, command: securityCommand)
+        let tessl = tesslSignalSync(root: root, registryPath: registryPath)
+        let pipeline = Self.productionPipelineCandidate(
+            root: root,
+            selectedSkillPath: selectedSkillPath,
+            evidenceFingerprint: boundEvidence.candidateFingerprint,
+            checks: checks,
+            tessl: tessl
+        )
         return SkillDashboard(
             displayName: metadata.name,
             version: metadata.version,
@@ -147,14 +256,276 @@ struct DashboardLoader {
             localEvidenceCommand: Self.localEvidenceCommand(root: root, skillPath: selectedSkillPath),
             reviewedText: "Local SDK evidence",
             deltaText: "Local SDK",
-            quality: qualitySignal(from: package, root: root, command: packageCommand),
-            impact: impactSignal(from: scenario, root: root, command: impactCommand),
-            security: securitySignal(from: security, root: root, command: securityCommand),
-            tessl: tesslSignalSync(root: root, registryPath: registryPath),
+            quality: quality,
+            impact: impact,
+            security: security,
+            tessl: tessl,
             fleet: fleetSignal(root: root, selectedSkillPath: selectedSkillPath),
+            pipeline: pipeline,
             refreshedAt: Date(),
             error: nil
         )
+    }
+
+    static func pipelineCandidate(
+        root: URL,
+        selectedSkillPath: String,
+        evidenceFingerprint: String,
+        quality: MetricSignal,
+        security: SecuritySignal,
+        impact: MetricSignal = MetricSignal(
+            score: nil,
+            detail: "Scenario readiness unavailable.",
+            source: "Local SDK scenario-quality",
+            command: ""
+        ),
+        observedAt: Date = Date()
+    ) -> PipelineCandidate {
+        let governedInputs = governedInputURLs(root: root, selectedSkillPath: selectedSkillPath)
+        let governedPaths = governedInputs.map {
+            $0.path.replacingOccurrences(of: root.path + "/", with: "")
+        }
+        let identityCommand = copyCommand(root: root, command: Self.sdkStartCommand(for: selectedSkillPath))
+        let packageCommand = copyCommand(root: root, command: Self.packageCommand(for: selectedSkillPath))
+        let impactCommand = copyCommand(root: root, command: Self.impactCommand(for: selectedSkillPath))
+        let securityCommand = copyCommand(root: root, command: Self.securityCommand(for: selectedSkillPath))
+        guard !governedInputs.isEmpty,
+              let fingerprint = PipelineCandidate.fingerprint(for: governedInputs, root: root) else {
+            return .unproven(
+                fingerprint: "unreadable-candidate",
+                governedInputPaths: governedPaths,
+                observedAt: observedAt,
+                commands: [
+                    .candidateBaseline: identityCommand,
+                    .mechanicalValidation: packageCommand,
+                    .securityReview: securityCommand,
+                    .evalPreparation: impactCommand
+                ]
+            )
+        }
+        let mechanicalStatus: PipelineEvidenceStatus
+        if quality.score == 100 {
+            mechanicalStatus = .passed
+        } else if quality.score != nil {
+            mechanicalStatus = .reviewRequired
+        } else {
+            mechanicalStatus = .unproven
+        }
+        let preparationStatus: PipelineEvidenceStatus = impact.score == nil ? .unproven : .passed
+        let securityStatus: PipelineEvidenceStatus
+        switch security.disposition {
+        case .passed: securityStatus = .passed
+        case .advisory, .flagged: securityStatus = .reviewRequired
+        case .failed: securityStatus = .blocked
+        case .pending: securityStatus = .unproven
+        }
+
+        return PipelineCandidate(
+            fingerprint: fingerprint,
+            governedInputPaths: governedPaths,
+            observedAt: observedAt,
+            stageReceipts: [
+                PipelineStageReceipt(
+                    stage: .candidateBaseline,
+                    candidateFingerprint: evidenceFingerprint,
+                    evidenceStatus: .reviewRequired,
+                    stageScore: nil,
+                    command: identityCommand,
+                    receiptPath: nil,
+                    modelProfile: "local-identity",
+                    observedAt: observedAt,
+                    nextAction: "Canonical package digest missing"
+                ),
+                PipelineStageReceipt(
+                    stage: .mechanicalValidation,
+                    candidateFingerprint: evidenceFingerprint,
+                    evidenceStatus: mechanicalStatus,
+                    stageScore: quality.score == nil ? nil : 50,
+                    command: packageCommand,
+                    receiptPath: nil,
+                    modelProfile: "local-package",
+                    observedAt: quality.score == nil ? nil : observedAt,
+                    nextAction: quality.score == 100
+                        ? "Package verify passed · Strict audit missing"
+                        : "Package verification unavailable · Strict audit missing"
+                ),
+                PipelineStageReceipt(
+                    stage: .securityReview,
+                    candidateFingerprint: evidenceFingerprint,
+                    evidenceStatus: securityStatus,
+                    stageScore: security.score,
+                    command: securityCommand,
+                    receiptPath: nil,
+                    modelProfile: "local-security",
+                    observedAt: security.score == nil ? nil : observedAt,
+                    nextAction: security.score == nil
+                        ? "Risk taxonomy unavailable · full receipt missing"
+                        : "Risk taxonomy observed early · full receipt missing"
+                ),
+                PipelineStageReceipt(
+                    stage: .evalPreparation,
+                    candidateFingerprint: evidenceFingerprint,
+                    evidenceStatus: preparationStatus,
+                    stageScore: impact.score == nil ? nil : 50,
+                    command: impactCommand,
+                    receiptPath: nil,
+                    modelProfile: "eval-preparation",
+                    observedAt: impact.score == nil ? nil : observedAt,
+                    nextAction: impact.score == nil
+                        ? "Scenario readiness unavailable · scorer & calibration missing"
+                        : "Scenario readiness \(impact.statusLabel) · scorer & calibration missing"
+                ),
+                unprovenReceipt(
+                    .ossLocal,
+                    fingerprint: fingerprint,
+                    modelProfile: "oss-local",
+                    nextAction: "Eval local profile · Unproven"
+                ),
+                unprovenReceipt(
+                    .ossCloud,
+                    fingerprint: fingerprint,
+                    modelProfile: "oss-cloud",
+                    nextAction: "Eval cloud profile · Same scenario IDs required"
+                ),
+                unprovenReceipt(
+                    .tesslStaging,
+                    fingerprint: fingerprint,
+                    modelProfile: "tessl-staging",
+                    nextAction: "Local proof · dry run · handoff"
+                ),
+                unprovenReceipt(
+                    .tesslLiveRegistry,
+                    fingerprint: fingerprint,
+                    modelProfile: "tessl-live",
+                    nextAction: "Publish receipt · registry visibility"
+                ),
+                unprovenReceipt(
+                    .liveScoreAndRuntime,
+                    fingerprint: fingerprint,
+                    modelProfile: "live-runtime",
+                    nextAction: "Installed digest · doctor · observed behavior"
+                )
+            ]
+        )
+    }
+
+    static func productionPipelineCandidate(
+        root: URL,
+        selectedSkillPath: String,
+        evidenceFingerprint: String,
+        checks: PipelineEvidenceLoader.LocalChecks,
+        tessl: TesslSignal,
+        observedAt: Date = Date()
+    ) -> PipelineCandidate {
+        let governedInputs = governedInputURLs(root: root, selectedSkillPath: selectedSkillPath)
+        let governedPaths = governedInputs.map {
+            $0.path.replacingOccurrences(of: root.path + "/", with: "")
+        }
+        guard !governedInputs.isEmpty,
+              let fingerprint = PipelineCandidate.fingerprint(for: governedInputs, root: root) else {
+            return .unproven(fingerprint: "unreadable-candidate", governedInputPaths: governedPaths, observedAt: observedAt)
+        }
+        let evidence = PipelineEvidenceLoader(
+            root: root,
+            selectedSkillPath: selectedSkillPath,
+            evidenceFingerprint: evidenceFingerprint,
+            checks: checks,
+            tessl: tessl,
+            observedAt: observedAt
+        )
+        return PipelineCandidate(
+            fingerprint: fingerprint,
+            governedInputPaths: governedPaths,
+            observedAt: observedAt,
+            stageReceipts: evidence.stageReceipts()
+        )
+    }
+
+    private static func unprovenReceipt(
+        _ stage: PipelineStage,
+        fingerprint: String,
+        modelProfile: String,
+        nextAction: String
+    ) -> PipelineStageReceipt {
+        PipelineStageReceipt(
+            stage: stage,
+            candidateFingerprint: fingerprint,
+            evidenceStatus: .unproven,
+            stageScore: nil,
+            command: "",
+            receiptPath: nil,
+            modelProfile: modelProfile,
+            observedAt: nil,
+            nextAction: nextAction
+        )
+    }
+
+    static func collectEvidence<Value>(
+        root: URL,
+        selectedSkillPath: String,
+        _ collection: () throws -> Value
+    ) rethrows -> CandidateEvidenceBinding<Value> {
+        CandidateEvidenceBinding(
+            candidateFingerprint: candidateFingerprint(root: root, selectedSkillPath: selectedSkillPath),
+            evidence: try collection()
+        )
+    }
+
+    private static func collectEvidenceAsync<Value>(
+        root: URL,
+        selectedSkillPath: String,
+        _ collection: () async -> Value
+    ) async -> CandidateEvidenceBinding<Value> {
+        let fingerprint = candidateFingerprint(root: root, selectedSkillPath: selectedSkillPath)
+        let evidence = await collection()
+        return CandidateEvidenceBinding(
+            candidateFingerprint: fingerprint,
+            evidence: evidence
+        )
+    }
+
+    private static func candidateFingerprint(root: URL, selectedSkillPath: String) -> String {
+        PipelineCandidate.fingerprint(
+            for: governedInputURLs(root: root, selectedSkillPath: selectedSkillPath),
+            root: root
+        ) ?? "unreadable-candidate"
+    }
+
+    private static func isContained(_ child: URL, beneath parent: URL) -> Bool {
+        let parentPath = parent.path.hasSuffix("/") ? parent.path : parent.path + "/"
+        return child.path == parent.path || child.path.hasPrefix(parentPath)
+    }
+
+    private static func governedInputURLs(root: URL, selectedSkillPath: String) -> [URL] {
+        let resolvedRoot = root.standardizedFileURL.resolvingSymlinksInPath()
+        let skillsRoot = resolvedRoot.appendingPathComponent("Skills")
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let skillURL = resolvedRoot.appendingPathComponent(selectedSkillPath)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        guard isContained(skillURL, beneath: skillsRoot),
+              FileManager.default.fileExists(atPath: skillURL.path) else { return [] }
+        let skillDirectory = skillURL.deletingLastPathComponent()
+        guard let enumerator = FileManager.default.enumerator(
+            at: skillDirectory,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [skillURL] }
+        let packageFiles = enumerator.compactMap { $0 as? URL }
+            .map { $0.standardizedFileURL.resolvingSymlinksInPath() }
+            .filter { url in
+                guard isContained(url, beneath: skillsRoot),
+                      let values = try? url.resourceValues(forKeys: [.isRegularFileKey]),
+                      values.isRegularFile == true else { return false }
+                return url != skillURL
+            }
+        return ([skillURL] + packageFiles)
+        .filter { FileManager.default.fileExists(atPath: $0.path) }
+        .reduce(into: [URL]()) { result, url in
+            if !result.contains(where: { $0.path == url.path }) { result.append(url) }
+        }
+        .sorted { $0.path < $1.path }
     }
 
     private func findRepoRoot() throws -> URL {
@@ -181,15 +552,22 @@ struct DashboardLoader {
             ?? environment["SELECTED_SKILL_PATH"]
             ?? UserDefaults.standard.string(forKey: Self.selectedSkillDefaultsKey)
             ?? Self.defaultSkillPath
-        let relativePath = rawPath.hasPrefix(root.path + "/")
-            ? String(rawPath.dropFirst(root.path.count + 1))
-            : rawPath
-        guard relativePath.hasPrefix("Skills/"),
-              relativePath.hasSuffix("/SKILL.md"),
-              FileManager.default.fileExists(atPath: root.appendingPathComponent(relativePath).path) else {
+        let resolvedRoot = root.standardizedFileURL.resolvingSymlinksInPath()
+        let skillsRoot = resolvedRoot.appendingPathComponent("Skills")
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let candidateURL = rawPath.hasPrefix("/")
+            ? URL(fileURLWithPath: rawPath)
+            : resolvedRoot.appendingPathComponent(rawPath)
+        let selectedURL = candidateURL.standardizedFileURL.resolvingSymlinksInPath()
+        guard selectedURL.lastPathComponent == "SKILL.md",
+              Self.isContained(selectedURL, beneath: skillsRoot),
+              FileManager.default.fileExists(atPath: selectedURL.path) else {
             return Self.defaultSkillPath
         }
-        return relativePath
+        let rootPrefix = resolvedRoot.path.hasSuffix("/") ? resolvedRoot.path : resolvedRoot.path + "/"
+        guard selectedURL.path.hasPrefix(rootPrefix) else { return Self.defaultSkillPath }
+        return String(selectedURL.path.dropFirst(rootPrefix.count))
     }
 
     private func run(root: URL, command: String) async -> CommandResult {
@@ -273,6 +651,9 @@ struct DashboardLoader {
         let tessl = Self.tesslCommand()
         let versionResult = Shell.run("\(tessl) --version", cwd: root, timeout: 5)
         guard versionResult.exitCode == 0 else {
+            if let cached = TesslRegistryCache().load(registryPath: registryPath) {
+                return cached.cachedSignal
+            }
             return TesslSignal(
                 ok: false,
                 cliAvailable: false,
@@ -341,7 +722,7 @@ struct DashboardLoader {
         let detail = Shell.run("\(tessl) plugin info \(Self.shellQuoted(registryPath))", cwd: root, timeout: 20)
         let detailVisibility = detail.exitCode == 0 ? Self.tesslVisibility(fromPluginInfo: detail.stdout) : nil
 
-        return TesslSignal(
+        let signal = TesslSignal(
             ok: true,
             cliAvailable: true,
             authenticated: true,
@@ -356,23 +737,30 @@ struct DashboardLoader {
             registryEvalCount: metadata.evalCount,
             registryImprovementMultiplier: metadata.improvementMultiplier,
             registryVisibility: detailVisibility ?? metadata.visibility,
+            dataOrigin: .liveCLI,
             recoveryCommand: "tessl install \(registryPath)"
         )
+        TesslRegistryCache().save(registryPath: registryPath, signal: signal)
+        return signal
     }
 
     private func tesslFixtureSignal(registryPath: String) -> TesslSignal? {
         let environment = ProcessInfo.processInfo.environment
         guard environment["TESSL_REGISTRY_FIXTURE"] == "1"
-                || environment["TESSL_REGISTRY_FIXTURE_SCORE"] != nil else { return nil }
+                || environment["TESSL_REGISTRY_FIXTURE_SCORE"] != nil
+                || environment["TESSL_REGISTRY_FIXTURE_MODE"] != nil else { return nil }
+        let mode = environment["TESSL_REGISTRY_FIXTURE_MODE"] ?? "live"
         let rawScore = environment["TESSL_REGISTRY_FIXTURE_SCORE"]
         let score = rawScore.flatMap(Int.init).flatMap { (0...100).contains($0) ? $0 : nil }
         return TesslSignal(
-            ok: true,
-            cliAvailable: true,
-            authenticated: true,
-            displayStatus: score == nil ? "Connected" : "Scored",
-            detail: score.map { "Fixture registry score \($0); local evidence remains separate." } ?? "Fixture registry metadata connected; local evidence remains separate.",
-            cliVersion: environment["TESSL_REGISTRY_FIXTURE_CLI_VERSION"] ?? "fixture",
+            ok: mode != "cached",
+            cliAvailable: mode != "cached",
+            authenticated: mode != "cached",
+            displayStatus: mode == "cached" ? "CLI unavailable" : (score == nil ? "Connected" : "Scored"),
+            detail: mode == "cached"
+                ? "The Tessl CLI is unavailable; showing the last known registry snapshot."
+                : (score.map { "Fixture registry score \($0); local evidence remains separate." } ?? "Fixture registry metadata connected; local evidence remains separate."),
+            cliVersion: mode == "cached" ? nil : (environment["TESSL_REGISTRY_FIXTURE_CLI_VERSION"] ?? "fixture"),
             registryScore: score,
             registryVersion: environment["TESSL_REGISTRY_FIXTURE_VERSION"],
             registryQualityScore: environment["TESSL_REGISTRY_FIXTURE_QUALITY"].flatMap(Int.init),
@@ -381,6 +769,7 @@ struct DashboardLoader {
             registryEvalCount: environment["TESSL_REGISTRY_FIXTURE_EVALS"].flatMap(Int.init),
             registryImprovementMultiplier: environment["TESSL_REGISTRY_FIXTURE_MULTIPLIER"].flatMap(Double.init),
             registryVisibility: environment["TESSL_REGISTRY_FIXTURE_VISIBILITY"] ?? "Private",
+            dataOrigin: mode == "cached" ? .cached : .liveCLI,
             recoveryCommand: "tessl install \(registryPath)"
         )
     }

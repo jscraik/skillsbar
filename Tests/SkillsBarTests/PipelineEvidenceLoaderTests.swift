@@ -1,0 +1,439 @@
+import Foundation
+@testable import SkillsBar
+import SkillsBarCore
+import XCTest
+
+final class PipelineEvidenceLoaderTests: XCTestCase {
+    private let selectedSkillPath = "Skills/example/SKILL.md"
+    private let digest = "sha256:" + String(repeating: "a", count: 64)
+    private let otherDigest = "sha256:" + String(repeating: "b", count: 64)
+
+    func testLiveProductionLoaderWhenExplicitlyEnabled() throws {
+        guard ProcessInfo.processInfo.environment["SKILLSBAR_LIVE_INTEGRATION"] == "1" else {
+            throw XCTSkip("Set SKILLSBAR_LIVE_INTEGRATION=1 to run against the configured agent-skills and Tessl surfaces.")
+        }
+
+        let dashboard = try DashboardLoader().loadSync()
+
+        XCTAssertEqual(dashboard.pipeline.orderedReceipts.count, 9)
+        XCTAssertEqual(dashboard.pipeline.orderedReceipts.first?.stage, .candidateBaseline)
+        XCTAssertEqual(dashboard.pipeline.orderedReceipts.first?.evidenceStatus, .passed)
+        XCTAssertEqual(
+            dashboard.pipeline.orderedReceipts.first { $0.stage == .mechanicalValidation }?.evidenceStatus,
+            .passed
+        )
+        XCTAssertNotNil(dashboard.pipeline.activeReceipt)
+        XCTAssertTrue(dashboard.localEvidenceCommand.contains("sdk package build"))
+        XCTAssertTrue(dashboard.localEvidenceCommand.contains("skills audit"))
+        XCTAssertTrue(dashboard.localEvidenceCommand.contains("scorer-calibration"))
+    }
+
+    func testLocalRefreshUsesAllRequiredReadOnlySDKChecks() {
+        let command = DashboardLoader.localEvidenceCommand(
+            root: URL(fileURLWithPath: "/tmp/agent-skills"),
+            skillPath: selectedSkillPath
+        )
+
+        XCTAssertTrue(command.contains("sdk package build"))
+        XCTAssertTrue(command.contains("skills package verify"))
+        XCTAssertTrue(command.contains("skills audit"))
+        XCTAssertTrue(command.contains("sdk security risk-modes"))
+        XCTAssertTrue(command.contains("sdk eval scenario-quality"))
+        XCTAssertTrue(command.contains("sdk eval scorer-quality"))
+        XCTAssertTrue(command.contains("sdk eval scorer-calibration"))
+        XCTAssertFalse(command.contains("oss-local"))
+        XCTAssertFalse(command.contains("oss-cloud"))
+        XCTAssertFalse(command.contains("tessl-live"))
+    }
+
+    func testMissingDurableReceiptsNeverInventsDownstreamProof() throws {
+        try withRepo { root in
+            let receipts = makeLoader(root: root).stageReceipts()
+
+            XCTAssertEqual(receipts.prefix(4).map(\.evidenceStatus), [.passed, .passed, .passed, .passed])
+            XCTAssertEqual(receipts.dropFirst(4).map(\.evidenceStatus), Array(repeating: .unproven, count: 5))
+        }
+    }
+
+    func testCleanRiskTaxonomyCannotPassWithoutFullGovernedSecurityReceipt() throws {
+        try withRepo { root in
+            try FileManager.default.removeItem(at: securityReceiptURL(root))
+
+            let security = makeLoader(root: root).stageReceipts().first { $0.stage == .securityReview }
+
+            XCTAssertEqual(security?.evidenceStatus, .unproven)
+            XCTAssertTrue(security?.nextAction.contains("missing or malformed") == true)
+        }
+    }
+
+    func testCompleteCandidateBoundEvidenceCanProveAllNineStages() throws {
+        try withRepo { root in
+            try writeGateChain(
+                root: root,
+                gates: ["oss_local", "oss_cloud", "tessl_local_proof", "tessl_dry_run", "handoff_readiness"],
+                digest: digest,
+                scenarioIDs: ["scenario-a", "scenario-b"]
+            )
+            try writeReleaseReceipt(
+                root: root,
+                gate: "tessl_live_registry",
+                digest: digest,
+                scenarioIDs: ["scenario-a", "scenario-b"]
+            )
+            try writeRuntimeCard(root: root, digest: digest, status: "pass")
+
+            let receipts = makeLoader(root: root).stageReceipts()
+
+            XCTAssertEqual(receipts.map(\.evidenceStatus), Array(repeating: .passed, count: 9))
+            XCTAssertTrue(receipts.dropFirst(4).allSatisfy { $0.receiptPath != nil })
+        }
+    }
+
+    func testDigestMismatchMarksTheReceiptStale() throws {
+        try withRepo { root in
+            try writeGateChain(root: root, gates: ["oss_local"], digest: otherDigest, scenarioIDs: ["scenario-a"])
+
+            let local = makeLoader(root: root).stageReceipts().first { $0.stage == .ossLocal }
+
+            XCTAssertEqual(local?.evidenceStatus, .stale)
+            XCTAssertTrue(local?.nextAction.contains("different package digest") == true)
+        }
+    }
+
+    func testGateChainRequiresEveryPrecedingGateToPass() throws {
+        try withRepo { root in
+            try writeGateChain(root: root, gates: ["oss_local"], digest: digest, scenarioIDs: ["scenario-a"])
+            let gateChain = handoffDirectory(root).appendingPathComponent("gate-chain.json")
+            var object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: gateChain)) as? [String: Any])
+            var gates = try XCTUnwrap(object["gates"] as? [[String: Any]])
+            gates[0]["status"] = "blocked"
+            object["gates"] = gates
+            try writeJSON(object, to: gateChain)
+
+            let local = makeLoader(root: root).stageReceipts().first { $0.stage == .ossLocal }
+
+            XCTAssertEqual(local?.evidenceStatus, .unproven)
+            XCTAssertTrue(local?.nextAction.contains("gate-chain") == true)
+        }
+    }
+
+    func testEvalCloudRequiresTheSameScenarioIdentitiesAsEvalLocal() throws {
+        try withRepo { root in
+            try writeGateChain(
+                root: root,
+                gates: ["oss_local", "oss_cloud"],
+                digest: digest,
+                scenarioIDsByGate: [
+                    "oss_local": ["scenario-a", "scenario-b"],
+                    "oss_cloud": ["scenario-a", "scenario-c"]
+                ]
+            )
+
+            let cloud = makeLoader(root: root).stageReceipts().first { $0.stage == .ossCloud }
+
+            XCTAssertEqual(cloud?.evidenceStatus, .blocked)
+            XCTAssertTrue(cloud?.nextAction.contains("do not match") == true)
+        }
+    }
+
+    func testUnsafeReceiptPathIsRejected() throws {
+        try withRepo { root in
+            let handoff = handoffDirectory(root)
+            try FileManager.default.createDirectory(at: handoff, withIntermediateDirectories: true)
+            try writeJSON([
+                "schema_version": "skills-sdk.gate-chain.v1",
+                "gates": [[
+                    "id": "oss_local",
+                    "status": "pass",
+                    "receipt_path": "../outside.json"
+                ]]
+            ], to: handoff.appendingPathComponent("gate-chain.json"))
+
+            let local = makeLoader(root: root).stageReceipts().first { $0.stage == .ossLocal }
+
+            XCTAssertEqual(local?.evidenceStatus, .unproven)
+            XCTAssertNil(local?.receiptPath)
+        }
+    }
+
+    func testLiveRegistryDataCannotPromotePublicationWithoutCandidateReceipt() throws {
+        try withRepo { root in
+            try writeGateChain(
+                root: root,
+                gates: ["oss_local", "oss_cloud", "tessl_local_proof", "tessl_dry_run", "handoff_readiness"],
+                digest: digest,
+                scenarioIDs: ["scenario-a"]
+            )
+
+            let publication = makeLoader(root: root).stageReceipts().first { $0.stage == .tesslLiveRegistry }
+
+            XCTAssertEqual(publication?.evidenceStatus, .unproven)
+            XCTAssertTrue(publication?.nextAction.contains("publication") == true)
+        }
+    }
+
+    func testRuntimeCardForAnotherDigestIsStale() throws {
+        try withRepo { root in
+            try writeGateChain(
+                root: root,
+                gates: ["oss_local", "oss_cloud", "tessl_local_proof", "tessl_dry_run", "handoff_readiness"],
+                digest: digest,
+                scenarioIDs: ["scenario-a"]
+            )
+            try writeReleaseReceipt(root: root, gate: "tessl_live_registry", digest: digest, scenarioIDs: ["scenario-a"])
+            try writeRuntimeCard(root: root, digest: otherDigest, status: "pass")
+
+            let runtime = makeLoader(root: root).stageReceipts().first { $0.stage == .liveScoreAndRuntime }
+
+            XCTAssertEqual(runtime?.evidenceStatus, .stale)
+        }
+    }
+
+    func testMalformedCanonicalDigestBlocksIdentityAndDownstreamEvidence() throws {
+        try withRepo { root in
+            let checks = makeChecks(digest: "not-a-digest")
+            let receipts = makeLoader(root: root, checks: checks).stageReceipts()
+
+            XCTAssertEqual(receipts.first?.evidenceStatus, .blocked)
+            XCTAssertTrue(receipts.dropFirst().allSatisfy { $0.evidenceStatus == .unproven })
+        }
+    }
+
+    private func makeLoader(
+        root: URL,
+        checks: PipelineEvidenceLoader.LocalChecks? = nil
+    ) -> PipelineEvidenceLoader {
+        var tessl = SkillDashboard.reviewFixture.tessl
+        tessl.ok = true
+        tessl.cliAvailable = true
+        tessl.authenticated = true
+        tessl.dataOrigin = .liveCLI
+        return PipelineEvidenceLoader(
+            root: root,
+            selectedSkillPath: selectedSkillPath,
+            evidenceFingerprint: "candidate-fingerprint",
+            checks: checks ?? makeChecks(digest: digest),
+            tessl: tessl,
+            observedAt: Date(timeIntervalSince1970: 1)
+        )
+    }
+
+    private func makeChecks(digest: String) -> PipelineEvidenceLoader.LocalChecks {
+        PipelineEvidenceLoader.LocalChecks(
+            packageBuild: result([
+                "status": "success",
+                "data": ["skills_sdk_package_build": [
+                    "status": "built",
+                    "canonical_source_path": selectedSkillPath,
+                    "version": "0.2.0",
+                    "package_digest": digest,
+                    "mutation_performed": false
+                ]]
+            ]),
+            strictAudit: result([
+                "status": "success",
+                "data": [
+                    "diagnostics": ["exit_code": 0],
+                    "security_gate": ["exit_code": 0],
+                    "family_benchmarks": ["exit_code": 0],
+                    "openclaw_guard": ["exit_code": 0]
+                ]
+            ]),
+            packageVerify: result([
+                "status": "success",
+                "data": ["skill_package_verification": [
+                    "status": "pass",
+                    "checks": [["status": "pass"], ["status": "pass"]]
+                ]]
+            ]),
+            securityRiskModes: result([
+                "status": "success",
+                "data": ["skills_sdk_risk_mode_taxonomy": [
+                    "package_digest": digest,
+                    "receipt": ["status": "pass", "mode_results": []]
+                ]]
+            ]),
+            scenarioQuality: result([
+                "status": "success",
+                "data": ["skills_sdk_eval_scenario_quality": [
+                    "status": "preview",
+                    "blocked_count": 0,
+                    "scenario_count": 2,
+                    "promotion_ready_count": 2
+                ]]
+            ]),
+            scorerQuality: previewResult(key: "skills_sdk_eval_scorer_quality"),
+            scorerCalibration: previewResult(key: "skills_sdk_eval_scorer_calibration")
+        )
+    }
+
+    private func previewResult(key: String) -> CommandResult {
+        result([
+            "status": "success",
+            "data": [key: ["status": "preview", "ready": true, "blocked_count": 0]]
+        ])
+    }
+
+    private func result(_ object: [String: Any]) -> CommandResult {
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else {
+            XCTFail("Test fixture must serialize as JSON")
+            return CommandResult(exitCode: 1, stdout: "", stderr: "fixture serialization failed")
+        }
+        return CommandResult(exitCode: 0, stdout: String(decoding: data, as: UTF8.self), stderr: "")
+    }
+
+    private func withRepo(_ body: (URL) throws -> Void) throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-production-evidence-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let skill = root.appendingPathComponent(selectedSkillPath)
+        try FileManager.default.createDirectory(at: skill.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "---\nname: example\ndescription: Test\n---\n".write(to: skill, atomically: true, encoding: .utf8)
+        try writeSecurityReceipt(root: root, digest: digest)
+        try body(root)
+    }
+
+    private func writeSecurityReceipt(root: URL, digest: String) throws {
+        try writeJSON(
+            [
+                "status": "success",
+                "data": ["skills_sdk_security_lane": [
+                    "receipt": [
+                        "schema_version": "skills-sdk.security-lane-receipt.v0",
+                        "status": "pass",
+                        "package_digest": digest,
+                        "security_lane_digest": "sha256:" + String(repeating: "c", count: 64),
+                        "execution_performed": false,
+                        "network_accessed": false,
+                        "credentials_accessed": false,
+                        "mutation_performed": false
+                    ]
+                ]]
+            ],
+            to: securityReceiptURL(root)
+        )
+    }
+
+    private func securityReceiptURL(_ root: URL) -> URL {
+        root.appendingPathComponent(
+            ".harness/evidence/skills-sdk/oss-security/example-security-lane-receipt.json"
+        )
+    }
+
+    private func writeGateChain(
+        root: URL,
+        gates: [String],
+        digest: String,
+        scenarioIDs: [String]
+    ) throws {
+        try writeGateChain(
+            root: root,
+            gates: gates,
+            digest: digest,
+            scenarioIDsByGate: Dictionary(uniqueKeysWithValues: gates.map { ($0, scenarioIDs) })
+        )
+    }
+
+    private func writeGateChain(
+        root: URL,
+        gates: [String],
+        digest: String,
+        scenarioIDsByGate: [String: [String]]
+    ) throws {
+        let handoff = handoffDirectory(root)
+        try FileManager.default.createDirectory(at: handoff, withIntermediateDirectories: true)
+        let canonical = [
+            "sdk_start", "strict_audit", "package_verify", "security_risk_modes",
+            "scenario_quality", "scorer_quality", "scorer_calibration", "oss_local",
+            "oss_cloud", "tessl_local_proof", "tessl_dry_run", "handoff_readiness"
+        ]
+        let lastIndex = try XCTUnwrap(gates.compactMap { canonical.firstIndex(of: $0) }.max())
+        var rows: [[String: Any]] = []
+        for gate in canonical.prefix(lastIndex + 1) {
+            let receipt: String
+            if gates.contains(gate) {
+                receipt = try writeReleaseReceipt(
+                    root: root,
+                    gate: gate,
+                    digest: digest,
+                    scenarioIDs: scenarioIDsByGate[gate] ?? []
+                )
+            } else {
+                receipt = ".harness/evidence/handoff/example/not-inspected-\(gate).json"
+            }
+            rows.append([
+                "id": gate,
+                "status": "pass",
+                "receipt_path": receipt
+            ])
+        }
+        try writeJSON(
+            ["schema_version": "skills-sdk.gate-chain.v1", "gates": rows],
+            to: handoff.appendingPathComponent("gate-chain.json")
+        )
+    }
+
+    @discardableResult
+    private func writeReleaseReceipt(
+        root: URL,
+        gate: String,
+        digest: String,
+        scenarioIDs: [String]
+    ) throws -> String {
+        let handoff = handoffDirectory(root)
+        try FileManager.default.createDirectory(at: handoff, withIntermediateDirectories: true)
+        let evidenceRelative = ".harness/evidence/handoff/example/evidence-\(gate).json"
+        var evidence: [String: Any] = [
+            "status": "pass",
+            "package_digest": digest,
+            "scenario_ids": scenarioIDs
+        ]
+        if gate == "tessl_live_registry" {
+            evidence["registry_package_digest"] = digest
+        }
+        try writeJSON(evidence, to: root.appendingPathComponent(evidenceRelative))
+        let receiptRelative = ".harness/evidence/handoff/example/release-gate-\(gate).json"
+        try writeJSON(
+            [
+                "schema_version": "skills-sdk.release-gate-receipt.v1",
+                "gate": gate,
+                "status": "pass",
+                "what_this_proves": "This gate is candidate-bound.",
+                "what_this_does_not_prove": "This gate does not prove later gates.",
+                "evidence_refs": [evidenceRelative]
+            ],
+            to: root.appendingPathComponent(receiptRelative)
+        )
+        return receiptRelative
+    }
+
+    private func writeRuntimeCard(root: URL, digest: String, status: String) throws {
+        let path = root.appendingPathComponent(
+            ".harness/evidence/runtime-proof/example/codex/runtime-card.json"
+        )
+        try FileManager.default.createDirectory(at: path.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try writeJSON(
+            [
+                "schema_version": 1,
+                "skill_handle": "example",
+                "runtime_target": "codex",
+                "runtime_status": status,
+                "package_digest": digest,
+                "installed_digest": digest,
+                "doctor_status": "pass",
+                "observed_behavior_status": "pass"
+            ],
+            to: path
+        )
+    }
+
+    private func handoffDirectory(_ root: URL) -> URL {
+        root.appendingPathComponent(".harness/evidence/handoff/example")
+    }
+
+    private func writeJSON(_ object: Any, to url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: url)
+    }
+}

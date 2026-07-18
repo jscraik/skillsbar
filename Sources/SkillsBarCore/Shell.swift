@@ -146,7 +146,8 @@ public struct JSONNode {
     public func firstInt(for keys: [String]) -> Int? {
         for key in keys {
             if let int = findValue(named: key, in: value) as? Int { return int }
-            if let double = findValue(named: key, in: value) as? Double { return Int(double) }
+            if let double = findValue(named: key, in: value) as? Double,
+               let int = Int(exactly: double) { return int }
         }
         return nil
     }
@@ -159,6 +160,13 @@ public struct JSONNode {
         return nil
     }
 
+    public func firstBool(for keys: [String]) -> Bool? {
+        for key in keys {
+            if let bool = findValue(named: key, in: value) as? Bool { return bool }
+        }
+        return nil
+    }
+
     public func allStrings(for key: String) -> [String] {
         var results: [String] = []
         collectStrings(named: key, from: value, into: &results)
@@ -167,6 +175,17 @@ public struct JSONNode {
 
     public func string(at path: [String]) -> String? {
         value(at: path) as? String
+    }
+
+    public func int(at path: [String]) -> Int? {
+        if let int = value(at: path) as? Int { return int }
+        if let double = value(at: path) as? Double,
+           let int = Int(exactly: double) { return int }
+        return nil
+    }
+
+    public func bool(at path: [String]) -> Bool? {
+        value(at: path) as? Bool
     }
 
     public func stringArray(at path: [String]) -> [String] {

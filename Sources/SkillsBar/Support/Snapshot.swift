@@ -28,6 +28,10 @@ private struct IncreasedContrastOverrideKey: EnvironmentKey {
     static let defaultValue: Bool? = nil
 }
 
+private struct SnapshotModeKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
     var skillsBarReduceTransparencyOverride: Bool? {
         get { self[ReduceTransparencyOverrideKey.self] }
@@ -38,12 +42,18 @@ extension EnvironmentValues {
         get { self[IncreasedContrastOverrideKey.self] }
         set { self[IncreasedContrastOverrideKey.self] = newValue }
     }
+
+    var skillsBarSnapshotMode: Bool {
+        get { self[SnapshotModeKey.self] }
+        set { self[SnapshotModeKey.self] = newValue }
+    }
 }
 
 enum SnapshotRenderer {
     @MainActor
     static func render(to outputURL: URL) {
         do {
+            _ = NSApplication.shared
             let dashboard = try DashboardDataSource().loadSync()
             try render(dashboard: dashboard, to: outputURL)
             print("Wrote snapshot \(outputURL.path)")
@@ -71,12 +81,19 @@ enum SnapshotRenderer {
             .environment(\.dynamicTypeSize, configuration.dynamicTypeSize)
             .environment(\.skillsBarReduceTransparencyOverride, configuration.reduceTransparency)
             .environment(\.skillsBarIncreasedContrastOverride, configuration.increasedContrast)
+            .environment(\.skillsBarSnapshotMode, true)
         let hostingView = NSHostingView(rootView: view)
         hostingView.frame = NSRect(
             origin: .zero,
             size: NSSize(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
         )
         hostingView.layoutSubtreeIfNeeded()
+        // AppKit material layers can complete after the first layout pass in a
+        // headless process. Give them a bounded settle window before capture.
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.20))
+        hostingView.layoutSubtreeIfNeeded()
+        hostingView.needsDisplay = true
+        hostingView.displayIfNeeded()
         guard let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds) else {
             throw SnapshotError.bitmapUnavailable
         }

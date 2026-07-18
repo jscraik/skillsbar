@@ -16,16 +16,28 @@ struct DashboardDataSource {
     }
 
     var usesReviewFixture: Bool {
-        environment["SKILLSBAR_REVIEW_FIXTURE"] == "1"
+        fixtureValue != nil
+    }
+
+    private var fixtureValue: String? {
+        guard let value = environment["SKILLSBAR_REVIEW_FIXTURE"]?.lowercased(),
+              ["1", "live", "no-cli", "offline"].contains(value) else { return nil }
+        return value
+    }
+
+    private var fixtureDashboard: SkillDashboard {
+        fixtureValue == "no-cli" || fixtureValue == "offline"
+            ? .reviewNoCLIFixture
+            : .reviewFixture
     }
 
     var initialDashboard: SkillDashboard {
-        usesReviewFixture ? .reviewFixture : .placeholder
+        usesReviewFixture ? fixtureDashboard : .placeholder
     }
 
     func loadSync() throws -> SkillDashboard {
         if usesReviewFixture {
-            return .reviewFixture
+            return fixtureDashboard
         }
         return try liveLoad()
     }
@@ -33,7 +45,7 @@ struct DashboardDataSource {
     @MainActor
     func load() async throws -> SkillDashboard {
         if usesReviewFixture {
-            return .reviewFixture
+            return fixtureDashboard
         }
         return try await liveLoadAsync()
     }

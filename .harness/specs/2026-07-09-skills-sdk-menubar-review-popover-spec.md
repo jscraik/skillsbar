@@ -4,7 +4,7 @@ artifact_id: spec-2026-07-09-skills-sdk-menubar-review-popover
 artifact_type: he-spec
 canonical_slug: skills-sdk-menubar-review-popover
 title: Skills SDK Menubar Review Popover Visual and Behavior Spec
-status: implemented_pending_live_proof
+status: superseded_by_pipeline_posture_spec
 date: 2026-07-09
 origin: user-requested mockup-to-spec
 risk: medium
@@ -37,7 +37,14 @@ persistent_artifacts:
   - .harness/reviews/2026-07-09-review-popover-pass3-synthesis.md
 live_state_refresh: required
 session_evidence_status: historical
+successor_spec: .harness/specs/2026-07-10-skillsbar-pipeline-posture-spec.md
 ---
+
+> Superseded as the default implementation contract on 2026-07-10 by
+> [SkillsBar Pipeline Posture Spec](2026-07-10-skillsbar-pipeline-posture-spec.md).
+> This document remains historical evidence for the earlier local-review versus
+> registry layout. Its fixed `78` review score and single review-trigger model
+> must not govern new pipeline-posture implementation.
 
 ## Command Summary
 

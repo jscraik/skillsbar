@@ -23,6 +23,7 @@ final class ReviewPopoverTests: XCTestCase {
     }
 
     private let expectedCommand = "cd '/Users/jamiecraik/dev/agent-skills' && ./bin/ask sdk security risk-modes 'Skills/agent-ops/improve-agent-native/SKILL.md' --preview --json --robot"
+    private let expectedIdentityCommand = "cd '/Users/jamiecraik/dev/agent-skills' && ./bin/ask sdk start 'Skills/agent-ops/improve-agent-native' --json --robot"
 
     func testReviewFixtureMatchesImplementationHandoffContract() {
         let dashboard = SkillDashboard.reviewFixture
@@ -31,6 +32,11 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(dashboard.verdictDetail, "3 risks need inspection")
         XCTAssertEqual(dashboard.description, "Live eval plugin for improve-agent-native.")
         XCTAssertEqual(dashboard.score, 78)
+        XCTAssertEqual(dashboard.pipeline.postureScore, 0)
+        XCTAssertEqual(dashboard.pipeline.evidencedStageCount, 1)
+        XCTAssertEqual(dashboard.pipeline.activeReceipt?.stage, .candidateBaseline)
+        XCTAssertEqual(dashboard.pipeline.activeReceipt?.nextAction, "Canonical package digest missing")
+        XCTAssertEqual(dashboard.pipeline.activeReceipt?.command, expectedIdentityCommand)
         XCTAssertEqual(dashboard.quality.statusLabel, "100%")
         XCTAssertEqual(dashboard.impact.statusLabel, "71/71")
         XCTAssertEqual(dashboard.security.statusDisplay, "3 risks")
@@ -41,6 +47,7 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(dashboard.tessl.registryImpactScore, 63)
         XCTAssertEqual(dashboard.tessl.registrySecurityDisplay, "Passed")
         XCTAssertEqual(dashboard.tessl.registryEvalCount, 68)
+        XCTAssertEqual(dashboard.tessl.registryImprovementMultiplier, 1.28)
         XCTAssertEqual(dashboard.tessl.registryVisibilityDisplay, "Private")
         XCTAssertEqual(dashboard.reviewInspectCommand, expectedCommand)
     }
@@ -122,6 +129,12 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(SecurityDisposition(label: "Advisory review").tone, .advisory)
         XCTAssertEqual(SecurityDisposition(label: "Flagged").tone, .warning)
         XCTAssertEqual(SecurityDisposition(label: "Failed").tone, .danger)
+    }
+
+    func testSemanticVersionNormalizationHandlesUpperAndLowercasePrefixes() {
+        XCTAssertEqual(normalizeSemanticVersion("v1.2.3"), "1.2.3")
+        XCTAssertEqual(normalizeSemanticVersion("V1.2.3"), "1.2.3")
+        XCTAssertEqual(normalizeSemanticVersion(" 1.2.3 "), "1.2.3")
     }
 
     func testSecurityDispositionUsesSeverityFirstPrecedence() {
@@ -241,6 +254,15 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertNil(missingMetadata.visibility)
     }
 
+    func testRegistryVisibilityDisplayNormalizesPluginMetadataForThePill() {
+        var privateSignal = SkillDashboard.reviewFixture.tessl
+        privateSignal.registryVisibility = "private"
+        XCTAssertEqual(privateSignal.registryVisibilityDisplay, "Private")
+
+        privateSignal.registryVisibility = "PUBLIC"
+        XCTAssertEqual(privateSignal.registryVisibilityDisplay, "Public")
+    }
+
     func testTesslMetadataPrefersCanonicalResultOverUnrelatedNestedKeys() throws {
         let metadata = try registryMetadata(fixture: "tessl-ambiguous-skill")
 
@@ -281,6 +303,30 @@ final class ReviewPopoverTests: XCTestCase {
         let baselineURL = repoRoot.appendingPathComponent(".harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png")
         let difference = try pixelDifference(baselineURL, outputURL)
         XCTAssertLessThanOrEqual(difference, 0.0005, "Rendered review fixture drifted from the retained baseline")
+    }
+
+    @MainActor
+    func testReviewFixtureRendersPipelinePostureDeterministically() throws {
+        let firstURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-review-first-\(UUID().uuidString).png")
+        let secondURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-review-second-\(UUID().uuidString).png")
+        defer {
+            try? FileManager.default.removeItem(at: firstURL)
+            try? FileManager.default.removeItem(at: secondURL)
+        }
+
+        try SnapshotRenderer.render(dashboard: .reviewFixture, to: firstURL)
+        try SnapshotRenderer.render(dashboard: .reviewFixture, to: secondURL)
+
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: firstURL)))
+        XCTAssertEqual(bitmap.pixelsWide, 404)
+        XCTAssertEqual(bitmap.pixelsHigh, 720)
+        XCTAssertLessThanOrEqual(
+            try pixelDifference(firstURL, secondURL),
+            0.0005,
+            "Repeated production renders must not capture partially materialized layers"
+        )
     }
 
     @MainActor
@@ -327,6 +373,453 @@ final class ReviewPopoverTests: XCTestCase {
 
         XCTAssertEqual(liveLoadCount, 0)
         XCTAssertEqual(dashboard.reviewInspectCommand, expectedCommand)
+    }
+
+    @MainActor
+    func testAsyncNoCLIFixtureBypassesLiveLoader() async throws {
+        var liveLoadCount = 0
+        let source = DashboardDataSource(
+            environment: ["SKILLSBAR_REVIEW_FIXTURE": "no-cli"],
+            liveLoad: { .placeholder },
+            liveLoadAsync: {
+                liveLoadCount += 1
+                return .reviewFixture
+            }
+        )
+
+        let dashboard = try await source.load()
+
+        XCTAssertEqual(liveLoadCount, 0)
+        XCTAssertEqual(
+            dashboard.registryEvidenceCaption,
+            "Historical external baseline · not proof for this candidate."
+        )
+    }
+
+    @MainActor
+    func testAsyncLoadUsesLiveLoaderWhenFixtureIsDisabled() async throws {
+        var liveLoadCount = 0
+        let source = DashboardDataSource(
+            environment: [:],
+            liveLoad: { .placeholder },
+            liveLoadAsync: {
+                liveLoadCount += 1
+                return .reviewFixture
+            }
+        )
+
+        let dashboard = try await source.load()
+
+        XCTAssertEqual(liveLoadCount, 1)
+        XCTAssertEqual(dashboard.registryPath, SkillDashboard.reviewFixture.registryPath)
+    }
+
+    func testPipelinePostureReconcilesVisibleFixtureContributions() {
+        let candidate = SkillDashboard.reviewFixture.pipeline
+
+        XCTAssertEqual(candidate.orderedReceipts.map(\.stage), PipelineStage.allCases)
+        XCTAssertEqual(candidate.orderedReceipts.count, 9)
+        XCTAssertEqual(
+            candidate.orderedReceipts.map(\.evidenceStatus),
+            [.reviewRequired, .held, .held, .held, .unproven, .unproven, .unproven, .unproven, .unproven]
+        )
+        XCTAssertEqual(candidate.orderedReceipts.map { candidate.contribution(for: $0) }, Array(repeating: 0, count: 9))
+        XCTAssertEqual(candidate.postureScore, 0)
+        XCTAssertEqual(
+            candidate.postureScore,
+            candidate.orderedReceipts.reduce(0) { $0 + candidate.contribution(for: $1) }
+        )
+    }
+
+    func testPipelineGatesLaterReceiptsAfterReviewStage() {
+        let fingerprint = "candidate-a"
+        let candidate = PipelineCandidate(
+            fingerprint: fingerprint,
+            governedInputPaths: ["Skills/example/SKILL.md"],
+            observedAt: Date(timeIntervalSince1970: 0),
+            stageReceipts: PipelineStage.allCases.map { stage in
+                PipelineStageReceipt(
+                    stage: stage,
+                    candidateFingerprint: fingerprint,
+                    evidenceStatus: stage == .securityReview ? .reviewRequired : .passed,
+                    stageScore: 100,
+                    command: "inspect \(stage.title)",
+                    receiptPath: "receipt:\(stage.rawValue)",
+                    modelProfile: "test",
+                    observedAt: Date(timeIntervalSince1970: 0),
+                    nextAction: "Inspect \(stage.title)"
+                )
+            }
+        )
+
+        guard let securityIndex = PipelineStage.allCases.firstIndex(of: .securityReview) else {
+            XCTFail("Security review must remain a canonical pipeline stage")
+            return
+        }
+        XCTAssertTrue(candidate.orderedReceipts.prefix(securityIndex).allSatisfy { $0.evidenceStatus == .passed })
+        XCTAssertEqual(candidate.orderedReceipts[securityIndex].evidenceStatus, .reviewRequired)
+        XCTAssertTrue(candidate.orderedReceipts.dropFirst(securityIndex + 1).allSatisfy { $0.evidenceStatus == .held })
+        XCTAssertEqual(candidate.postureScore, 35)
+    }
+
+    func testFingerprintChangeMakesOldReceiptsStale() {
+        let oldFingerprint = "old"
+        let candidate = PipelineCandidate(
+            fingerprint: "new",
+            governedInputPaths: ["Skills/example/SKILL.md", "Skills/example/references/core.md"],
+            observedAt: Date(timeIntervalSince1970: 1),
+            stageReceipts: PipelineStage.allCases.map { stage in
+                PipelineStageReceipt(
+                    stage: stage,
+                    candidateFingerprint: oldFingerprint,
+                    evidenceStatus: .passed,
+                    stageScore: 100,
+                    command: "inspect",
+                    receiptPath: "old-receipt",
+                    modelProfile: "test",
+                    observedAt: Date(timeIntervalSince1970: 0),
+                    nextAction: "Re-establish evidence"
+                )
+            }
+        )
+
+        XCTAssertTrue(candidate.orderedReceipts.allSatisfy { $0.evidenceStatus == .stale })
+        XCTAssertEqual(candidate.evidencedStageCount, 0)
+        XCTAssertEqual(candidate.postureScore, 0)
+    }
+
+    func testLoaderRejectsEvidenceWhenGovernedInputChangesDuringCollection() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-candidate-binding-\(UUID().uuidString)")
+        let selectedSkillPath = "Skills/example/SKILL.md"
+        let skillURL = root.appendingPathComponent(selectedSkillPath)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: skillURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try "# Candidate before collection".write(to: skillURL, atomically: true, encoding: .utf8)
+
+        let boundEvidence = try DashboardLoader.collectEvidence(
+            root: root,
+            selectedSkillPath: selectedSkillPath
+        ) {
+            try "# Candidate changed during collection".write(
+                to: skillURL,
+                atomically: true,
+                encoding: .utf8
+            )
+            return (
+                quality: MetricSignal(
+                    score: 100,
+                    detail: "Package verified.",
+                    source: "Local SDK package verify",
+                    command: "verify"
+                ),
+                security: SecuritySignal(
+                    score: 100,
+                    status: "Passed",
+                    detail: "No known issues.",
+                    sourceLabel: "Local SDK risk-modes",
+                    segmentCount: 0,
+                    inspectCommand: "inspect"
+                )
+            )
+        }
+        let candidate = DashboardLoader.pipelineCandidate(
+            root: root,
+            selectedSkillPath: selectedSkillPath,
+            evidenceFingerprint: boundEvidence.candidateFingerprint,
+            quality: boundEvidence.evidence.quality,
+            security: boundEvidence.evidence.security,
+            observedAt: Date(timeIntervalSince1970: 1)
+        )
+
+        XCTAssertNotEqual(candidate.fingerprint, boundEvidence.candidateFingerprint)
+        XCTAssertTrue(candidate.orderedReceipts.prefix(4).allSatisfy { $0.evidenceStatus == .stale })
+        XCTAssertTrue(candidate.orderedReceipts.dropFirst(4).allSatisfy { $0.evidenceStatus == .unproven })
+        XCTAssertEqual(candidate.evidencedStageCount, 0)
+        XCTAssertEqual(candidate.postureScore, 0)
+    }
+
+    func testPipelineCandidateRejectsMissingGovernedInput() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-missing-candidate-\(UUID().uuidString)")
+        let selectedSkillPath = "Skills/example/SKILL.md"
+        let skillURL = root.appendingPathComponent(selectedSkillPath)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: skillURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try "# Candidate before removal".write(to: skillURL, atomically: true, encoding: .utf8)
+
+        let boundEvidence = DashboardLoader.collectEvidence(
+            root: root,
+            selectedSkillPath: selectedSkillPath
+        ) {}
+        try FileManager.default.removeItem(at: skillURL)
+
+        let candidate = DashboardLoader.pipelineCandidate(
+            root: root,
+            selectedSkillPath: selectedSkillPath,
+            evidenceFingerprint: boundEvidence.candidateFingerprint,
+            quality: MetricSignal(
+                score: 100,
+                detail: "Package verified.",
+                source: "Local SDK package verify",
+                command: "verify"
+            ),
+            security: SecuritySignal(
+                score: 100,
+                status: "Passed",
+                detail: "No known issues.",
+                sourceLabel: "Local SDK risk-modes",
+                segmentCount: 0,
+                inspectCommand: "inspect"
+            )
+        )
+
+        XCTAssertEqual(candidate.fingerprint, "unreadable-candidate")
+        XCTAssertTrue(candidate.orderedReceipts.allSatisfy { $0.evidenceStatus == .unproven })
+    }
+
+    func testCanonicalIdentityRemainsActiveUntilCanonicalDigestExists() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-active-stage-\(UUID().uuidString)")
+        let selectedSkillPath = "Skills/example/SKILL.md"
+        let skillURL = root.appendingPathComponent(selectedSkillPath)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: skillURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try "# Stable candidate".write(to: skillURL, atomically: true, encoding: .utf8)
+        let fingerprint = DashboardLoader.collectEvidence(
+            root: root,
+            selectedSkillPath: selectedSkillPath
+        ) {}
+        let candidate = DashboardLoader.pipelineCandidate(
+            root: root,
+            selectedSkillPath: selectedSkillPath,
+            evidenceFingerprint: fingerprint.candidateFingerprint,
+            quality: MetricSignal(
+                score: 100,
+                detail: "Package verified.",
+                source: "Local SDK package verify",
+                command: "verify"
+            ),
+            security: SecuritySignal(
+                score: 100,
+                status: "Passed",
+                detail: "No known issues.",
+                sourceLabel: "Local SDK risk-modes",
+                segmentCount: 0,
+                inspectCommand: "inspect"
+            ),
+            observedAt: Date(timeIntervalSince1970: 1)
+        )
+
+        XCTAssertEqual(PipelineStage.ossLocal.title, "Eval local proof")
+        XCTAssertEqual(PipelineStage.ossCloud.title, "Eval cloud proof")
+        XCTAssertEqual(PipelineStage.tesslLiveRegistry.title, "Tessl publication & registry")
+        XCTAssertEqual(
+            candidate.orderedReceipts.first { $0.stage == .ossLocal }?.nextAction,
+            "Eval local profile · Unproven"
+        )
+        XCTAssertEqual(
+            candidate.orderedReceipts.first { $0.stage == .ossCloud }?.nextAction,
+            "Eval cloud profile · Same scenario IDs required"
+        )
+        XCTAssertEqual(
+            candidate.orderedReceipts.first { $0.stage == .tesslLiveRegistry }?.nextAction,
+            "Publish receipt · registry visibility"
+        )
+        XCTAssertEqual(candidate.activeReceipt?.stage, .candidateBaseline)
+        XCTAssertEqual(candidate.activeReceipt?.modelProfile, "local-identity")
+        XCTAssertEqual(candidate.activeReceipt?.nextAction, "Canonical package digest missing")
+        XCTAssertTrue(candidate.activeReceipt?.command.contains("./bin/ask sdk start") ?? false)
+    }
+
+    func testHistoricalTesslDataDoesNotChangeLocalPipelinePosture() {
+        var dashboard = SkillDashboard.reviewFixture
+        let before = dashboard.pipeline.postureScore
+        dashboard.tessl.registryScore = 100
+        dashboard.tessl.registryQualityScore = 100
+        dashboard.tessl.registryImpactScore = 100
+        dashboard.tessl.registrySecurityLabel = "Passed"
+        dashboard.tessl.registryImprovementMultiplier = 1.28
+
+        XCTAssertEqual(dashboard.pipeline.postureScore, before)
+        XCTAssertEqual(dashboard.pipeline.postureScore, 0)
+    }
+
+    func testLiveTesslComparisonReportsVersionMatchWithoutClaimingPackageIdentity() {
+        var dashboard = SkillDashboard.reviewFixture
+        dashboard.version = "v0.2.0"
+        dashboard.tessl.registryVersion = "0.2.0"
+        dashboard.tessl.dataOrigin = .liveCLI
+
+        XCTAssertEqual(
+            dashboard.registryEvidenceCaption,
+            "Version matches local declaration · package identity unverified."
+        )
+    }
+
+    func testLiveTesslComparisonReportsVersionMismatch() {
+        var dashboard = SkillDashboard.reviewFixture
+        dashboard.version = "0.3.0"
+        dashboard.tessl.registryVersion = "0.2.0"
+        dashboard.tessl.dataOrigin = .liveCLI
+
+        XCTAssertEqual(
+            dashboard.registryEvidenceCaption,
+            "Live Tessl registry · v0.2.0 differs from local v0.3.0."
+        )
+    }
+
+    func testLiveTesslComparisonDoesNotInventIdentityWithoutRegistryVersion() {
+        var dashboard = SkillDashboard.reviewFixture
+        dashboard.tessl.registryVersion = nil
+        dashboard.tessl.dataOrigin = .liveCLI
+
+        XCTAssertEqual(
+            dashboard.registryEvidenceCaption,
+            "Live Tessl registry data · candidate identity not verified."
+        )
+    }
+
+    func testMissingTesslCLIUsesHistoricalFallbackCaption() {
+        var dashboard = SkillDashboard.reviewFixture
+        dashboard.tessl.cliAvailable = false
+        dashboard.tessl.dataOrigin = .unavailable
+
+        XCTAssertEqual(
+            dashboard.registryEvidenceCaption,
+            "Historical external baseline · not proof for this candidate."
+        )
+    }
+
+    func testNoCLIFixtureUsesCachedRegistryDataWithoutALiveClaim() throws {
+        var liveLoadCount = 0
+        let source = DashboardDataSource(
+            environment: ["SKILLSBAR_REVIEW_FIXTURE": "no-cli"],
+            liveLoad: {
+                liveLoadCount += 1
+                return .placeholder
+            }
+        )
+
+        let dashboard = try source.loadSync()
+
+        XCTAssertEqual(liveLoadCount, 0)
+        XCTAssertEqual(dashboard.tessl.dataOrigin, .cached)
+        XCTAssertFalse(dashboard.tessl.cliAvailable)
+        XCTAssertEqual(dashboard.tessl.registryScore, 66)
+        XCTAssertEqual(dashboard.tessl.registrySecurityDisplay, "Passed")
+        XCTAssertEqual(
+            dashboard.registryEvidenceCaption,
+            "Historical external baseline · not proof for this candidate."
+        )
+    }
+
+    func testTesslRegistryCacheRoundTripsOnlyLiveRegistryObservations() throws {
+        let suiteName = "skillsbar-registry-cache-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let cache = TesslRegistryCache(defaults: defaults, keyPrefix: "test-cache")
+
+        cache.save(registryPath: "jscraik/improve-agent-native", signal: SkillDashboard.reviewFixture.tessl)
+        let snapshot = try XCTUnwrap(cache.load(registryPath: "jscraik/improve-agent-native"))
+
+        XCTAssertEqual(snapshot.score, 66)
+        XCTAssertEqual(snapshot.version, "0.2.0")
+        XCTAssertEqual(snapshot.cachedSignal.dataOrigin, .cached)
+        XCTAssertFalse(snapshot.cachedSignal.cliAvailable)
+        XCTAssertNil(cache.load(registryPath: "jscraik/another-skill"))
+
+        cache.save(registryPath: "jscraik/unavailable", signal: SkillDashboard.reviewNoCLIFixture.tessl)
+        XCTAssertNil(cache.load(registryPath: "jscraik/unavailable"))
+    }
+
+    func testNineGatePipelineStressPreservesOrderAndSingleActiveGate() {
+        for _ in 0..<1_000 {
+            let candidate = SkillDashboard.reviewFixture.pipeline
+            XCTAssertEqual(candidate.orderedReceipts.map(\.stage), PipelineStage.allCases)
+            XCTAssertEqual(candidate.orderedReceipts.count, 9)
+            XCTAssertEqual(candidate.activeReceipt?.stage, .candidateBaseline)
+            XCTAssertEqual(candidate.evidencedStageCount, 1)
+            XCTAssertEqual(candidate.orderedReceipts.filter { $0.evidenceStatus == .reviewRequired }.count, 1)
+            XCTAssertTrue(candidate.orderedReceipts.dropFirst(4).allSatisfy { $0.evidenceStatus == .unproven })
+        }
+    }
+
+    @MainActor
+    func testLiveAndNoCLIFixturesRenderAtStableCanvasSize() throws {
+        var renderedSnapshots: [Data] = []
+        for dashboard in [SkillDashboard.reviewFixture, .reviewNoCLIFixture] {
+            let outputURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("skillsbar-release-evidence-\(UUID().uuidString).png")
+            defer { try? FileManager.default.removeItem(at: outputURL) }
+
+            try SnapshotRenderer.render(dashboard: dashboard, to: outputURL)
+            let snapshot = try Data(contentsOf: outputURL)
+            let bitmap = try XCTUnwrap(NSBitmapImageRep(data: snapshot))
+            XCTAssertEqual(bitmap.pixelsWide, 404)
+            XCTAssertEqual(bitmap.pixelsHigh, 720)
+            renderedSnapshots.append(snapshot)
+        }
+
+        XCTAssertGreaterThan(
+            try pixelDifference(renderedSnapshots[0], renderedSnapshots[1]),
+            0.0005,
+            "The fixed Tessl baseline must make live and no-CLI states visibly distinct without scrolling"
+        )
+    }
+
+    @MainActor
+    func testCompactCanvasPreservesTheCompleteEvidenceStackForScrolling() {
+        let contentWidth = MenuBarTemplateMetrics.width - 24
+        let content = ReleaseEvidenceView(dashboard: .reviewFixture, isRefreshing: false)
+            .frame(width: contentWidth)
+        let hostingView = NSHostingView(rootView: content)
+        hostingView.layoutSubtreeIfNeeded()
+
+        XCTAssertGreaterThan(
+            hostingView.fittingSize.height,
+            MenuBarTemplateMetrics.height,
+            "The complete evidence stack should remain intact and overflow into DashboardView's vertical scroll region"
+        )
+        XCTAssertEqual(SkillDashboard.reviewFixture.pipeline.orderedReceipts.count, 9)
+        XCTAssertFalse(SkillDashboard.reviewFixture.pipeline.activeReceipt?.command.isEmpty ?? true)
+    }
+
+    func testBlockedLiveRegistryComparisonIsNotCalledHistorical() {
+        var dashboard = SkillDashboard.reviewFixture
+        dashboard.tessl.cliAvailable = true
+        dashboard.tessl.authenticated = false
+        dashboard.tessl.dataOrigin = .unavailable
+
+        XCTAssertEqual(
+            dashboard.registryEvidenceCaption,
+            "Registry comparison unavailable · not proof for this candidate."
+        )
+    }
+
+    func testUnavailableRegistryWithoutCacheDoesNotClaimHistoricalEvidence() {
+        var dashboard = SkillDashboard.placeholder
+        dashboard.tessl.dataOrigin = .unavailable
+        dashboard.tessl.cliAvailable = false
+        dashboard.tessl.registryScore = nil
+        dashboard.tessl.registryVersion = nil
+        dashboard.tessl.registryQualityScore = nil
+        dashboard.tessl.registryImpactScore = nil
+        dashboard.tessl.registrySecurityLabel = nil
+
+        XCTAssertEqual(
+            dashboard.registryEvidenceCaption,
+            "Tessl CLI unavailable · no registry evidence cached."
+        )
     }
 
     func testLiveSourceUsesLoaderWhenFixtureIsDisabled() throws {
@@ -537,8 +1030,12 @@ private func registryMetadata(fixture: String, registryPath: String? = nil) thro
 }
 
 private func pixelDifference(_ lhsURL: URL, _ rhsURL: URL) throws -> Double {
-    let lhs = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: lhsURL)))
-    let rhs = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: rhsURL)))
+    try pixelDifference(Data(contentsOf: lhsURL), Data(contentsOf: rhsURL))
+}
+
+private func pixelDifference(_ lhsData: Data, _ rhsData: Data) throws -> Double {
+    let lhs = try XCTUnwrap(NSBitmapImageRep(data: lhsData))
+    let rhs = try XCTUnwrap(NSBitmapImageRep(data: rhsData))
     XCTAssertEqual(lhs.pixelsWide, rhs.pixelsWide)
     XCTAssertEqual(lhs.pixelsHigh, rhs.pixelsHigh)
     let lhsData = try XCTUnwrap(lhs.bitmapData)
