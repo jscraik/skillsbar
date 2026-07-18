@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { headers } from "next/headers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,12 +15,8 @@ const geistMono = Geist_Mono({
 const title = "When evidence goes stale · SkillsBar";
 const description = "See one changed Skill stop at stale proof before a maintainer decides to ship.";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const socialImage = new URL("/og.png", `${protocol}://${host}`).toString();
-
+export function generateMetadata(): Metadata {
+  const socialImage = "/og.png";
   return {
     title,
     description,

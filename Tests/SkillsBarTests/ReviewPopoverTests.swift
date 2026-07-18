@@ -440,6 +440,12 @@ final class ReviewPopoverTests: XCTestCase {
         let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: outputURL)))
         XCTAssertEqual(bitmap.pixelsWide, 404)
         XCTAssertEqual(bitmap.pixelsHigh, 560)
+        let presentation = RegistryEvidencePresentation(
+            dashboard: .reviewFixture,
+            isDemoFixture: true
+        )
+        XCTAssertEqual(presentation.statusLabel, "BASELINE")
+        XCTAssertEqual(presentation.caption, "Published baseline · not candidate proof.")
     }
 
     @MainActor

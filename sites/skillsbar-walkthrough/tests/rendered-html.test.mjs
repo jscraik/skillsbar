@@ -31,11 +31,13 @@ test("server-renders the SkillsBar evidence landing page", async () => {
   assert.match(html, /Candidate digest is missing/);
   assert.match(html, /SUPPORTED DEMO FIXTURE/);
   assert.match(html, /NATIVE APP CAPTURE/);
+  assert.match(html, /Use this explainer in Q&amp;A; the native app is the product demo\./);
+  assert.doesNotMatch(html, /Run the proof/);
   assert.match(html, /Inspect all nine evidence gates/);
   assert.match(html, /CONCEPT MOCKUP/);
   assert.match(html, /NOT RUNTIME EVIDENCE/);
   assert.match(html, /Meaningful use of Codex/);
-  assert.match(html, /82 tests\. Signed app\. Launch receipt\./);
+  assert.match(html, /Fixture disclosure\. Build receipt\. Launch receipt\./);
   assert.doesNotMatch(html, /LIVE PRODUCT CAPTURE/);
   assert.doesNotMatch(html, /Safe to release|Production ready|Live runtime proof/i);
 });

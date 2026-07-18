@@ -19,14 +19,19 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
         XCTAssertEqual(dashboard.pipeline.orderedReceipts.first?.stage, .candidateBaseline)
         XCTAssertEqual(
             dashboard.pipeline.orderedReceipts.first?.evidenceStatus,
-            .passed,
-            dashboard.pipeline.orderedReceipts.first?.nextAction ?? "Candidate identity has no diagnostic"
+            .passed
+        )
+        XCTAssertEqual(
+            dashboard.pipeline.orderedReceipts.first?.nextAction,
+            "Canonical package digest established"
         )
         XCTAssertEqual(
             dashboard.pipeline.orderedReceipts.first { $0.stage == .mechanicalValidation }?.evidenceStatus,
-            .passed,
-            dashboard.pipeline.orderedReceipts.first { $0.stage == .mechanicalValidation }?.nextAction
-                ?? "Mechanical validation has no diagnostic"
+            .passed
+        )
+        XCTAssertEqual(
+            dashboard.pipeline.orderedReceipts.first { $0.stage == .mechanicalValidation }?.nextAction,
+            "Package verify passed · strict audit passed"
         )
         XCTAssertNotNil(dashboard.pipeline.activeReceipt)
         XCTAssertTrue(dashboard.localEvidenceCommand.contains("sdk package build"))

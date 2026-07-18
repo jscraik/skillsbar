@@ -455,12 +455,12 @@ private struct CompactTesslRegistryStrip: View {
                     CompactRegistryMetric(
                         label: "Quality",
                         value: dashboard.tessl.registryQualityScore.map { "\($0)%" } ?? "—",
-                        tone: .positive
+                        tone: RegistryMetricPresentation.percentTone(dashboard.tessl.registryQualityScore)
                     )
                     CompactRegistryMetric(
                         label: "Impact",
                         value: dashboard.tessl.registryImpactScore.map { "\($0)%" } ?? "—",
-                        tone: .warning
+                        tone: RegistryMetricPresentation.percentTone(dashboard.tessl.registryImpactScore)
                     )
                     VStack(alignment: .leading, spacing: 1) {
                         HStack(spacing: 3) {
@@ -586,7 +586,8 @@ private struct CompactCanonicalIdentityAction: View {
             Spacer(minLength: 4)
             if isInitialLoad {
                 ProgressView().controlSize(.small)
-            } else if retriesAutomaticIdentity {
+            } else {
+                if retriesAutomaticIdentity {
                 Button(action: onRefresh) {
                     Image(systemName: "arrow.clockwise")
                         .frame(width: 31, height: 31)
@@ -594,7 +595,8 @@ private struct CompactCanonicalIdentityAction: View {
                 .buttonStyle(ReleasePressButtonStyle())
                 .disabled(isRefreshing)
                 .accessibilityLabel("Retry automatic identity check")
-            } else if !command.isEmpty {
+                }
+                if !command.isEmpty {
                 Button { feedback.copy(command) } label: {
                     Image(systemName: feedback.copiedCommand == command ? "checkmark" : "doc.on.doc")
                         .frame(width: 31, height: 31)
@@ -602,6 +604,7 @@ private struct CompactCanonicalIdentityAction: View {
                 .buttonStyle(ReleasePressButtonStyle())
                 .foregroundStyle(feedback.copiedCommand == command ? Color.successAccent : Color.primaryText)
                 .accessibilityLabel("Copy the active gate command")
+                }
             }
         }
         .padding(.horizontal, 9)
@@ -637,27 +640,31 @@ private struct NextRequiredCard: View {
                     .foregroundStyle(.bodyText)
             }
             Spacer(minLength: 4)
-            Button {
-                if retriesAutomaticIdentity {
-                    onRefresh()
-                } else {
-                    feedback.copy(receipt.command)
+            if retriesAutomaticIdentity {
+                Button(action: onRefresh) {
+                    Text("RETRY CHECK")
+                        .releaseFont(10, weight: .medium, design: .rounded, relativeTo: .caption)
+                        .padding(.horizontal, 9)
+                        .frame(height: 30)
                 }
-            } label: {
-                Text(
-                    retriesAutomaticIdentity
-                        ? "RETRY CHECK"
-                        : feedback.copiedCommand == receipt.command ? "COPIED" : "COPY COMMAND"
-                )
-                    .releaseFont(10, weight: .medium, design: .rounded, relativeTo: .caption)
-                    .padding(.horizontal, 9)
-                    .frame(height: 30)
+                .buttonStyle(ReleasePressButtonStyle(tint: receipt.evidenceStatus.tone.color))
+                .foregroundStyle(receipt.evidenceStatus.tone.color)
+                .disabled(isRefreshing)
+                .help("Retry automatic identity check")
+                .accessibilityLabel("Retry automatic identity check")
             }
-            .buttonStyle(ReleasePressButtonStyle(tint: receipt.evidenceStatus.tone.color))
-            .foregroundStyle(receipt.evidenceStatus.tone.color)
-            .disabled(retriesAutomaticIdentity ? isRefreshing : receipt.command.isEmpty)
-            .help(retriesAutomaticIdentity ? "Retry automatic identity check" : "Copy the \(receipt.stage.title.lowercased()) command")
-            .accessibilityLabel(retriesAutomaticIdentity ? "Retry automatic identity check" : "Copy the \(receipt.stage.title.lowercased()) command")
+            if !receipt.command.isEmpty {
+                Button { feedback.copy(receipt.command) } label: {
+                    Text(feedback.copiedCommand == receipt.command ? "COPIED" : "COPY COMMAND")
+                        .releaseFont(10, weight: .medium, design: .rounded, relativeTo: .caption)
+                        .padding(.horizontal, 9)
+                        .frame(height: 30)
+                }
+                .buttonStyle(ReleasePressButtonStyle(tint: receipt.evidenceStatus.tone.color))
+                .foregroundStyle(receipt.evidenceStatus.tone.color)
+                .help("Copy the \(receipt.stage.title.lowercased()) command")
+                .accessibilityLabel("Copy the \(receipt.stage.title.lowercased()) command")
+            }
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 8)

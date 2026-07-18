@@ -3,7 +3,10 @@ import SkillsBarCore
 import XCTest
 
 final class ShellTests: XCTestCase {
-    func testRunPrefersStableToolLocationsOverVersionManagerShims() {
+    func testRunPrefersStableToolLocationsOverVersionManagerShims() throws {
+        guard Shell.run("command -v python3", cwd: URL(fileURLWithPath: "/private/tmp"), timeout: 10).exitCode == 0 else {
+            throw XCTSkip("python3 is not installed on this host.")
+        }
         let result = Shell.run("command -v python3", cwd: URL(fileURLWithPath: "/private/tmp"), timeout: 10)
 
         XCTAssertEqual(result.exitCode, 0)
@@ -30,6 +33,14 @@ final class ShellTests: XCTestCase {
 
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertEqual(result.stdout, "1|2|1|true")
+    }
+
+    func testRunCreatesIsolatedToolDirectories() {
+        let command = "test -d \"$ZDOTDIR\" -a -d \"$XDG_CACHE_HOME\" -a -d \"$MISE_CACHE_DIR\" -a -d \"$UV_CACHE_DIR\""
+
+        let result = Shell.run(command, cwd: URL(fileURLWithPath: "/private/tmp"), timeout: 10)
+
+        XCTAssertEqual(result.exitCode, 0)
     }
 
     func testRunCapturesLargeStdoutAndStderrWithoutDeadlock() {

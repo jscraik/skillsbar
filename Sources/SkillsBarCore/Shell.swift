@@ -89,6 +89,21 @@ public enum Shell {
             "UV_OFFLINE": "1",
             "npm_config_offline": "true"
         ]
+        for path in [
+            overrides["ZDOTDIR"],
+            overrides["XDG_CACHE_HOME"],
+            overrides["MISE_CACHE_DIR"],
+            overrides["UV_CACHE_DIR"]
+        ].compactMap({ $0 }) {
+            do {
+                try FileManager.default.createDirectory(
+                    atPath: path,
+                    withIntermediateDirectories: true
+                )
+            } catch {
+                return CommandResult(exitCode: -1, stdout: "", stderr: error.localizedDescription)
+            }
+        }
         if FileManager.default.isExecutableFile(atPath: managedPython.path) {
             overrides["PYTHON_BIN"] = managedPython.path
         }

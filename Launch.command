@@ -10,9 +10,11 @@ LOCK_DIR="$BUILD_ROOT/launch.lock"
 LOCK_PID_FILE="$LOCK_DIR/pid"
 LOCK_OWNED=0
 EVIDENCE_MODE="live_local_evidence"
-if [[ "${SKILLSBAR_DEMO_MODE:-0}" == "1" ]]; then
-  EVIDENCE_MODE="deterministic_demo_fixture"
-fi
+case "${SKILLSBAR_DEMO_MODE:-}" in
+  1|true|TRUE|yes|YES|on|ON)
+    EVIDENCE_MODE="deterministic_demo_fixture"
+    ;;
+esac
 
 mkdir -p "$BUILD_ROOT"
 # shellcheck disable=SC2329 # Invoked by the trap below.

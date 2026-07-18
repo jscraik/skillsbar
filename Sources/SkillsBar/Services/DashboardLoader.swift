@@ -203,7 +203,7 @@ struct DashboardLoader {
         let fleet = fleetSignal(root: root, selectedSkillPath: selectedSkillPath)
         if let onLocalEvidence {
             let cachedTessl = TesslRegistryCache().load(registryPath: registryPath)?.cachedSignal
-                ?? Self.pendingTesslSignal
+                ?? Self.pendingTesslSignal(registryPath: registryPath)
             let localDashboard = makeDashboard(
                 metadata: metadata,
                 registryPath: registryPath,
@@ -276,7 +276,7 @@ struct DashboardLoader {
         )
     }
 
-    private static var pendingTesslSignal: TesslSignal {
+    private static func pendingTesslSignal(registryPath: String) -> TesslSignal {
         TesslSignal(
             ok: false,
             cliAvailable: true,
@@ -292,7 +292,7 @@ struct DashboardLoader {
             registryEvalCount: nil,
             registryImprovementMultiplier: nil,
             registryVisibility: nil,
-            recoveryCommand: "tessl search --type skills jscraik/improve-agent-native"
+            recoveryCommand: "tessl search --type skills \(registryPath)"
         )
     }
 
@@ -815,12 +815,8 @@ struct DashboardLoader {
         let metadata = TesslRegistryMetadata(payload: search.json, registryPath: registryPath)
         let detailVisibility: String?
         if metadata.visibility == nil {
-            if let cachedVisibility = cachedRegistry?.registryVisibility {
-                detailVisibility = cachedVisibility
-            } else {
-                let detail = Shell.run("\(tessl) plugin info \(Self.shellQuoted(registryPath))", cwd: root, timeout: 20)
-                detailVisibility = detail.exitCode == 0 ? Self.tesslVisibility(fromPluginInfo: detail.stdout) : nil
-            }
+            let detail = Shell.run("\(tessl) plugin info \(Self.shellQuoted(registryPath))", cwd: root, timeout: 20)
+            detailVisibility = detail.exitCode == 0 ? Self.tesslVisibility(fromPluginInfo: detail.stdout) : nil
         } else {
             detailVisibility = nil
         }

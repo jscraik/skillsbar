@@ -1,6 +1,6 @@
 # SkillsBar evidence walkthrough
 
-A landing page and four-view walkthrough for the SkillsBar evidence cockpit.
+A landing page and four-view visual explainer for the SkillsBar evidence cockpit. The explainer supports judge Q&A; the native menu-bar app remains the product demo.
 The page presents one deterministic candidate-identity scenario: the local Skill
 has no canonical package digest at Gate 1, so every downstream receipt remains
 held while the published registry baseline stays visible as separate context.

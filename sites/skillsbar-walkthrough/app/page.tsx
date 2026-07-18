@@ -60,7 +60,7 @@ const beats = [
     camera: "ship" as Camera,
     eyebrow: "Gates 7–9 · held",
     headline: "A registry score cannot override missing candidate identity.",
-    body: "Staging, publication, and runtime truth stay held while SkillsBar gives the maintainer the identity command—not a false green light.",
+    body: "Staging, publication, and runtime truth stay held while SkillsBar gives the maintainer the identity command—not a false approval signal.",
   },
 ] as const;
 
@@ -90,7 +90,7 @@ function CandidateRail({ camera = "overview", compact = false }: { camera?: Came
   } as CSSProperties;
 
   return (
-    <div className={`rail-viewport ${compact ? "rail-compact" : ""}`} data-camera={camera} aria-label="Candidate 9c21 moves through Build, Prove, and Ship and stops at the required security receipt">
+    <div className={`rail-viewport ${compact ? "rail-compact" : ""}`} data-camera={camera} aria-label="Candidate 9c21 moves through Build, Prove, and Ship and stops at the required candidate identity receipt">
       <div className="rail-world" style={railStyle}>
         <div className="candidate-track" aria-hidden="true">
           <span className="candidate-origin">candidate <b>digest missing</b></span>
@@ -122,7 +122,7 @@ export default function Home() {
   const [activeBeat, setActiveBeat] = useState(0);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "unavailable">("idle");
   const beat = beats[activeBeat];
-  const command = "./bin/ask sdk start …/improve-agent-native --json --robot";
+  const command = "./bin/ask sdk start Skills/agent-ops/improve-agent-native --json --robot";
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -166,7 +166,7 @@ export default function Home() {
     <main>
       <nav className="site-nav" aria-label="Primary navigation">
         <a className="brand" href="#top" aria-label="SkillsBar home"><Image src="/skillsbar-icon.png" alt="" width={28} height={28} unoptimized /><span>SkillsBar</span><small>by brAInwav</small></a>
-        <div className="nav-links"><a href="#product">Product proof</a><a href="#walkthrough">90-second walkthrough</a><a className="nav-cta" href="https://github.com/jscraik/skillsbar">Repository ↗</a></div>
+        <div className="nav-links"><a href="#product">Product proof</a><a href="#walkthrough">How it works</a><a className="nav-cta" href="https://github.com/jscraik/skillsbar">Repository ↗</a></div>
       </nav>
 
       <section className="hero" id="top" aria-labelledby="hero-title">
@@ -175,7 +175,7 @@ export default function Home() {
           <p className="kicker">OpenAI hackathon · Built with Codex</p>
           <h1 id="hero-title">When evidence goes stale.</h1>
           <p className="hero-lede">A changed Skill can still look healthy when its registry score belongs to yesterday’s candidate. SkillsBar stops the hand-me-down.</p>
-          <div className="hero-actions"><a className="button primary" href="#walkthrough">Run the proof <span aria-hidden="true">↓</span></a><a className="button secondary" href="#product">See the app</a></div>
+          <div className="hero-actions"><a className="button primary" href="#walkthrough">Explore the model <span aria-hidden="true">↓</span></a><a className="button secondary" href="#product">See the app</a></div>
           <p className="hero-disclosure">CONCEPT MOCKUP · NOT RUNTIME EVIDENCE</p>
         </div>
         <div className="hero-technical" data-reveal>
@@ -203,7 +203,7 @@ export default function Home() {
       </section>
 
       <section className="walkthrough-section" id="walkthrough" aria-labelledby="walkthrough-title">
-        <div className="walkthrough-heading" data-reveal><p className="section-number">02 · 90-second walkthrough</p><h2 id="walkthrough-title">One world. One candidate. Four views.</h2><p>The evidence stays fixed while the camera moves from Build to Prove to Ship.</p></div>
+        <div className="walkthrough-heading" data-reveal><p className="section-number">02 · Visual explainer</p><h2 id="walkthrough-title">One world. One candidate. Four views.</h2><p>The evidence stays fixed while the camera moves from Build to Prove to Ship. Use this explainer in Q&amp;A; the native app is the product demo.</p></div>
         <div className="walkthrough-shell" data-reveal>
           <div className="beat-copy" id="active-proof-beat" aria-live="polite"><p>{beat.number} · {beat.eyebrow}</p><h3>{beat.headline}</h3><span>{beat.body}</span></div>
           <div className="technical-stage">
@@ -213,7 +213,7 @@ export default function Home() {
             <div className="baseline-bar"><i /> Tessl registry · observed external baseline · not current local proof</div>
           </div>
           <div className="beat-controls">
-            <div className="beat-tabs" role="tablist" aria-label="Walkthrough beats">{beats.map((item, index) => <button key={item.label} type="button" role="tab" aria-controls="active-proof-beat" aria-selected={index === activeBeat} className={index === activeBeat ? "active" : ""} onClick={() => selectBeat(index)}><span>{item.number}</span><b>{item.label}</b></button>)}</div>
+            <div className="beat-tabs" aria-label="Walkthrough beats">{beats.map((item, index) => <button key={item.label} type="button" aria-pressed={index === activeBeat} className={index === activeBeat ? "active" : ""} onClick={() => selectBeat(index)}><span>{item.number}</span><b>{item.label}</b></button>)}</div>
             <div className="step-buttons"><button type="button" disabled={activeBeat === 0} onClick={() => selectBeat(activeBeat - 1)}>← Previous</button><span>{activeBeat + 1} / {beats.length}</span><button type="button" disabled={activeBeat === beats.length - 1} onClick={() => selectBeat(activeBeat + 1)}>Next →</button></div>
           </div>
           <p className="concept-label">CONCEPT MOCKUP · DETERMINISTIC SCENARIO · NOT RUNTIME EVIDENCE</p>
@@ -233,7 +233,7 @@ export default function Home() {
         <div className="evidence-trace" data-reveal>
           <article><span>Challenge found</span><h3>Camera state changed evidence.</h3><p>The walkthrough could imply that moving the view advanced the candidate.</p></article>
           <article><span>Codex intervention</span><h3>One deterministic contract.</h3><p>The evidence state remains fixed while only the camera and disclosure change.</p></article>
-          <article><span>Behavior proof</span><h3>82 tests. Signed app. Launch receipt.</h3><p>The fixture cannot claim live evidence, and the native app records exactly how it launched.</p></article>
+          <article><span>Behavior proof</span><h3>Fixture disclosure. Build receipt. Launch receipt.</h3><p>The fixture cannot claim live evidence, and the native app records exactly how it launched.</p></article>
         </div>
       </section>
 
