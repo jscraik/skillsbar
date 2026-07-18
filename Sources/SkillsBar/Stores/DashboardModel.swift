@@ -68,7 +68,7 @@ final class DashboardModel: ObservableObject {
                     refreshLogger.info("Local evidence ready in \(elapsedMilliseconds, privacy: .public) ms")
                 }
                 availableSkillPaths = DashboardLoader.discoverSkillPaths(root: URL(fileURLWithPath: dashboard.repoPath))
-                recordSelectedSkillDirectory()
+                await recordSelectedSkillDirectory()
                 let elapsedMilliseconds = Int(Date().timeIntervalSince(refreshStartedAt) * 1_000)
                 refreshLogger.info("Evidence refresh completed in \(elapsedMilliseconds, privacy: .public) ms")
             } catch {
@@ -109,13 +109,13 @@ final class DashboardModel: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: self?.sourceChangePollNanoseconds ?? 500_000_000)
                 guard !Task.isCancelled else { return }
-                self?.queueRefreshIfSelectedSkillChanged()
+                await self?.queueRefreshIfSelectedSkillChanged()
             }
         }
     }
 
-    private func queueRefreshIfSelectedSkillChanged() {
-        guard selectedSkillChanged() else { return }
+    private func queueRefreshIfSelectedSkillChanged() async {
+        guard await selectedSkillChanged() else { return }
         sourceChangeDebounceTask?.cancel()
         sourceChangeDebounceTask = Task { [weak self] in
             guard let self else { return }
@@ -126,13 +126,13 @@ final class DashboardModel: ObservableObject {
     }
 
     func refreshIfSelectedSkillChanged() async {
-        guard selectedSkillChanged() else { return }
+        guard await selectedSkillChanged() else { return }
         await refresh()
     }
 
-    private func selectedSkillChanged() -> Bool {
+    private func selectedSkillChanged() async -> Bool {
         guard let directory = selectedSkillDirectory(),
-              let currentDate = selectedSkillSourceModificationDate(in: directory) else { return false }
+              let currentDate = await Self.selectedSkillSourceModificationDate(in: directory) else { return false }
         guard observedSkillDirectory == directory.path,
               let previousDate = observedSkillSourceModificationDate else {
             observedSkillDirectory = directory.path
@@ -144,10 +144,10 @@ final class DashboardModel: ObservableObject {
         return true
     }
 
-    private func recordSelectedSkillDirectory() {
+    private func recordSelectedSkillDirectory() async {
         guard let directory = selectedSkillDirectory() else { return }
         observedSkillDirectory = directory.path
-        observedSkillSourceModificationDate = selectedSkillSourceModificationDate(in: directory)
+        observedSkillSourceModificationDate = await Self.selectedSkillSourceModificationDate(in: directory)
     }
 
     private func selectedSkillDirectory() -> URL? {
@@ -156,7 +156,13 @@ final class DashboardModel: ObservableObject {
         return skill.deletingLastPathComponent()
     }
 
-    private func selectedSkillSourceModificationDate(in directory: URL) -> Date? {
+    private nonisolated static func selectedSkillSourceModificationDate(in directory: URL) async -> Date? {
+        await Task.detached(priority: .utility) {
+            selectedSkillSourceModificationDateSync(in: directory)
+        }.value
+    }
+
+    private nonisolated static func selectedSkillSourceModificationDateSync(in directory: URL) -> Date? {
         let fileManager = FileManager.default
         var latest = modificationDate(for: directory)
         guard let enumerator = fileManager.enumerator(
@@ -173,7 +179,7 @@ final class DashboardModel: ObservableObject {
         return latest
     }
 
-    private func modificationDate(for url: URL) -> Date? {
+    private nonisolated static func modificationDate(for url: URL) -> Date? {
         let values = try? url.resourceValues(forKeys: [.contentModificationDateKey])
         return values?.contentModificationDate
     }

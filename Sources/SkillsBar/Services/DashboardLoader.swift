@@ -167,7 +167,7 @@ struct DashboardLoader {
             Self.localEvidenceCache.entry(for: cacheKey, packageDigest: $0)?.checks
         }
         let checks: PipelineEvidenceLoader.LocalChecks
-        if let cachedChecks {
+        if let cachedChecks, Self.canReuse(cachedChecks) {
             checks = PipelineEvidenceLoader.LocalChecks(
                 packageBuild: packageBuildResult,
                 strictAudit: cachedChecks.strictAudit,
@@ -294,6 +294,17 @@ struct DashboardLoader {
             registryVisibility: nil,
             recoveryCommand: "tessl search --type skills \(registryPath)"
         )
+    }
+
+    private static func canReuse(_ checks: PipelineEvidenceLoader.LocalChecks) -> Bool {
+        [
+            checks.strictAudit,
+            checks.packageVerify,
+            checks.securityRiskModes,
+            checks.scenarioQuality,
+            checks.scorerQuality,
+            checks.scorerCalibration
+        ].allSatisfy { $0.exitCode == 0 }
     }
 
     func loadSync() throws -> SkillDashboard {
@@ -789,6 +800,9 @@ struct DashboardLoader {
         guard search.exitCode == 0 else {
             let cliMissing = search.exitCode == 127
                 || search.combinedOutput.localizedCaseInsensitiveContains("not found")
+            if cliMissing, let cachedRegistry {
+                return cachedRegistry
+            }
             let authExpired = search.combinedOutput.localizedCaseInsensitiveContains("401")
                 || search.combinedOutput.localizedCaseInsensitiveContains("login")
                 || search.combinedOutput.localizedCaseInsensitiveContains("auth")
