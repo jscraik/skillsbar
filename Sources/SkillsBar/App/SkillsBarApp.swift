@@ -14,9 +14,11 @@ struct SkillsBarApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            DashboardView(model: model)
+            DashboardView(
+                model: model,
+                isDemoFixture: SkillsBarDemoMode.isEnabled()
+            )
                 .frame(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
-                .task { await model.refresh() }
         } label: {
             SkillsMenuBarIconView()
                 .accessibilityLabel(model.menuTitle)

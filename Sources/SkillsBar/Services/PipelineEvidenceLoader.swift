@@ -152,9 +152,35 @@ struct PipelineEvidenceLoader {
             modelProfile: digest,
             observedAt: digest == nil ? nil : observedAt,
             nextAction: digest == nil
-                ? "Canonical package digest unavailable"
+                ? identityFailureReason
                 : "Canonical package digest established"
         )
+    }
+
+    private var identityFailureReason: String {
+        let result = checks.packageBuild
+        guard result.exitCode == 0 else {
+            let detail = result.shortFailure.trimmingCharacters(in: .whitespacesAndNewlines)
+            return detail.isEmpty
+                ? "Automatic identity command exited with status \(result.exitCode)"
+                : "Automatic identity command failed: \(detail)"
+        }
+        guard let payload = result.json else {
+            return "Automatic identity command returned unreadable JSON"
+        }
+        guard payload.string(at: ["status"]) == "success" else {
+            return "Automatic identity command did not report success"
+        }
+        guard payload.string(at: ["data", "skills_sdk_package_build", "status"]) == "built" else {
+            return "Automatic identity command did not build a package digest"
+        }
+        guard payload.string(at: ["data", "skills_sdk_package_build", "canonical_source_path"]) == selectedSkillPath else {
+            return "Automatic identity result referred to a different skill source"
+        }
+        guard payload.bool(at: ["data", "skills_sdk_package_build", "mutation_performed"]) == false else {
+            return "Automatic identity result did not confirm a read-only check"
+        }
+        return "Automatic identity command returned an invalid package digest"
     }
 
     private func mechanicalReceipt(digest: String?) -> PipelineStageReceipt {

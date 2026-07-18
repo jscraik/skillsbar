@@ -1,18 +1,43 @@
 import Foundation
 
+enum SkillsBarDemoMode {
+    static let environmentKey = "SKILLSBAR_DEMO_MODE"
+
+    static func isEnabled(in environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+        guard let value = environment[environmentKey]?.lowercased() else { return false }
+        return ["1", "true", "yes", "on"].contains(value)
+    }
+}
+
 struct DashboardDataSource {
+    typealias LocalEvidenceUpdate = @MainActor (SkillDashboard) -> Void
+
     private let environment: [String: String]
     private let liveLoad: () throws -> SkillDashboard
-    private let liveLoadAsync: () async throws -> SkillDashboard
+    private let progressiveLoadAsync: (@escaping LocalEvidenceUpdate) async throws -> SkillDashboard
 
     init(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         liveLoad: @escaping () throws -> SkillDashboard = { try DashboardLoader().loadSync() },
-        liveLoadAsync: @escaping () async throws -> SkillDashboard = { try await DashboardLoader().load() }
+        liveLoadAsync: (() async throws -> SkillDashboard)? = nil,
+        progressiveLoadAsync: ((@escaping LocalEvidenceUpdate) async throws -> SkillDashboard)? = nil
     ) {
         self.environment = environment
         self.liveLoad = liveLoad
-        self.liveLoadAsync = liveLoadAsync
+        let resolvedLiveLoadAsync = liveLoadAsync ?? { try await DashboardLoader().load() }
+        if let progressiveLoadAsync {
+            self.progressiveLoadAsync = progressiveLoadAsync
+        } else if liveLoadAsync != nil {
+            self.progressiveLoadAsync = { update in
+                let dashboard = try await resolvedLiveLoadAsync()
+                await update(dashboard)
+                return dashboard
+            }
+        } else {
+            self.progressiveLoadAsync = { update in
+                try await DashboardLoader().load(onLocalEvidence: update)
+            }
+        }
     }
 
     var usesReviewFixture: Bool {
@@ -20,6 +45,9 @@ struct DashboardDataSource {
     }
 
     private var fixtureValue: String? {
+        if SkillsBarDemoMode.isEnabled(in: environment) {
+            return "live"
+        }
         guard let value = environment["SKILLSBAR_REVIEW_FIXTURE"]?.lowercased(),
               ["1", "live", "no-cli", "offline"].contains(value) else { return nil }
         return value
@@ -44,9 +72,15 @@ struct DashboardDataSource {
 
     @MainActor
     func load() async throws -> SkillDashboard {
+        try await load { _ in }
+    }
+
+    @MainActor
+    func load(onLocalEvidence: @escaping LocalEvidenceUpdate) async throws -> SkillDashboard {
         if usesReviewFixture {
+            onLocalEvidence(fixtureDashboard)
             return fixtureDashboard
         }
-        return try await liveLoadAsync()
+        return try await progressiveLoadAsync(onLocalEvidence)
     }
 }

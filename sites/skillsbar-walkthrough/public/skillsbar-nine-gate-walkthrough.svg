@@ -1,0 +1,200 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2160" height="1750" viewBox="0 0 2160 1750" role="img" aria-labelledby="title description">
+  <title id="title">SkillsBar nine-gate candidate proof walkthrough</title>
+  <desc id="description">A dark macOS-style design board showing the nine sections of the SkillsBar candidate-proof pipeline, each expanded with its information, evidence source, and next action.</desc>
+  <defs>
+    <style>
+      .page { fill:#090b0e; }
+      .card { fill:#111418; stroke:#2c3239; stroke-width:2; }
+      .card-active { fill:#121416; stroke:#ff5f52; stroke-width:3; }
+      .topline { fill:#9ca4b4; font:600 19px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; letter-spacing:1.25px; }
+      .package { fill:#c0c7d5; font:500 19px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .title { fill:#f4f5f7; font:700 28px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .headline { fill:#c7ced9; font:500 22px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .headline-red { fill:#ff6b5e; font:650 22px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .label { fill:#929baa; font:650 15px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; letter-spacing:1.1px; }
+      .row-key { fill:#929baa; font:500 17px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .row-value { fill:#eef0f4; font:600 17px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .row-pass { fill:#48e58a; font:700 17px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .row-warn { fill:#ffb520; font:700 17px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .row-red { fill:#ff6b5e; font:700 17px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .row-cyan { fill:#2ed4ed; font:700 17px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .source { fill:#7e8999; font:500 15px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .action { fill:#dde2ea; font:600 16px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .badge { font:750 14px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; letter-spacing:1px; }
+      .footer { fill:#8c96a5; font:500 16px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .footer-strong { fill:#d7dce4; font:600 16px -apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif; }
+      .divider { stroke:#303842; stroke-width:1.5; }
+    </style>
+  </defs>
+  <rect class="page" x="0" y="0" width="2160" height="1750" rx="0"/>
+
+  <text x="60" y="64" class="topline">SKILLS SDK</text>
+  <text x="60" y="110" class="title" style="font-size:38px">Nine-gate candidate proof walkthrough</text>
+  <text x="60" y="143" class="package">jscraik/improve-agent-native  ·  LOCAL  ·  v0.2.0  ·  each card shows the active gate, its evidence, and the next action</text>
+  <line x1="60" y1="165" x2="2100" y2="165" class="divider"/>
+
+  <!-- Gate 1 -->
+  <g transform="translate(60,195)">
+    <rect class="card-active" width="640" height="430" rx="24"/>
+    <circle cx="45" cy="45" r="25" fill="#221517" stroke="#ff5f52" stroke-width="3"/>
+    <text x="45" y="52" text-anchor="middle" class="headline-red" style="font-size:22px">1</text>
+    <text x="86" y="40" class="title">Candidate identity</text>
+    <rect x="482" y="20" width="130" height="32" rx="16" fill="#33191b" stroke="#ff5f52"/>
+    <text x="547" y="42" text-anchor="middle" class="badge" fill="#ff6b5e">REVIEW</text>
+    <text x="86" y="76" class="headline-red">Canonical package digest unavailable</text>
+    <line x1="28" y1="100" x2="612" y2="100" class="divider"/>
+    <text x="28" y="130" class="label">NOW CHECKING</text>
+    <text x="28" y="164" class="row-key">Selected skill</text><text x="612" y="164" text-anchor="end" class="row-value">improve-agent-native/SKILL.md</text>
+    <text x="28" y="196" class="row-key">Governed inputs</text><text x="612" y="196" text-anchor="end" class="row-value">skill · risk modes · scenarios</text>
+    <text x="28" y="228" class="row-key">Candidate digest</text><text x="612" y="228" text-anchor="end" class="row-red">MISSING</text>
+    <text x="28" y="260" class="row-key">Downstream proof</text><text x="612" y="260" text-anchor="end" class="row-warn">HELD</text>
+    <text x="28" y="302" class="source">EVIDENCE SOURCE  ·  Canonical SDK package build</text>
+    <rect x="28" y="326" width="584" height="74" rx="14" fill="#191d22" stroke="#4d2525"/>
+    <text x="48" y="355" class="label">NEXT ACTION</text><text x="48" y="383" class="action">Build package identity</text>
+    <rect x="544" y="343" width="46" height="42" rx="11" fill="#252a31" stroke="#56606c"/>
+    <path d="M560 356h14v17h-14zM566 351h14v17" fill="none" stroke="#dce1e8" stroke-width="2.5"/>
+  </g>
+
+  <!-- Gate 2 -->
+  <g transform="translate(760,195)">
+    <rect class="card" width="640" height="430" rx="24"/>
+    <circle cx="45" cy="45" r="25" fill="#2a2113" stroke="#ffb520" stroke-width="3"/>
+    <text x="45" y="52" text-anchor="middle" class="row-warn" style="font-size:22px">2</text>
+    <text x="86" y="40" class="title">Mechanical validation</text>
+    <rect x="447" y="20" width="165" height="32" rx="16" fill="#342814" stroke="#ffb520"/>
+    <text x="529" y="42" text-anchor="middle" class="badge" fill="#ffb520">PARTIAL 1 / 2</text>
+    <text x="86" y="76" class="headline">Package verifies; strict audit required</text>
+    <line x1="28" y1="100" x2="612" y2="100" class="divider"/>
+    <text x="28" y="130" class="label">NOW CHECKING</text>
+    <text x="28" y="164" class="row-key">Package verify</text><text x="612" y="164" text-anchor="end" class="row-pass">PASSED</text>
+    <text x="28" y="196" class="row-key">Strict audit</text><text x="612" y="196" text-anchor="end" class="row-red">MISSING</text>
+    <text x="28" y="228" class="row-key">Receipt binding</text><text x="612" y="228" text-anchor="end" class="row-value">candidate digest required</text>
+    <text x="28" y="260" class="row-key">Contribution</text><text x="612" y="260" text-anchor="end" class="row-warn">0 / 10 until complete</text>
+    <text x="28" y="302" class="source">EVIDENCE SOURCE  ·  Package verify + strict audit receipts</text>
+    <rect x="28" y="326" width="584" height="74" rx="14" fill="#191d22"/>
+    <text x="48" y="355" class="label">NEXT ACTION</text><text x="48" y="383" class="action">Run strict audit</text>
+    <rect x="544" y="343" width="46" height="42" rx="11" fill="#252a31" stroke="#56606c"/><path d="M560 356h14v17h-14zM566 351h14v17" fill="none" stroke="#dce1e8" stroke-width="2.5"/>
+  </g>
+
+  <!-- Gate 3 -->
+  <g transform="translate(1460,195)">
+    <rect class="card" width="640" height="430" rx="24"/>
+    <circle cx="45" cy="45" r="25" fill="#28191a" stroke="#ff6b5e" stroke-width="3"/>
+    <text x="45" y="52" text-anchor="middle" class="headline-red" style="font-size:22px">3</text>
+    <text x="86" y="40" class="title">Security &amp; guardrails</text>
+    <rect x="482" y="20" width="130" height="32" rx="16" fill="#33191b" stroke="#ff5f52"/>
+    <text x="547" y="42" text-anchor="middle" class="badge" fill="#ff6b5e">REVIEW</text>
+    <text x="86" y="76" class="headline">Risk taxonomy observed; receipt missing</text>
+    <line x1="28" y1="100" x2="612" y2="100" class="divider"/>
+    <text x="28" y="130" class="label">NOW CHECKING</text>
+    <text x="28" y="164" class="row-key">Risk modes</text><text x="612" y="164" text-anchor="end" class="row-value">destructive · credentials · external</text>
+    <text x="28" y="196" class="row-key">Guardrail coverage</text><text x="612" y="196" text-anchor="end" class="row-warn">advisory preview</text>
+    <text x="28" y="228" class="row-key">Candidate binding</text><text x="612" y="228" text-anchor="end" class="row-red">UNVERIFIED</text>
+    <text x="28" y="260" class="row-key">Disposition</text><text x="612" y="260" text-anchor="end" class="row-red">HUMAN REVIEW</text>
+    <text x="28" y="302" class="source">EVIDENCE SOURCE  ·  Governed risk-mode evidence</text>
+    <rect x="28" y="326" width="584" height="74" rx="14" fill="#191d22"/>
+    <text x="48" y="355" class="label">NEXT ACTION</text><text x="48" y="383" class="action">Inspect risk modes</text>
+    <rect x="544" y="343" width="46" height="42" rx="11" fill="#252a31" stroke="#56606c"/><path d="M560 356h14v17h-14zM566 351h14v17" fill="none" stroke="#dce1e8" stroke-width="2.5"/>
+  </g>
+
+  <!-- Gate 4 -->
+  <g transform="translate(60,665)">
+    <rect class="card" width="640" height="430" rx="24"/>
+    <circle cx="45" cy="45" r="25" fill="#2a2113" stroke="#ffb520" stroke-width="3"/><text x="45" y="52" text-anchor="middle" class="row-warn" style="font-size:22px">4</text>
+    <text x="86" y="40" class="title">Eval preparation</text>
+    <rect x="447" y="20" width="165" height="32" rx="16" fill="#342814" stroke="#ffb520"/><text x="529" y="42" text-anchor="middle" class="badge" fill="#ffb520">PARTIAL 1 / 3</text>
+    <text x="86" y="76" class="headline">Scenarios ready; scorers incomplete</text><line x1="28" y1="100" x2="612" y2="100" class="divider"/>
+    <text x="28" y="130" class="label">NOW CHECKING</text>
+    <text x="28" y="164" class="row-key">Scenario quality</text><text x="612" y="164" text-anchor="end" class="row-pass">71 / 71</text>
+    <text x="28" y="196" class="row-key">Scorer quality</text><text x="612" y="196" text-anchor="end" class="row-red">MISSING</text>
+    <text x="28" y="228" class="row-key">Scorer calibration</text><text x="612" y="228" text-anchor="end" class="row-red">MISSING</text>
+    <text x="28" y="260" class="row-key">Scenario IDs</text><text x="612" y="260" text-anchor="end" class="row-value">canonical set recorded</text>
+    <text x="28" y="302" class="source">EVIDENCE SOURCE  ·  Scenario + scorer + calibration receipts</text><rect x="28" y="326" width="584" height="74" rx="14" fill="#191d22"/>
+    <text x="48" y="355" class="label">NEXT ACTION</text><text x="48" y="383" class="action">Prepare scorers</text><rect x="544" y="343" width="46" height="42" rx="11" fill="#252a31" stroke="#56606c"/><path d="M560 356h14v17h-14zM566 351h14v17" fill="none" stroke="#dce1e8" stroke-width="2.5"/>
+  </g>
+
+  <!-- Gate 5 -->
+  <g transform="translate(760,665)">
+    <rect class="card" width="640" height="430" rx="24"/>
+    <circle cx="45" cy="45" r="25" fill="#2a2113" stroke="#ffb520" stroke-width="3"/><text x="45" y="52" text-anchor="middle" class="row-warn" style="font-size:22px">5</text>
+    <text x="86" y="40" class="title">Eval local proof</text>
+    <rect x="448" y="20" width="164" height="32" rx="16" fill="#342814" stroke="#ffb520"/><text x="530" y="42" text-anchor="middle" class="badge" fill="#ffb520">UNPROVEN</text>
+    <text x="86" y="76" class="headline">No candidate-bound local eval receipt</text><line x1="28" y1="100" x2="612" y2="100" class="divider"/>
+    <text x="28" y="130" class="label">NOW CHECKING</text>
+    <text x="28" y="164" class="row-key">Eval profile</text><text x="612" y="164" text-anchor="end" class="row-value">oss-local</text>
+    <text x="28" y="196" class="row-key">Candidate digest</text><text x="612" y="196" text-anchor="end" class="row-warn">REQUIRED</text>
+    <text x="28" y="228" class="row-key">Scenario IDs</text><text x="612" y="228" text-anchor="end" class="row-value">must match preparation</text>
+    <text x="28" y="260" class="row-key">Local result</text><text x="612" y="260" text-anchor="end" class="row-warn">NO RECEIPT</text>
+    <text x="28" y="302" class="source">EVIDENCE SOURCE  ·  Governed local eval receipt</text><rect x="28" y="326" width="584" height="74" rx="14" fill="#191d22"/>
+    <text x="48" y="355" class="label">NEXT ACTION</text><text x="48" y="383" class="action">Run local eval and save receipt</text><rect x="544" y="343" width="46" height="42" rx="11" fill="#252a31" stroke="#56606c"/><path d="M560 356h14v17h-14zM566 351h14v17" fill="none" stroke="#dce1e8" stroke-width="2.5"/>
+  </g>
+
+  <!-- Gate 6 -->
+  <g transform="translate(1460,665)">
+    <rect class="card" width="640" height="430" rx="24"/>
+    <circle cx="45" cy="45" r="25" fill="#2a2113" stroke="#ffb520" stroke-width="3"/><text x="45" y="52" text-anchor="middle" class="row-warn" style="font-size:22px">6</text>
+    <text x="86" y="40" class="title">Eval cloud proof</text>
+    <rect x="478" y="20" width="134" height="32" rx="16" fill="#342814" stroke="#ffb520"/><text x="545" y="42" text-anchor="middle" class="badge" fill="#ffb520">HELD</text>
+    <text x="86" y="76" class="headline">Cloud comparison waits for local proof</text><line x1="28" y1="100" x2="612" y2="100" class="divider"/>
+    <text x="28" y="130" class="label">NOW CHECKING</text>
+    <text x="28" y="164" class="row-key">Eval profile</text><text x="612" y="164" text-anchor="end" class="row-value">oss-cloud</text>
+    <text x="28" y="196" class="row-key">Candidate digest</text><text x="612" y="196" text-anchor="end" class="row-value">must match local</text>
+    <text x="28" y="228" class="row-key">Scenario IDs</text><text x="612" y="228" text-anchor="end" class="row-value">exact same set required</text>
+    <text x="28" y="260" class="row-key">Provider run</text><text x="612" y="260" text-anchor="end" class="row-warn">NOT STARTED</text>
+    <text x="28" y="302" class="source">EVIDENCE SOURCE  ·  Governed cloud eval receipt</text><rect x="28" y="326" width="584" height="74" rx="14" fill="#191d22"/>
+    <text x="48" y="355" class="label">NEXT ACTION</text><text x="48" y="383" class="action">Complete local proof first</text><rect x="544" y="343" width="46" height="42" rx="11" fill="#252a31" stroke="#56606c"/><path d="M560 356h14v17h-14zM566 351h14v17" fill="none" stroke="#dce1e8" stroke-width="2.5"/>
+  </g>
+
+  <!-- Gate 7 -->
+  <g transform="translate(60,1135)">
+    <rect class="card" width="640" height="430" rx="24"/>
+    <circle cx="45" cy="45" r="25" fill="#2a2113" stroke="#ffb520" stroke-width="3"/><text x="45" y="52" text-anchor="middle" class="row-warn" style="font-size:22px">7</text>
+    <text x="86" y="40" class="title">Tessl staging</text>
+    <rect x="448" y="20" width="164" height="32" rx="16" fill="#342814" stroke="#ffb520"/><text x="530" y="42" text-anchor="middle" class="badge" fill="#ffb520">UNPROVEN</text>
+    <text x="86" y="76" class="headline">Staging evidence chain incomplete</text><line x1="28" y1="100" x2="612" y2="100" class="divider"/>
+    <text x="28" y="130" class="label">NOW CHECKING</text>
+    <text x="28" y="164" class="row-key">Tessl local proof</text><text x="612" y="164" text-anchor="end" class="row-red">MISSING</text>
+    <text x="28" y="196" class="row-key">Tessl dry run</text><text x="612" y="196" text-anchor="end" class="row-red">MISSING</text>
+    <text x="28" y="228" class="row-key">Handoff readiness</text><text x="612" y="228" text-anchor="end" class="row-red">MISSING</text>
+    <text x="28" y="260" class="row-key">Publication effect</text><text x="612" y="260" text-anchor="end" class="row-value">none · staging only</text>
+    <text x="28" y="302" class="source">EVIDENCE SOURCE  ·  Local proof + dry run + handoff receipts</text><rect x="28" y="326" width="584" height="74" rx="14" fill="#191d22"/>
+    <text x="48" y="355" class="label">NEXT ACTION</text><text x="48" y="383" class="action">Create staging receipts</text><rect x="544" y="343" width="46" height="42" rx="11" fill="#252a31" stroke="#56606c"/><path d="M560 356h14v17h-14zM566 351h14v17" fill="none" stroke="#dce1e8" stroke-width="2.5"/>
+  </g>
+
+  <!-- Gate 8 -->
+  <g transform="translate(760,1135)">
+    <rect class="card" width="640" height="430" rx="24"/>
+    <circle cx="45" cy="45" r="25" fill="#10252a" stroke="#2ed4ed" stroke-width="3"/><text x="45" y="52" text-anchor="middle" class="row-cyan" style="font-size:22px">8</text>
+    <text x="86" y="40" class="title">Tessl publication &amp; registry</text>
+    <rect x="482" y="20" width="130" height="32" rx="16" fill="#33191b" stroke="#ff5f52"/><text x="547" y="42" text-anchor="middle" class="badge" fill="#ff6b5e">REVIEW</text>
+    <text x="86" y="76" class="headline">Registry baseline ≠ candidate proof</text><line x1="28" y1="100" x2="612" y2="100" class="divider"/>
+    <text x="28" y="130" class="label">NOW CHECKING</text>
+    <text x="28" y="164" class="row-key">Published version</text><text x="612" y="164" text-anchor="end" class="row-cyan">v0.2.0</text>
+    <text x="28" y="196" class="row-key">Registry score</text><text x="612" y="196" text-anchor="end" class="row-cyan">67</text>
+    <text x="28" y="228" class="row-key">Quality / impact</text><text x="612" y="228" text-anchor="end" class="row-cyan">100% / 63%</text>
+    <text x="28" y="260" class="row-key">Security / visibility</text><text x="612" y="260" text-anchor="end" class="row-cyan">Passed / Private</text>
+    <text x="28" y="302" class="source">EVIDENCE SOURCE  ·  Live registry observation ≠ publication proof</text><rect x="28" y="326" width="584" height="74" rx="14" fill="#111e23" stroke="#15505a"/>
+    <text x="48" y="355" class="label">NEXT ACTION</text><text x="48" y="383" class="action">Attach publication + score receipts</text><rect x="544" y="343" width="46" height="42" rx="11" fill="#1b3035" stroke="#2d7d8c"/><path d="M560 356h14v17h-14zM566 351h14v17" fill="none" stroke="#dce1e8" stroke-width="2.5"/>
+  </g>
+
+  <!-- Gate 9 -->
+  <g transform="translate(1460,1135)">
+    <rect class="card" width="640" height="430" rx="24"/>
+    <circle cx="45" cy="45" r="25" fill="#2a2113" stroke="#ffb520" stroke-width="3"/><text x="45" y="52" text-anchor="middle" class="row-warn" style="font-size:22px">9</text>
+    <text x="86" y="40" class="title">Runtime truth</text>
+    <rect x="448" y="20" width="164" height="32" rx="16" fill="#342814" stroke="#ffb520"/><text x="530" y="42" text-anchor="middle" class="badge" fill="#ffb520">UNPROVEN</text>
+    <text x="86" y="76" class="headline">No current installed-runtime proof card</text><line x1="28" y1="100" x2="612" y2="100" class="divider"/>
+    <text x="28" y="130" class="label">NOW CHECKING</text>
+    <text x="28" y="164" class="row-key">Installed digest</text><text x="612" y="164" text-anchor="end" class="row-red">MISSING</text>
+    <text x="28" y="196" class="row-key">Doctor status</text><text x="612" y="196" text-anchor="end" class="row-red">MISSING</text>
+    <text x="28" y="228" class="row-key">Observed behavior</text><text x="612" y="228" text-anchor="end" class="row-red">MISSING</text>
+    <text x="28" y="260" class="row-key">Digest agreement</text><text x="612" y="260" text-anchor="end" class="row-warn">NOT ESTABLISHED</text>
+    <text x="28" y="302" class="source">EVIDENCE SOURCE  ·  runtime-card.json bound to candidate</text><rect x="28" y="326" width="584" height="74" rx="14" fill="#191d22"/>
+    <text x="48" y="355" class="label">NEXT ACTION</text><text x="48" y="383" class="action">Install · doctor · observe behavior</text><rect x="544" y="343" width="46" height="42" rx="11" fill="#252a31" stroke="#56606c"/><path d="M560 356h14v17h-14zM566 351h14v17" fill="none" stroke="#dce1e8" stroke-width="2.5"/>
+  </g>
+
+  <line x1="60" y1="1602" x2="2100" y2="1602" class="divider"/>
+  <text x="60" y="1640" class="footer-strong">Legend</text>
+  <text x="135" y="1640" class="footer"><tspan fill="#48e58a">PASSED</tspan> = current receipt  ·  <tspan fill="#ff6b5e">REVIEW</tspan> = human attention  ·  <tspan fill="#ffb520">HELD</tspan> = earlier gate incomplete  ·  <tspan fill="#ffb520">UNPROVEN</tspan> = receipt absent  ·  <tspan fill="#a3aabb">STALE</tspan> = digest mismatch</text>
+  <text x="60" y="1690" class="footer">Concept walkthrough · generated/mockup media is not runtime proof · registry observation stays separate from candidate publication evidence.</text>
+</svg>

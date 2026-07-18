@@ -18,6 +18,7 @@ struct DashboardLoader {
     static let scorerCalibrationCommand = "./bin/ask sdk eval scorer-calibration Skills/agent-ops/improve-agent-native --preview --json --robot"
     static let securityCommand = "./bin/ask sdk security risk-modes Skills/agent-ops/improve-agent-native --preview --json --robot"
     static let allSkillsInventoryCommand = "find Skills -name SKILL.md -print | sort"
+    private static let localEvidenceCache = LocalEvidenceCache()
     static func packageCommand(for skillPath: String) -> String {
         "./bin/ask skills package verify \(shellQuoted(skillPath)) --json --robot"
     }
@@ -31,7 +32,7 @@ struct DashboardLoader {
     }
 
     static func impactCommand(for skillPath: String) -> String {
-        "./bin/ask sdk eval scenario-quality \(shellQuoted(skillPath)) --preview --json --robot"
+        "./bin/ask sdk eval scenario-quality \(shellQuoted(skillPackagePath(for: skillPath))) --preview --json --robot"
     }
 
     static func scorerQualityCommand(for skillPath: String) -> String {
@@ -141,7 +142,9 @@ struct DashboardLoader {
         }.joined(separator: "; ")
     }
 
-    func load() async throws -> SkillDashboard {
+    func load(
+        onLocalEvidence: (@MainActor (SkillDashboard) -> Void)? = nil
+    ) async throws -> SkillDashboard {
         let root = try findRepoRoot()
         let selectedSkillPath = try findSelectedSkillPath(root: root)
         let metadata = try SkillMetadata.load(from: root.appendingPathComponent(selectedSkillPath))
@@ -156,18 +159,32 @@ struct DashboardLoader {
 
         async let tesslResult = tesslSignal(root: root, registryPath: registryPath)
 
-        let boundEvidence = await Self.collectEvidenceAsync(
-            root: root,
-            selectedSkillPath: selectedSkillPath
-        ) {
-            async let packageBuildResult = run(root: root, command: packageBuildCommand)
+        let fingerprint = Self.candidateFingerprint(root: root, selectedSkillPath: selectedSkillPath)
+        let packageBuildResult = await run(root: root, command: packageBuildCommand)
+        let cacheKey = "\(root.standardizedFileURL.path)::\(selectedSkillPath)"
+        let digest = Self.packageDigest(from: packageBuildResult, selectedSkillPath: selectedSkillPath)
+        let cachedChecks = digest.flatMap {
+            Self.localEvidenceCache.entry(for: cacheKey, packageDigest: $0)?.checks
+        }
+        let checks: PipelineEvidenceLoader.LocalChecks
+        if let cachedChecks {
+            checks = PipelineEvidenceLoader.LocalChecks(
+                packageBuild: packageBuildResult,
+                strictAudit: cachedChecks.strictAudit,
+                packageVerify: cachedChecks.packageVerify,
+                securityRiskModes: cachedChecks.securityRiskModes,
+                scenarioQuality: cachedChecks.scenarioQuality,
+                scorerQuality: cachedChecks.scorerQuality,
+                scorerCalibration: cachedChecks.scorerCalibration
+            )
+        } else {
             async let strictAuditResult = run(root: root, command: strictAuditCommand)
             async let packageResult = run(root: root, command: packageCommand)
             async let scenarioResult = run(root: root, command: impactCommand)
             async let scorerQualityResult = run(root: root, command: scorerQualityCommand)
             async let scorerCalibrationResult = run(root: root, command: scorerCalibrationCommand)
             async let securityResult = run(root: root, command: securityCommand)
-            return await PipelineEvidenceLoader.LocalChecks(
+            checks = await PipelineEvidenceLoader.LocalChecks(
                 packageBuild: packageBuildResult,
                 strictAudit: strictAuditResult,
                 packageVerify: packageResult,
@@ -176,20 +193,68 @@ struct DashboardLoader {
                 scorerQuality: scorerQualityResult,
                 scorerCalibration: scorerCalibrationResult
             )
+            if let digest {
+                Self.localEvidenceCache.store(checks, packageDigest: digest, for: cacheKey)
+            }
         }
-        let checks = boundEvidence.evidence
         let quality = qualitySignal(from: checks.packageVerify, root: root, command: packageCommand)
         let impact = impactSignal(from: checks.scenarioQuality, root: root, command: impactCommand)
         let securitySignal = securitySignal(from: checks.securityRiskModes, root: root, command: securityCommand)
+        let fleet = fleetSignal(root: root, selectedSkillPath: selectedSkillPath)
+        if let onLocalEvidence {
+            let cachedTessl = TesslRegistryCache().load(registryPath: registryPath)?.cachedSignal
+                ?? Self.pendingTesslSignal
+            let localDashboard = makeDashboard(
+                metadata: metadata,
+                registryPath: registryPath,
+                root: root,
+                selectedSkillPath: selectedSkillPath,
+                fingerprint: fingerprint,
+                checks: checks,
+                quality: quality,
+                impact: impact,
+                security: securitySignal,
+                tessl: cachedTessl,
+                fleet: fleet
+            )
+            await onLocalEvidence(localDashboard)
+        }
         let tessl = await tesslResult
+        return makeDashboard(
+            metadata: metadata,
+            registryPath: registryPath,
+            root: root,
+            selectedSkillPath: selectedSkillPath,
+            fingerprint: fingerprint,
+            checks: checks,
+            quality: quality,
+            impact: impact,
+            security: securitySignal,
+            tessl: tessl,
+            fleet: fleet
+        )
+    }
+
+    private func makeDashboard(
+        metadata: SkillMetadata,
+        registryPath: String,
+        root: URL,
+        selectedSkillPath: String,
+        fingerprint: String,
+        checks: PipelineEvidenceLoader.LocalChecks,
+        quality: MetricSignal,
+        impact: MetricSignal,
+        security: SecuritySignal,
+        tessl: TesslSignal,
+        fleet: FleetSignal
+    ) -> SkillDashboard {
         let pipeline = Self.productionPipelineCandidate(
             root: root,
             selectedSkillPath: selectedSkillPath,
-            evidenceFingerprint: boundEvidence.candidateFingerprint,
+            evidenceFingerprint: fingerprint,
             checks: checks,
             tessl: tessl
         )
-
         return SkillDashboard(
             displayName: metadata.name,
             version: metadata.version,
@@ -202,12 +267,32 @@ struct DashboardLoader {
             deltaText: tessl.ok ? "Tessl" : "Local SDK",
             quality: quality,
             impact: impact,
-            security: securitySignal,
+            security: security,
             tessl: tessl,
-            fleet: fleetSignal(root: root, selectedSkillPath: selectedSkillPath),
+            fleet: fleet,
             pipeline: pipeline,
             refreshedAt: Date(),
             error: nil
+        )
+    }
+
+    private static var pendingTesslSignal: TesslSignal {
+        TesslSignal(
+            ok: false,
+            cliAvailable: true,
+            authenticated: false,
+            displayStatus: "Refreshing",
+            detail: "Refreshing the live Tessl registry observation; local evidence is current independently.",
+            cliVersion: nil,
+            registryScore: nil,
+            registryVersion: nil,
+            registryQualityScore: nil,
+            registryImpactScore: nil,
+            registrySecurityLabel: nil,
+            registryEvalCount: nil,
+            registryImprovementMultiplier: nil,
+            registryVisibility: nil,
+            recoveryCommand: "tessl search --type skills jscraik/improve-agent-native"
         )
     }
 
@@ -491,6 +576,23 @@ struct DashboardLoader {
         ) ?? "unreadable-candidate"
     }
 
+    private static func packageDigest(
+        from result: CommandResult,
+        selectedSkillPath: String
+    ) -> String? {
+        guard result.exitCode == 0,
+              let payload = result.json,
+              payload.string(at: ["status"]) == "success",
+              payload.string(at: ["data", "skills_sdk_package_build", "status"]) == "built",
+              payload.string(at: ["data", "skills_sdk_package_build", "canonical_source_path"]) == selectedSkillPath,
+              payload.bool(at: ["data", "skills_sdk_package_build", "mutation_performed"]) == false,
+              let digest = payload.string(at: ["data", "skills_sdk_package_build", "package_digest"]),
+              digest.range(of: #"^sha256:[0-9a-f]{64}$"#, options: .regularExpression) != nil else {
+            return nil
+        }
+        return digest
+    }
+
     private static func isContained(_ child: URL, beneath parent: URL) -> Bool {
         let parentPath = parent.path.hasSuffix("/") ? parent.path : parent.path + "/"
         return child.path == parent.path || child.path.hasPrefix(parentPath)
@@ -649,62 +751,52 @@ struct DashboardLoader {
         }
 
         let tessl = Self.tesslCommand()
-        let versionResult = Shell.run("\(tessl) --version", cwd: root, timeout: 5)
-        guard versionResult.exitCode == 0 else {
-            if let cached = TesslRegistryCache().load(registryPath: registryPath) {
-                return cached.cachedSignal
+        let cachedRegistry = TesslRegistryCache().load(registryPath: registryPath)?.cachedSignal
+        let cachedVersion = TesslSessionCache.shared.version(for: tessl) ?? cachedRegistry?.cliVersion
+        let version: String
+        if let cachedVersion {
+            version = cachedVersion
+        } else {
+            let versionResult = Shell.run("\(tessl) --version", cwd: root, timeout: 5)
+            guard versionResult.exitCode == 0 else {
+                if let cached = TesslRegistryCache().load(registryPath: registryPath) {
+                    return cached.cachedSignal
+                }
+                return TesslSignal(
+                    ok: false,
+                    cliAvailable: false,
+                    authenticated: false,
+                    displayStatus: "CLI missing",
+                    detail: "Tessl CLI was not found on PATH.",
+                    cliVersion: nil,
+                    registryScore: nil,
+                    registryVersion: nil,
+                    registryQualityScore: nil,
+                    registryImpactScore: nil,
+                    registrySecurityLabel: nil,
+                    registryEvalCount: nil,
+                    registryImprovementMultiplier: nil,
+                    registryVisibility: nil,
+                    recoveryCommand: "tessl doctor"
+                )
             }
-            return TesslSignal(
-                ok: false,
-                cliAvailable: false,
-                authenticated: false,
-                displayStatus: "CLI missing",
-                detail: "Tessl CLI was not found on PATH.",
-                cliVersion: nil,
-                registryScore: nil,
-                registryVersion: nil,
-                registryQualityScore: nil,
-                registryImpactScore: nil,
-                registrySecurityLabel: nil,
-                registryEvalCount: nil,
-                registryImprovementMultiplier: nil,
-                registryVisibility: nil,
-                recoveryCommand: "tessl doctor"
-            )
-        }
-
-        let version = versionResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-        let whoami = Shell.run("\(tessl) whoami", cwd: root, timeout: 15)
-        guard whoami.exitCode == 0 else {
-            let authExpired = whoami.combinedOutput.localizedCaseInsensitiveContains("401")
-                || whoami.combinedOutput.localizedCaseInsensitiveContains("login")
-            return TesslSignal(
-                ok: false,
-                cliAvailable: true,
-                authenticated: false,
-                displayStatus: authExpired ? "Auth expired" : "Auth blocked",
-                detail: whoami.shortFailure,
-                cliVersion: version.isEmpty ? nil : version,
-                registryScore: nil,
-                registryVersion: nil,
-                registryQualityScore: nil,
-                registryImpactScore: nil,
-                registrySecurityLabel: nil,
-                registryEvalCount: nil,
-                registryImprovementMultiplier: nil,
-                registryVisibility: nil,
-                recoveryCommand: "tessl login"
-            )
+            version = versionResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            TesslSessionCache.shared.store(version: version, for: tessl)
         }
 
         let searchCommand = "\(tessl) search --json --type skills \(Self.shellQuoted(registryPath))"
         let search = Shell.run(searchCommand, cwd: root, timeout: 20)
         guard search.exitCode == 0 else {
+            let cliMissing = search.exitCode == 127
+                || search.combinedOutput.localizedCaseInsensitiveContains("not found")
+            let authExpired = search.combinedOutput.localizedCaseInsensitiveContains("401")
+                || search.combinedOutput.localizedCaseInsensitiveContains("login")
+                || search.combinedOutput.localizedCaseInsensitiveContains("auth")
             return TesslSignal(
                 ok: false,
-                cliAvailable: true,
-                authenticated: true,
-                displayStatus: "Search blocked",
+                cliAvailable: !cliMissing,
+                authenticated: !cliMissing && !authExpired,
+                displayStatus: cliMissing ? "CLI missing" : (authExpired ? "Auth expired" : "Search blocked"),
                 detail: search.shortFailure,
                 cliVersion: version.isEmpty ? nil : version,
                 registryScore: nil,
@@ -715,12 +807,23 @@ struct DashboardLoader {
                 registryEvalCount: nil,
                 registryImprovementMultiplier: nil,
                 registryVisibility: nil,
-                recoveryCommand: "tessl search --type skills \(registryPath)"
+                recoveryCommand: cliMissing
+                    ? "tessl --version"
+                    : (authExpired ? "tessl login" : "tessl search --type skills \(registryPath)")
             )
         }
         let metadata = TesslRegistryMetadata(payload: search.json, registryPath: registryPath)
-        let detail = Shell.run("\(tessl) plugin info \(Self.shellQuoted(registryPath))", cwd: root, timeout: 20)
-        let detailVisibility = detail.exitCode == 0 ? Self.tesslVisibility(fromPluginInfo: detail.stdout) : nil
+        let detailVisibility: String?
+        if metadata.visibility == nil {
+            if let cachedVisibility = cachedRegistry?.registryVisibility {
+                detailVisibility = cachedVisibility
+            } else {
+                let detail = Shell.run("\(tessl) plugin info \(Self.shellQuoted(registryPath))", cwd: root, timeout: 20)
+                detailVisibility = detail.exitCode == 0 ? Self.tesslVisibility(fromPluginInfo: detail.stdout) : nil
+            }
+        } else {
+            detailVisibility = nil
+        }
 
         let signal = TesslSignal(
             ok: true,

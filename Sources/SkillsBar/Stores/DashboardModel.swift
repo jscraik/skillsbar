@@ -1,14 +1,23 @@
 import Foundation
+import OSLog
+
+private let refreshLogger = Logger(
+    subsystem: Bundle.main.bundleIdentifier ?? "local.jscraik.skillsbar",
+    category: "Refresh"
+)
 
 @MainActor
 final class DashboardModel: ObservableObject {
     @Published var dashboard: SkillDashboard
     @Published var isRefreshing = false
+    @Published private(set) var hasLoadedEvidence: Bool
     @Published private(set) var availableSkillPaths: [String] = []
     private let refreshIntervalNanoseconds: UInt64 = 5 * 60 * 1_000_000_000
-    private let sourceChangePollNanoseconds: UInt64 = 3 * 1_000_000_000
+    private let sourceChangePollNanoseconds: UInt64 = 500_000_000
+    private let sourceChangeDebounceNanoseconds: UInt64 = 350_000_000
     private var refreshLoopTask: Task<Void, Never>?
     private var sourceChangeTask: Task<Void, Never>?
+    private var sourceChangeDebounceTask: Task<Void, Never>?
     private var observedSkillDirectory: String?
     private var observedSkillSourceModificationDate: Date?
     private var refreshQueued = false
@@ -21,6 +30,7 @@ final class DashboardModel: ObservableObject {
     ) {
         self.source = source
         self.dashboard = dashboard ?? source.initialDashboard
+        self.hasLoadedEvidence = dashboard != nil || source.usesReviewFixture
         if autorefresh && !source.usesReviewFixture {
             Task { await refresh() }
             startRefreshLoop()
@@ -31,6 +41,7 @@ final class DashboardModel: ObservableObject {
     deinit {
         refreshLoopTask?.cancel()
         sourceChangeTask?.cancel()
+        sourceChangeDebounceTask?.cancel()
     }
 
     var menuTitle: String {
@@ -44,15 +55,28 @@ final class DashboardModel: ObservableObject {
         }
         isRefreshing = true
         defer { isRefreshing = false }
+        let refreshStartedAt = Date()
+        refreshLogger.info("Evidence refresh started")
         repeat {
             refreshQueued = false
             do {
-                dashboard = try await source.load()
+                dashboard = try await source.load { [weak self] localDashboard in
+                    guard let self else { return }
+                    dashboard = localDashboard
+                    hasLoadedEvidence = true
+                    let elapsedMilliseconds = Int(Date().timeIntervalSince(refreshStartedAt) * 1_000)
+                    refreshLogger.info("Local evidence ready in \(elapsedMilliseconds, privacy: .public) ms")
+                }
                 availableSkillPaths = DashboardLoader.discoverSkillPaths(root: URL(fileURLWithPath: dashboard.repoPath))
                 recordSelectedSkillDirectory()
+                let elapsedMilliseconds = Int(Date().timeIntervalSince(refreshStartedAt) * 1_000)
+                refreshLogger.info("Evidence refresh completed in \(elapsedMilliseconds, privacy: .public) ms")
             } catch {
                 dashboard = SkillDashboard.placeholder.withError(error.localizedDescription)
+                let elapsedMilliseconds = Int(Date().timeIntervalSince(refreshStartedAt) * 1_000)
+                refreshLogger.error("Evidence refresh failed after \(elapsedMilliseconds, privacy: .public) ms")
             }
+            hasLoadedEvidence = true
         } while refreshQueued
     }
 
@@ -83,24 +107,41 @@ final class DashboardModel: ObservableObject {
         sourceChangeTask?.cancel()
         sourceChangeTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: self?.sourceChangePollNanoseconds ?? 3_000_000_000)
+                try? await Task.sleep(nanoseconds: self?.sourceChangePollNanoseconds ?? 500_000_000)
                 guard !Task.isCancelled else { return }
-                await self?.refreshIfSelectedSkillChanged()
+                self?.queueRefreshIfSelectedSkillChanged()
             }
         }
     }
 
+    private func queueRefreshIfSelectedSkillChanged() {
+        guard selectedSkillChanged() else { return }
+        sourceChangeDebounceTask?.cancel()
+        sourceChangeDebounceTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: sourceChangeDebounceNanoseconds)
+            guard !Task.isCancelled else { return }
+            await refresh()
+        }
+    }
+
     func refreshIfSelectedSkillChanged() async {
+        guard selectedSkillChanged() else { return }
+        await refresh()
+    }
+
+    private func selectedSkillChanged() -> Bool {
         guard let directory = selectedSkillDirectory(),
-              let currentDate = selectedSkillSourceModificationDate(in: directory) else { return }
+              let currentDate = selectedSkillSourceModificationDate(in: directory) else { return false }
         guard observedSkillDirectory == directory.path,
               let previousDate = observedSkillSourceModificationDate else {
             observedSkillDirectory = directory.path
             observedSkillSourceModificationDate = currentDate
-            return
+            return false
         }
-        guard currentDate > previousDate else { return }
-        await refresh()
+        guard currentDate > previousDate else { return false }
+        observedSkillSourceModificationDate = currentDate
+        return true
     }
 
     private func recordSelectedSkillDirectory() {

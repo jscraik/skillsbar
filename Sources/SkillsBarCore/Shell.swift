@@ -66,15 +66,33 @@ public enum Shell {
         let localBin = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".local/bin")
             .path
-        process.environment = ProcessInfo.processInfo.environment.merging([
-            "PATH": existingPath + ":\(localBin):/opt/homebrew/bin:/usr/local/bin",
+        let managedPython = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".venvs/pyyaml/bin/python")
+        let stablePath = [
+            localBin,
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            "/usr/sbin",
+            "/sbin",
+            existingPath
+        ].joined(separator: ":")
+        var overrides = [
+            "PATH": stablePath,
             "ZDOTDIR": "/private/tmp/skillsbar-zdotdir",
             "XDG_CACHE_HOME": "/private/tmp/skillsbar-xdg",
-            "MISE_TRUSTED_CONFIG_PATHS": cwd.appendingPathComponent(".mise.toml").path,
-            "MISE_STATE_DIR": "/private/tmp/skillsbar-mise-state",
             "MISE_CACHE_DIR": "/private/tmp/skillsbar-mise-cache",
-            "UV_CACHE_DIR": "/private/tmp/skillsbar-uv-cache"
-        ]) { _, new in new }
+            "MISE_OFFLINE": "1",
+            "MISE_JOBS": "2",
+            "UV_CACHE_DIR": "/private/tmp/skillsbar-uv-cache",
+            "UV_OFFLINE": "1",
+            "npm_config_offline": "true"
+        ]
+        if FileManager.default.isExecutableFile(atPath: managedPython.path) {
+            overrides["PYTHON_BIN"] = managedPython.path
+        }
+        process.environment = ProcessInfo.processInfo.environment.merging(overrides) { _, new in new }
 
         let stdout = Pipe()
         let stderr = Pipe()

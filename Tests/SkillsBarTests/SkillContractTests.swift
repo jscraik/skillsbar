@@ -2,6 +2,21 @@ import Foundation
 import XCTest
 
 final class SkillContractTests: XCTestCase {
+    func testSignedAppResourceLookupPrecedesTheSwiftPMFallback() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let dashboardView = try String(
+            contentsOf: repoRoot.appendingPathComponent("Sources/SkillsBar/Views/DashboardView.swift"),
+            encoding: .utf8
+        )
+        let mainLookup = try XCTUnwrap(dashboardView.range(of: "Bundle.main.url(forResource:"))
+        let moduleLookup = try XCTUnwrap(dashboardView.range(of: "Bundle.module.url(forResource:"))
+
+        XCTAssertLessThan(mainLookup.lowerBound, moduleLookup.lowerBound)
+    }
+
     deinit {}
 
     func testAnimationPlanCommandsShareTheResolvedDirectory() throws {
