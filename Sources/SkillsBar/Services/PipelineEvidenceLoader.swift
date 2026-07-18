@@ -500,7 +500,7 @@ struct PipelineEvidenceLoader {
         guard !digests.isEmpty else {
             return .unproven(reason: "\(expectedGate) receipt is not bound to a package digest")
         }
-        guard digests == [digest] else {
+        guard digests == Set([digest]) else {
             return .stale(path: relativeReceipt)
         }
         let scenarioIDs = Array(Set(documents.flatMap { scenarioIDs(in: $0) })).sorted()

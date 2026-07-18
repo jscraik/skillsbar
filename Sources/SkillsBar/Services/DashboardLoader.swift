@@ -491,13 +491,21 @@ struct DashboardLoader {
         ) ?? "unreadable-candidate"
     }
 
+    private static func isContained(_ child: URL, beneath parent: URL) -> Bool {
+        let parentPath = parent.path.hasSuffix("/") ? parent.path : parent.path + "/"
+        return child.path == parent.path || child.path.hasPrefix(parentPath)
+    }
+
     private static func governedInputURLs(root: URL, selectedSkillPath: String) -> [URL] {
         let resolvedRoot = root.standardizedFileURL.resolvingSymlinksInPath()
-        let skillURL = root.appendingPathComponent(selectedSkillPath)
+        let skillsRoot = resolvedRoot.appendingPathComponent("Skills")
             .standardizedFileURL
             .resolvingSymlinksInPath()
-        let rootPrefix = resolvedRoot.path.hasSuffix("/") ? resolvedRoot.path : resolvedRoot.path + "/"
-        guard skillURL.path.hasPrefix(rootPrefix) else { return [] }
+        let skillURL = resolvedRoot.appendingPathComponent(selectedSkillPath)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        guard isContained(skillURL, beneath: skillsRoot),
+              FileManager.default.fileExists(atPath: skillURL.path) else { return [] }
         let skillDirectory = skillURL.deletingLastPathComponent()
         guard let enumerator = FileManager.default.enumerator(
             at: skillDirectory,
@@ -507,7 +515,7 @@ struct DashboardLoader {
         let packageFiles = enumerator.compactMap { $0 as? URL }
             .map { $0.standardizedFileURL.resolvingSymlinksInPath() }
             .filter { url in
-                guard url.path.hasPrefix(rootPrefix),
+                guard isContained(url, beneath: skillsRoot),
                       let values = try? url.resourceValues(forKeys: [.isRegularFileKey]),
                       values.isRegularFile == true else { return false }
                 return url != skillURL
@@ -544,15 +552,22 @@ struct DashboardLoader {
             ?? environment["SELECTED_SKILL_PATH"]
             ?? UserDefaults.standard.string(forKey: Self.selectedSkillDefaultsKey)
             ?? Self.defaultSkillPath
-        let relativePath = rawPath.hasPrefix(root.path + "/")
-            ? String(rawPath.dropFirst(root.path.count + 1))
-            : rawPath
-        guard relativePath.hasPrefix("Skills/"),
-              relativePath.hasSuffix("/SKILL.md"),
-              FileManager.default.fileExists(atPath: root.appendingPathComponent(relativePath).path) else {
+        let resolvedRoot = root.standardizedFileURL.resolvingSymlinksInPath()
+        let skillsRoot = resolvedRoot.appendingPathComponent("Skills")
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let candidateURL = rawPath.hasPrefix("/")
+            ? URL(fileURLWithPath: rawPath)
+            : resolvedRoot.appendingPathComponent(rawPath)
+        let selectedURL = candidateURL.standardizedFileURL.resolvingSymlinksInPath()
+        guard selectedURL.lastPathComponent == "SKILL.md",
+              Self.isContained(selectedURL, beneath: skillsRoot),
+              FileManager.default.fileExists(atPath: selectedURL.path) else {
             return Self.defaultSkillPath
         }
-        return relativePath
+        let rootPrefix = resolvedRoot.path.hasSuffix("/") ? resolvedRoot.path : resolvedRoot.path + "/"
+        guard selectedURL.path.hasPrefix(rootPrefix) else { return Self.defaultSkillPath }
+        return String(selectedURL.path.dropFirst(rootPrefix.count))
     }
 
     private func run(root: URL, command: String) async -> CommandResult {

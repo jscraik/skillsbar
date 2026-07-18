@@ -68,8 +68,10 @@ regressions added during PR triage.
 The earlier 61-test focused, 60-test full, and 62-test final entries in this
 section are retained for provenance from successive triage snapshots. They are
 superseded and are not the current authoritative counts. The current
-authoritative feature-lane run is the 51-test `ReviewPopoverTests` baseline
-check followed by the 65-test full suite recorded under the repair closeout.
+authoritative feature-lane run is the 53-test `ReviewPopoverTests` suite plus
+the 12-test `PipelineEvidenceLoaderTests` suite (65 tests total, one opt-in
+integration skip), followed by the 67-test full suite recorded below. Earlier
+counts remain provenance only.
 
 Command: `HOME=/private/tmp/skillsbar-pr2-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-pr2-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-pr2-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-pr2-test-build -Xswiftc -gnone --filter "ReviewPopoverTests|PipelineEvidenceLoaderTests"` -> pass (61 tests executed, 1 integration test skipped, 0 failures)
 
@@ -115,6 +117,8 @@ state distinct from a cached historical snapshot. The superseded worker handoff
 now points to this receipt and the accepted QA proof by path.
 
 Command: `HOME=/private/tmp/skillsbar-repair-test-home2 XDG_CACHE_HOME=/private/tmp/skillsbar-repair-test-xdg2 CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-repair-test-clang2 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer timeout 600 swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-repair-test-build2 -Xswiftc -gnone` -> pass (65 tests executed, 1 opt-in integration test skipped, 0 failures)
+
+Command: `HOME=/private/tmp/skillsbar-pr2-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-pr2-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-pr2-test-clang DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer timeout 600 swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-pr2-test` -> pass (67 tests executed, 1 opt-in integration test skipped, 0 failures)
 
 Command: `git diff --check` -> pass (no whitespace diagnostics)
 

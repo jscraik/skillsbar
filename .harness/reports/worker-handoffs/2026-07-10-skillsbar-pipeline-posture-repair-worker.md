@@ -6,7 +6,7 @@ artifact_id: worker-2026-07-10-skillsbar-pipeline-posture-repair
 date: 2026-07-10
 task: Worker-SkillsBar Pipeline Posture Repair
 status: superseded
-superseded_by: .harness/reports/2026-07-14-skillsbar-nine-gate-ui-validation.md#pr-2-follow-up-validation
+superseded_by: .harness/reports/2026-07-14-skillsbar-nine-gate-ui-validation.md#review-follow-up-repair-closeout
 resolved_by: .harness/reports/qa-proofs/2026-07-11-skillsbar-pipeline-posture-validation-qa.md
 repair_findings:
   - QA-001

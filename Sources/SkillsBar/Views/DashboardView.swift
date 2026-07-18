@@ -116,7 +116,7 @@ private struct PipelinePostureHeader: View {
         .accessibilityLabel(
             "Skills SDK. \(active?.evidenceStatus == .reviewRequired ? "Candidate requires review" : "Current local candidate"). "
                 + "Pipeline readiness \(candidate.postureScore) out of 100. "
-                + "\(candidate.evidencedStageCount) of \(PipelineStage.allCases.count) stages evidenced."
+                + "\(candidate.evidencedStageCount) of \(PipelineStage.allCases.count) gates evidenced."
         )
     }
 
@@ -162,7 +162,7 @@ private struct PipelineReadinessSummary: View {
             Text("pipeline readiness")
                 .scaledSystemFont(size: 9.5, weight: .semibold, relativeTo: .caption)
                 .foregroundStyle(.bodyText)
-            Text("\(candidate.evidencedStageCount) of \(PipelineStage.allCases.count) stages evidenced")
+            Text("\(candidate.evidencedStageCount) of \(PipelineStage.allCases.count) gates evidenced")
                 .scaledSystemFont(size: 9, weight: .regular, relativeTo: .caption2)
                 .foregroundStyle(.secondaryText)
                 .lineLimit(1)

@@ -79,7 +79,13 @@ Then **stop and wait for the user to select** which findings become plans. If ru
 
 ### Phase 4 — Write plans
 
-Resolve the plan directory once: use `plans/` unless it already belongs to a different workflow, otherwise use `animation-plans/`. Use that same directory for numbering, plan files, and its README.
+Resolve the plan directory once, before numbering or writing anything. Treat
+`plans/` as belonging to this workflow when it is absent or when its optional
+`.workflow-owner` marker contains the exact line `workflow: improve-animations`.
+If the marker contains any other non-blank `workflow:` value, treat `plans/`
+as owned by another workflow and use `animation-plans/` instead. Use the one
+resolved directory for numbering, plan files, and its README; do not resolve a
+different directory for any later operation.
 
 One plan per selected finding, using [PLAN-TEMPLATE.md](PLAN-TEMPLATE.md), written into the resolved plan directory as `NNN-short-slug.md` (monotonic numbering; respect existing plans). Stamp each plan with the current commit (`git rev-parse --short HEAD`).
 

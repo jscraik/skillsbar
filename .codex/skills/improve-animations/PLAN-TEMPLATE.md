@@ -37,9 +37,11 @@ configs, media queries. Never "use a nicer easing":
 ## Repo conventions to follow
 
 How this codebase already does it, with one exemplar the executor should
-imitate (token names, file placement, prop patterns):
+imitate (token names, file placement, prop patterns). Populate the token-file
+path from the recon; if no shared token file exists, say so explicitly rather
+than inventing a repository path:
 
-- Easing tokens live in `src/styles/tokens.css`; add new curves there, e.g. `--ease-out: cubic-bezier(0.23, 1, 0.32, 1);`
+- Easing tokens live in `<recon-verified-token-file-or-no-shared-token-file>`; add new curves there only when recon confirms the file, e.g. `--ease-out: cubic-bezier(0.23, 1, 0.32, 1);`
 - <exemplar file:line that already does this correctly>
 
 ## Steps
@@ -72,4 +74,4 @@ imitate (token names, file placement, prop patterns):
 - One plan per finding. If two findings share every file and the same fix pattern (e.g. the same easing token swap across components), they may merge into one plan.
 - Pull every value from [AUDIT.md](AUDIT.md) — never approximate from memory.
 - The feel check is not optional. Motion can be mechanically correct and still feel wrong; give the executor (or the human reviewing the executor's diff) concrete things to watch for in slow motion.
-- After writing plans, create or update `<plan-directory>/README.md` with: a table of plans (number, title, severity, status), the recommended execution order, and any dependencies between plans. `<plan-directory>` is the single directory resolved by the skill before plan creation.
+- After writing plans, create or update `<resolved-plan-directory>/README.md` with: a table of plans (number, title, severity, status), the recommended execution order, and any dependencies between plans. `<resolved-plan-directory>` is the single directory resolved by the skill before plan creation and must be reused for numbering, plan files, and README updates.
