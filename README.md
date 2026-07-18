@@ -43,6 +43,16 @@ The launcher serializes concurrent builds, stops an existing instance, delegates
 ~/.codex/usage-data/skillsbar
 ```
 
+For the supported hackathon walkthrough, launch the real menu-bar app with deterministic demo evidence:
+
+```bash
+./script/build_and_run.sh --demo
+```
+
+This mode launches the packaged `MenuBarExtra`, selects the deterministic Gate 1 nine-gate fixture, and shows a `DEMO FIXTURE` disclosure in the popover. It prefers LaunchServices and accepts the launcher's sustained direct-executable fallback when LaunchServices is unavailable; the receipt records the exact method. Click the Skills SDK document icon in the macOS menu bar to reveal it. The receipt also records `evidence_mode` as `deterministic_demo_fixture`; the fixture demonstrates the product flow but is not live SDK, Tessl, hosted CI, notarization, or review-readiness proof. Use `--verify`, rather than `--demo`, when LaunchServices itself is the behavior under test.
+
+The timed judge walkthrough and proof-boundary answers are in [`DEMO.md`](DEMO.md).
+
 For a build-only check that does not open the app:
 
 ```bash
@@ -108,7 +118,7 @@ TESSL_BIN=/absolute/path/to/tessl ./Launch.command
 
 For fixture-based Tessl UI work, set `TESSL_REGISTRY_FIXTURE=1` or `TESSL_REGISTRY_FIXTURE_SCORE=<0-100>` with the optional fixture variables used in `DashboardLoader.swift`. Add `TESSL_REGISTRY_FIXTURE_MODE=cached` to exercise the CLI-unavailable historical treatment.
 
-For the deterministic nine-gate implementation state, set `SKILLSBAR_REVIEW_FIXTURE=live` (or `1`). This bypasses live package, scenario, security, and registry parsing before constructing the model, so snapshots consistently render candidate identity as the active gate, held mechanical/security/eval-preparation observations, registry score 66, and the canonical SDK-start command. Use `SKILLSBAR_REVIEW_FIXTURE=no-cli` to render the same last-known registry metrics with `CLI UNAVAILABLE` and `Historical external baseline · not proof for this candidate.`
+For product demos, use the supported `./script/build_and_run.sh --demo` path above. For deterministic test and mockup work only, `SKILLSBAR_REVIEW_FIXTURE=live` (or `1`) bypasses live package, scenario, security, and registry parsing before constructing the model, so snapshots consistently render candidate identity as the active gate, held mechanical/security/eval-preparation observations, registry score 66, and the canonical SDK-start command. Use `SKILLSBAR_REVIEW_FIXTURE=no-cli` to render the same last-known registry metrics with `CLI UNAVAILABLE` and `Historical external baseline · not proof for this candidate.`
 
 A successful live Tessl CLI search stores only sanitized registry fields (version, score, Quality, Impact, Security, eval count, multiplier, and visibility) in local preferences. If the CLI later becomes unavailable, SkillsBar can show that last-known snapshot as historical context. It does not cache credentials, raw command output, or package contents, and cached registry data never promotes a local pipeline gate.
 
@@ -149,7 +159,7 @@ swift test --build-system native --disable-sandbox --build-path /private/tmp/ski
 | `Launch.command`                                                                         | Build, bundle, sign, and LaunchServices entrypoint.                                                      |
 | `script/package_app.sh`                                                                  | Deterministic development/release bundle assembly, architecture verification, and signing boundary.      |
 | `script/release.sh`                                                                      | Universal Developer ID signing, notarization, stapling, verification, and release-zip boundary.          |
-| `script/build_and_run.sh`                                                                | Convenience wrapper for run, debug, logs, telemetry, and live verify modes.                              |
+| `script/build_and_run.sh`                                                                | Convenience wrapper for run, deterministic demo, debug, logs, telemetry, and live verify modes.          |
 | `version.env`                                                                            | Shared marketing version and monotonically increasing build number.                                      |
 | `Sources/SkillsBar`                                                                      | SwiftUI app, models, services, stores, resources, and views.                                             |
 | `Sources/SkillsBarCore`                                                                  | Shared shell execution and JSON parsing helpers.                                                         |
@@ -158,7 +168,7 @@ swift test --build-system native --disable-sandbox --build-path /private/tmp/ski
 | `.harness/reviews/2026-07-09-review-popover-3lane-synthesis.md`                          | Three-lane implementation handoff for the final-polish review popover refactor.                          |
 | `.harness/reviews/2026-07-09-review-popover-pass3-synthesis.md`                          | Pass-three review closeout separating spec/doc handoff defects from remaining implementation blockers.   |
 | `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-implementation-handoff.png` | Current full-height implementation-handoff mockup referenced by the review popover spec.                 |
-| `.harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png`              | Deterministic `404 x 720` app-rendered implementation snapshot; not live MenuBarExtra interaction proof. |
+| `.harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png`              | Deterministic `404 x 560` app-rendered implementation snapshot; not live MenuBarExtra interaction proof. |
 | `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-final-polish.png`           | Earlier final-polish mockup retained as historical comparison evidence.                                  |
 | `.harness/media/2026-07-09-skills-sdk-menubar-final-mockup.png`                          | Earlier persisted mockup retained as historical comparison evidence.                                     |
 

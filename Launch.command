@@ -9,6 +9,12 @@ LAUNCH_RECEIPT="$BUILD_ROOT/SkillsBar.launch-receipt.json"
 LOCK_DIR="$BUILD_ROOT/launch.lock"
 LOCK_PID_FILE="$LOCK_DIR/pid"
 LOCK_OWNED=0
+EVIDENCE_MODE="live_local_evidence"
+case "${SKILLSBAR_DEMO_MODE:-}" in
+  1|true|TRUE|yes|YES|on|ON)
+    EVIDENCE_MODE="deterministic_demo_fixture"
+    ;;
+esac
 
 mkdir -p "$BUILD_ROOT"
 # shellcheck disable=SC2329 # Invoked by the trap below.
@@ -55,6 +61,7 @@ if [[ "${NO_OPEN:-0}" == "1" ]]; then
   "schema_version": "skillsbar-launch/v1",
   "status": "built_not_launched",
   "launch_method": "none",
+  "evidence_mode": "$EVIDENCE_MODE",
   "app_path": "$APP_DIR",
   "executable_path": "$EXECUTABLE"
 }
@@ -70,6 +77,7 @@ if /usr/bin/open -n "$APP_DIR" >"$OPEN_OUTPUT" 2>&1; then
   "schema_version": "skillsbar-launch/v1",
   "status": "launched",
   "launch_method": "launchservices_open",
+  "evidence_mode": "$EVIDENCE_MODE",
   "app_path": "$APP_DIR",
   "executable_path": "$EXECUTABLE"
 }
@@ -103,6 +111,7 @@ if [[ "${SKILLSBAR_DIRECT_LAUNCH_FALLBACK:-1}" == "1" && "${SKILLSBAR_REQUIRE_LA
   "schema_version": "skillsbar-launch/v1",
   "status": "launched",
   "launch_method": "direct_executable_fallback",
+  "evidence_mode": "$EVIDENCE_MODE",
   "app_path": "$APP_DIR",
   "executable_path": "$EXECUTABLE",
   "launchservices_error": "$OPEN_ERROR"
@@ -120,6 +129,7 @@ cat > "$LAUNCH_RECEIPT" <<JSON
   "schema_version": "skillsbar-launch/v1",
   "status": "blocked_launchservices",
   "launch_method": "launchservices_open",
+  "evidence_mode": "$EVIDENCE_MODE",
   "app_path": "$APP_DIR",
   "executable_path": "$EXECUTABLE",
   "open_error": "$OPEN_ERROR",

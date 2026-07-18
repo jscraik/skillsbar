@@ -16,6 +16,7 @@ struct SnapshotConfiguration {
     var dynamicTypeSize: DynamicTypeSize = .large
     var reduceTransparency = false
     var increasedContrast = false
+    var isDemoFixture = false
 
     static let `default` = SnapshotConfiguration()
 }
@@ -55,7 +56,11 @@ enum SnapshotRenderer {
         do {
             _ = NSApplication.shared
             let dashboard = try DashboardDataSource().loadSync()
-            try render(dashboard: dashboard, to: outputURL)
+            try render(
+                dashboard: dashboard,
+                configuration: SnapshotConfiguration(isDemoFixture: SkillsBarDemoMode.isEnabled()),
+                to: outputURL
+            )
             print("Wrote snapshot \(outputURL.path)")
         } catch {
             fputs("Snapshot failed: \(error.localizedDescription)\n", stderr)
@@ -75,7 +80,7 @@ enum SnapshotRenderer {
         to outputURL: URL
     ) throws {
         let model = DashboardModel(dashboard: dashboard, autorefresh: false)
-        let view = DashboardView(model: model)
+        let view = DashboardView(model: model, isDemoFixture: configuration.isDemoFixture)
             .frame(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
             .background(Color.black)
             .environment(\.dynamicTypeSize, configuration.dynamicTypeSize)

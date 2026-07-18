@@ -4,15 +4,46 @@ import SwiftUI
 struct ReleaseEvidenceView: View {
     let dashboard: SkillDashboard
     let isRefreshing: Bool
+    var isInitialLoad = false
+    var isDemoFixture = false
+    var onRefresh: () -> Void = {}
 
     var body: some View {
         VStack(spacing: 0) {
-            ReleaseHeader(dashboard: dashboard, isRefreshing: isRefreshing)
+            ReleaseHeader(
+                dashboard: dashboard,
+                isRefreshing: isRefreshing,
+                isInitialLoad: isInitialLoad,
+                isDemoFixture: isDemoFixture
+            )
             ReleaseDivider().padding(.vertical, 8)
-            ScrollView {
-                ReleaseGateList(dashboard: dashboard)
-                    .padding(.trailing, 11)
+
+            if isInitialLoad {
+                AutomaticIdentityLoadingCard()
+                    .padding(.bottom, 8)
+            } else if let active = dashboard.pipeline.activeReceipt {
+                NextRequiredCard(
+                    receipt: active,
+                    isRefreshing: isRefreshing,
+                    onRefresh: onRefresh
+                )
+                .padding(.bottom, 8)
             }
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    CompactDownstreamGateList(
+                        dashboard: dashboard,
+                        activeStageID: dashboard.pipeline.activeReceipt?.id,
+                        isDemoFixture: isDemoFixture
+                    )
+                    .id(CompactDownstreamGateList.topAnchorID)
+                }
+                .onAppear {
+                    proxy.scrollTo(CompactDownstreamGateList.topAnchorID, anchor: .top)
+                }
+            }
+            .frame(minHeight: 132, maxHeight: .infinity)
             .scrollIndicators(.visible)
             .scrollBounceBehavior(.basedOnSize)
             .overlay(alignment: .top) {
@@ -21,10 +52,18 @@ struct ReleaseEvidenceView: View {
             .overlay(alignment: .bottom) {
                 ReleaseScrollEdge(direction: .bottom)
             }
-            .accessibilityLabel("Skills SDK gate pipeline")
-            TesslEvidenceCard(dashboard: dashboard)
+            .accessibilityLabel("Skills SDK downstream gate evidence")
+            CompactCanonicalIdentityAction(
+                receipt: dashboard.pipeline.activeReceipt,
+                isRefreshing: isRefreshing,
+                isInitialLoad: isInitialLoad,
+                onRefresh: onRefresh
+            )
                 .padding(.top, 8)
-            CanonicalIdentityAction(receipt: dashboard.pipeline.activeReceipt)
+            CompactTesslRegistryStrip(
+                dashboard: dashboard,
+                isDemoFixture: isDemoFixture
+            )
                 .padding(.top, 8)
         }
     }
@@ -33,6 +72,8 @@ struct ReleaseEvidenceView: View {
 private struct ReleaseHeader: View {
     let dashboard: SkillDashboard
     let isRefreshing: Bool
+    let isInitialLoad: Bool
+    let isDemoFixture: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var candidate: PipelineCandidate { dashboard.pipeline }
@@ -50,6 +91,10 @@ private struct ReleaseHeader: View {
                     Text("SKILLS SDK")
                         .releaseFont(12, weight: .medium, relativeTo: .caption)
                         .foregroundStyle(.secondaryText)
+                    if isDemoFixture {
+                        ReleasePill(text: "DEMO FIXTURE", tone: .warning)
+                            .accessibilityLabel("Deterministic demo fixture")
+                    }
                     if isRefreshing {
                         if reduceMotion {
                             Image(systemName: "arrow.clockwise")
@@ -77,25 +122,39 @@ private struct ReleaseHeader: View {
         .padding(.trailing, 30)
         .overlay(alignment: .bottomLeading) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(active.map { "Local candidate needs \($0.stage.title.lowercased())" } ?? "Local candidate is current")
+                Text(
+                    isInitialLoad
+                        ? "Checking local candidate automatically"
+                        : active.map { "Local candidate needs \($0.stage.title.lowercased())" }
+                            ?? "Local candidate is current"
+                )
                     .releaseFont(18, weight: .medium, relativeTo: .title3)
                     .foregroundStyle(.primaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(active?.evidenceStatus.tone.color ?? Color.successAccent)
+                        .fill(isInitialLoad ? Color.secondaryText : active?.evidenceStatus.tone.color ?? Color.successAccent)
                         .frame(width: 6, height: 6)
-                    Text(active.map { "Gate \($0.stage.number) of \(PipelineStage.allCases.count)" } ?? "All gates current")
+                    Text(
+                        isInitialLoad
+                            ? "Reading local SDK evidence"
+                            : active.map { "Gate \($0.stage.number) of \(PipelineStage.allCases.count)" }
+                                ?? "All gates current"
+                    )
                         .releaseFont(11, weight: .medium, relativeTo: .caption)
-                        .foregroundStyle(active?.evidenceStatus.tone.color ?? Color.successAccent)
+                        .foregroundStyle(isInitialLoad ? Color.secondaryText : active?.evidenceStatus.tone.color ?? Color.successAccent)
                     Text("·")
                         .foregroundStyle(.secondaryText)
-                    Text(active?.stage.title ?? "Current candidate")
+                    Text(isInitialLoad ? "Automatic check" : active?.stage.title ?? "Current candidate")
                         .releaseFont(11, weight: .regular, relativeTo: .caption)
                         .foregroundStyle(.bodyText)
                 }
-                Text("\(candidate.evidencedStageCount) receipt current · downstream proof \(active == nil ? "available" : "held")")
+                Text(
+                    isInitialLoad
+                        ? "Generating candidate identity before evaluating downstream proof"
+                        : "\(candidate.evidencedStageCount) receipt current · downstream proof \(active == nil ? "available" : "held")"
+                )
                     .releaseFont(10.5, weight: .regular, relativeTo: .caption)
                     .foregroundStyle(.bodyText)
             }
@@ -104,7 +163,7 @@ private struct ReleaseHeader: View {
         .padding(.bottom, 66)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "Skills SDK. \(active.map { "Local candidate needs \($0.stage.title.lowercased())" } ?? "Local candidate is current"). "
+            "Skills SDK. \(isInitialLoad ? "Checking local candidate automatically" : active.map { "Local candidate needs \($0.stage.title.lowercased())" } ?? "Local candidate is current"). "
                 + "\(candidate.evidencedStageCount) receipt current. "
                 + (active.map { "Current gate \($0.stage.number), \($0.stage.title)." } ?? "All gates current.")
         )
@@ -113,29 +172,40 @@ private struct ReleaseHeader: View {
 
 private struct ReleaseGateList: View {
     let dashboard: SkillDashboard
+    let isRefreshing: Bool
+    let isInitialLoad: Bool
+    let onRefresh: () -> Void
 
     private var candidate: PipelineCandidate { dashboard.pipeline }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("NEXT REQUIRED")
+            Text(isInitialLoad ? "AUTOMATIC CHECK" : "NEXT REQUIRED")
                 .releaseFont(10, weight: .medium, relativeTo: .caption)
                 .foregroundStyle(.secondaryText)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 5)
 
-            if let active = candidate.activeReceipt {
-                NextRequiredCard(receipt: active)
+            if isInitialLoad {
+                AutomaticIdentityLoadingCard()
+                    .padding(.bottom, 9)
+            } else if let active = candidate.activeReceipt {
+                NextRequiredCard(
+                    receipt: active,
+                    isRefreshing: isRefreshing,
+                    onRefresh: onRefresh
+                )
                     .padding(.bottom, 9)
             }
 
-            HStack {
-                Text("LOCAL PROOF")
-                    .releaseFont(11, weight: .medium, relativeTo: .caption)
-                    .foregroundStyle(.secondaryText)
-            }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 6)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("LOCAL PROOF")
+                        .releaseFont(11, weight: .medium, relativeTo: .caption)
+                        .foregroundStyle(.secondaryText)
+                }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 6)
 
             ZStack(alignment: .topLeading) {
                 GateConnector()
@@ -178,19 +248,382 @@ private struct ReleaseGateList: View {
                 }
             }
 
-            Text("A held observation cannot promote a downstream gate.")
-                .releaseFont(10.5, weight: .regular, relativeTo: .caption)
-                .foregroundStyle(.bodyText)
-                .padding(.horizontal, 8)
-                .padding(.top, 6)
+                Text("A held observation cannot promote a downstream gate.")
+                    .releaseFont(10.5, weight: .regular, relativeTo: .caption)
+                    .foregroundStyle(.bodyText)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 6)
+            }
+            .opacity(isInitialLoad ? 0 : 1)
+            .frame(height: isInitialLoad ? 0 : nil)
+            .clipped()
+            .accessibilityHidden(isInitialLoad)
         }
         .accessibilityElement(children: .contain)
     }
 }
 
+private struct AutomaticIdentityLoadingCard: View {
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 46)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Candidate identity")
+                    .releaseFont(14, weight: .medium, relativeTo: .subheadline)
+                Text("Computing canonical package digest")
+                    .releaseFont(10.5, weight: .medium, relativeTo: .caption)
+                    .foregroundStyle(.bodyText)
+                Text("This read-only check runs automatically and does not modify or publish the skill.")
+                    .releaseFont(10, weight: .regular, relativeTo: .caption2)
+                    .foregroundStyle(.bodyText)
+            }
+            Spacer(minLength: 4)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.035))
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(Color.white.opacity(0.14), lineWidth: 1))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Checking candidate identity automatically with a read-only package digest command")
+    }
+}
+
+private struct CompactDownstreamGateList: View {
+    static let topAnchorID = "pipeline-top"
+
+    let dashboard: SkillDashboard
+    let activeStageID: PipelineStage?
+    let isDemoFixture: Bool
+    @State private var expandedStageID: PipelineStage?
+
+    private var receipts: [PipelineStageReceipt] {
+        dashboard.pipeline.orderedReceipts.filter { $0.id != activeStageID }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("PIPELINE · SCROLL FOR GATES 2–9")
+                .releaseFont(10, weight: .medium, relativeTo: .caption)
+                .foregroundStyle(.secondaryText)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 5)
+
+            ForEach(receipts) { receipt in
+                if receipt.stage == .tesslStaging {
+                    Text("TESSL DELIVERY")
+                        .releaseFont(10, weight: .medium, relativeTo: .caption)
+                        .foregroundStyle(.secondaryText)
+                        .padding(.horizontal, 8)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
+                }
+
+                Button {
+                    expandedStageID = expandedStageID == receipt.id ? nil : receipt.id
+                } label: {
+                    CompactGateRow(receipt: receipt)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows or hides detail for \(receipt.stage.title)")
+
+                if expandedStageID == receipt.id {
+                    CompactGateDetail(
+                        receipt: receipt,
+                        dashboard: dashboard,
+                        isDemoFixture: isDemoFixture
+                    )
+                        .transition(.opacity)
+                }
+
+                if receipt.id != receipts.last?.id {
+                    ReleaseDivider().padding(.leading, 43)
+                }
+            }
+        }
+        .padding(.trailing, 11)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private struct CompactGateRow: View {
+    let receipt: PipelineStageReceipt
+
+    private var trailingLabel: String {
+        if receipt.stage == .mechanicalValidation,
+           let completedChecks = receipt.completedChecks,
+           let requiredChecks = receipt.requiredChecks {
+            return "\(completedChecks) / \(requiredChecks)"
+        }
+        if receipt.evidenceStatus == .passed { return "PASS" }
+        if receipt.evidenceStatus == .held { return "HELD" }
+        if receipt.evidenceStatus == .unproven { return "LOCKED" }
+        return receipt.evidenceStatus.label.uppercased()
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            GateSymbol(receipt: receipt, isActive: false)
+                .frame(width: 27)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(receipt.stage.number). \(receipt.stage.title)")
+                    .releaseFont(12.5, weight: .medium, relativeTo: .subheadline)
+                    .foregroundStyle(.primaryText)
+                    .lineLimit(1)
+                Text(receipt.nextAction)
+                    .releaseFont(9.5, weight: .regular, relativeTo: .caption2)
+                    .foregroundStyle(.bodyText)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            Text(trailingLabel)
+                .releaseFont(9.5, weight: .medium, design: .rounded, relativeTo: .caption2)
+                .foregroundStyle(receipt.evidenceStatus.tone.color)
+                .lineLimit(1)
+            Image(systemName: "chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.secondaryText)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Gate \(receipt.stage.number), \(receipt.stage.title). \(receipt.evidenceStatus.label).")
+    }
+}
+
+private struct CompactGateDetail: View {
+    let receipt: PipelineStageReceipt
+    let dashboard: SkillDashboard
+    let isDemoFixture: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(receipt.stage.supportingText)
+                .releaseFont(10, weight: .regular, relativeTo: .caption2)
+                .foregroundStyle(.bodyText)
+            if receipt.stage == .tesslLiveRegistry {
+                Text(RegistryEvidencePresentation(
+                    dashboard: dashboard,
+                    isDemoFixture: isDemoFixture
+                ).caption)
+                    .releaseFont(10, weight: .medium, relativeTo: .caption2)
+                    .foregroundStyle(Color.teal.opacity(0.88))
+            }
+        }
+        .padding(.leading, 43)
+        .padding(.trailing, 10)
+        .padding(.bottom, 7)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct CompactTesslRegistryStrip: View {
+    let dashboard: SkillDashboard
+    let isDemoFixture: Bool
+
+    private var presentation: RegistryEvidencePresentation {
+        RegistryEvidencePresentation(dashboard: dashboard, isDemoFixture: isDemoFixture)
+    }
+    private var versionText: String {
+        guard let version = dashboard.tessl.registryVersion, !version.isEmpty else { return "version unavailable" }
+        return "v\(version.trimmingCharacters(in: CharacterSet(charactersIn: "vV")))"
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            ReleaseTesslLogo(size: 38)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Text("Tessl")
+                        .releaseFont(11.5, weight: .semibold, relativeTo: .subheadline)
+                        .foregroundStyle(.primaryText)
+                    Text("tessl.io registry")
+                        .releaseFont(8.5, weight: .medium, relativeTo: .caption2)
+                        .foregroundStyle(.secondaryText)
+                    ReleasePill(
+                        text: presentation.statusLabel,
+                        tone: presentation.usesRegistryAccent ? .advisory : .pending
+                    )
+                    Text(versionText)
+                        .releaseFont(9.5, weight: .regular, relativeTo: .caption2)
+                        .foregroundStyle(.bodyText)
+                }
+                HStack(spacing: 7) {
+                    CompactRegistryMetric(
+                        label: "Quality",
+                        value: dashboard.tessl.registryQualityScore.map { "\($0)%" } ?? "—",
+                        tone: RegistryMetricPresentation.percentTone(dashboard.tessl.registryQualityScore)
+                    )
+                    CompactRegistryMetric(
+                        label: "Impact",
+                        value: dashboard.tessl.registryImpactScore.map { "\($0)%" } ?? "—",
+                        tone: RegistryMetricPresentation.percentTone(dashboard.tessl.registryImpactScore)
+                    )
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 3) {
+                            Text("Security")
+                            Text("by Snyk")
+                                .releaseFont(6.5, weight: .semibold, relativeTo: .caption2)
+                                .padding(.horizontal, 3)
+                                .padding(.vertical, 1)
+                                .background(Color.white.opacity(0.08))
+                                .clipShape(Capsule())
+                        }
+                        .releaseFont(7.5, weight: .regular, relativeTo: .caption2)
+                        .foregroundStyle(.bodyText)
+                        Text(dashboard.tessl.registrySecurityDisplay)
+                            .releaseFont(10.5, weight: .medium, design: .rounded, relativeTo: .caption)
+                            .foregroundStyle(dashboard.tessl.registrySecurityTone.color)
+                    }
+                }
+                Text(presentation.caption)
+                    .releaseFont(9, weight: .regular, relativeTo: .caption2)
+                    .foregroundStyle(.secondaryText)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 2)
+            VStack(spacing: 0) {
+                Text("TESSL")
+                    .releaseFont(7.5, weight: .medium, relativeTo: .caption2)
+                    .foregroundStyle(.secondaryText)
+                Text(dashboard.tessl.registryResultLabel)
+                    .releaseFont(18, weight: .semibold, design: .rounded, relativeTo: .title3)
+                    .foregroundStyle(Color.warningAccent)
+                    .monospacedDigit()
+            }
+            .frame(width: 38)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+        .background(Color.teal.opacity(presentation.usesRegistryAccent ? 0.075 : 0.035))
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(Color.teal.opacity(presentation.usesRegistryAccent ? 0.42 : 0.22), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Tessl Registry. \(presentation.statusLabel). \(presentation.caption)")
+    }
+}
+
+struct RegistryEvidencePresentation: Equatable {
+    let statusLabel: String
+    let caption: String
+    let usesRegistryAccent: Bool
+
+    init(dashboard: SkillDashboard, isDemoFixture: Bool) {
+        if isDemoFixture {
+            statusLabel = "BASELINE"
+            caption = "Published baseline · not candidate proof."
+            usesRegistryAccent = true
+            return
+        }
+
+        switch dashboard.tessl.dataOrigin {
+        case .liveCLI:
+            statusLabel = "LIVE"
+            caption = dashboard.registryEvidenceCaption
+            usesRegistryAccent = true
+        case .cached, .fixture:
+            statusLabel = "CLI UNAVAILABLE"
+            caption = dashboard.registryEvidenceCaption
+            usesRegistryAccent = false
+        case .unavailable:
+            statusLabel = "UNAVAILABLE"
+            caption = dashboard.registryEvidenceCaption
+            usesRegistryAccent = false
+        }
+    }
+}
+
+private struct CompactRegistryMetric: View {
+    let label: String
+    let value: String
+    let tone: StatusTone
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label)
+                .releaseFont(7.5, weight: .regular, relativeTo: .caption2)
+                .foregroundStyle(.bodyText)
+            Text(value)
+                .releaseFont(10.5, weight: .medium, design: .rounded, relativeTo: .caption)
+                .foregroundStyle(tone.color)
+        }
+    }
+}
+
+private struct CompactCanonicalIdentityAction: View {
+    let receipt: PipelineStageReceipt?
+    let isRefreshing: Bool
+    let isInitialLoad: Bool
+    let onRefresh: () -> Void
+    @ObservedObject private var feedback = CopyFeedbackModel.shared
+
+    private var command: String { receipt?.command ?? "" }
+    private var retriesAutomaticIdentity: Bool {
+        receipt?.stage == .candidateBaseline && receipt?.evidenceStatus == .blocked
+    }
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: isInitialLoad ? "arrow.triangle.2.circlepath" : "terminal")
+                .font(.system(size: 16, weight: .medium))
+                .frame(width: 31, height: 31)
+                .background(Color.white.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(isInitialLoad ? "Checking candidate identity" : "Copy inspection command")
+                    .releaseFont(12, weight: .medium, relativeTo: .subheadline)
+                Text(isInitialLoad ? "Generating the local candidate fingerprint" : receipt?.nextAction ?? "No held downstream gates")
+                    .releaseFont(9.5, weight: .regular, relativeTo: .caption2)
+                    .foregroundStyle(.bodyText)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            if isInitialLoad {
+                ProgressView().controlSize(.small)
+            } else {
+                if retriesAutomaticIdentity {
+                Button(action: onRefresh) {
+                    Image(systemName: "arrow.clockwise")
+                        .frame(width: 31, height: 31)
+                }
+                .buttonStyle(ReleasePressButtonStyle())
+                .disabled(isRefreshing)
+                .accessibilityLabel("Retry automatic identity check")
+                }
+                if !command.isEmpty {
+                Button { feedback.copy(command) } label: {
+                    Image(systemName: feedback.copiedCommand == command ? "checkmark" : "doc.on.doc")
+                        .frame(width: 31, height: 31)
+                }
+                .buttonStyle(ReleasePressButtonStyle())
+                .foregroundStyle(feedback.copiedCommand == command ? Color.successAccent : Color.primaryText)
+                .accessibilityLabel("Copy the active gate command")
+                }
+            }
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+        .background(Color.white.opacity(0.035))
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(Color.white.opacity(0.14), lineWidth: 1))
+    }
+}
+
 private struct NextRequiredCard: View {
     let receipt: PipelineStageReceipt
+    let isRefreshing: Bool
+    let onRefresh: () -> Void
     @ObservedObject private var feedback = CopyFeedbackModel.shared
+
+    private var retriesAutomaticIdentity: Bool {
+        receipt.stage == .candidateBaseline && receipt.evidenceStatus == .blocked
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -207,17 +640,31 @@ private struct NextRequiredCard: View {
                     .foregroundStyle(.bodyText)
             }
             Spacer(minLength: 4)
-            Button { feedback.copy(receipt.command) } label: {
-                Text(feedback.copiedCommand == receipt.command ? "COPIED" : "COPY COMMAND")
-                    .releaseFont(10, weight: .medium, design: .rounded, relativeTo: .caption)
-                    .padding(.horizontal, 9)
-                    .frame(height: 30)
+            if retriesAutomaticIdentity {
+                Button(action: onRefresh) {
+                    Text("RETRY CHECK")
+                        .releaseFont(10, weight: .medium, design: .rounded, relativeTo: .caption)
+                        .padding(.horizontal, 9)
+                        .frame(height: 30)
+                }
+                .buttonStyle(ReleasePressButtonStyle(tint: receipt.evidenceStatus.tone.color))
+                .foregroundStyle(receipt.evidenceStatus.tone.color)
+                .disabled(isRefreshing)
+                .help("Retry automatic identity check")
+                .accessibilityLabel("Retry automatic identity check")
             }
-            .buttonStyle(ReleasePressButtonStyle(tint: receipt.evidenceStatus.tone.color))
-            .foregroundStyle(receipt.evidenceStatus.tone.color)
-            .disabled(receipt.command.isEmpty)
-            .help("Copy the \(receipt.stage.title.lowercased()) command")
-            .accessibilityLabel("Copy the \(receipt.stage.title.lowercased()) command")
+            if !receipt.command.isEmpty {
+                Button { feedback.copy(receipt.command) } label: {
+                    Text(feedback.copiedCommand == receipt.command ? "COPIED" : "COPY COMMAND")
+                        .releaseFont(10, weight: .medium, design: .rounded, relativeTo: .caption)
+                        .padding(.horizontal, 9)
+                        .frame(height: 30)
+                }
+                .buttonStyle(ReleasePressButtonStyle(tint: receipt.evidenceStatus.tone.color))
+                .foregroundStyle(receipt.evidenceStatus.tone.color)
+                .help("Copy the \(receipt.stage.title.lowercased()) command")
+                .accessibilityLabel("Copy the \(receipt.stage.title.lowercased()) command")
+            }
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 8)
@@ -418,26 +865,33 @@ private struct TesslEvidenceCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text(hasRegistrySnapshot ? "PUBLISHED BASELINE · TESSL REGISTRY" : "TESSL REGISTRY")
+            Text(hasRegistrySnapshot ? "PUBLISHED BASELINE" : "REGISTRY STATUS")
                 .releaseFont(9.5, weight: .medium, relativeTo: .caption2)
                 .foregroundStyle(.secondaryText)
             HStack(alignment: .top, spacing: 10) {
-                ReleaseTesslLogo(size: 42)
+                ReleaseTesslLogo(size: 44)
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 7) {
+                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                        Text("Tessl")
+                            .releaseFont(13, weight: .semibold, relativeTo: .headline)
+                            .foregroundStyle(.primaryText)
+                        Text("tessl.io registry")
+                            .releaseFont(8.5, weight: .medium, relativeTo: .caption2)
+                            .foregroundStyle(.secondaryText)
+                            .lineLimit(1)
+                    }
+                    HStack(spacing: 6) {
                         ReleasePill(
                             text: statusLabel,
                             tone: statusTone
                         )
-                    }
-                    HStack(spacing: 6) {
                         Text(versionText)
                             .releaseFont(10.5, weight: .regular, relativeTo: .caption)
                             .foregroundStyle(.bodyText)
                             .lineLimit(1)
-                        if dashboard.registryVersionMatchesCandidate {
-                            ReleasePill(text: "DECLARED VERSION MATCH", tone: .pending)
-                        }
+                    }
+                    if dashboard.registryVersionMatchesCandidate {
+                        ReleasePill(text: "DECLARED VERSION MATCH", tone: .pending)
                     }
                 }
                 Spacer(minLength: 4)
@@ -479,6 +933,7 @@ private struct TesslEvidenceCard: View {
                 RegistryVerticalDivider()
                 RegistryMetric(
                     label: "Security",
+                    source: "Snyk",
                     value: dashboard.tessl.registrySecurityDisplay,
                     progress: dashboard.tessl.registrySecurityTone == .positive ? 1 : nil,
                     tone: dashboard.tessl.registrySecurityTone,
@@ -512,6 +967,7 @@ private struct TesslEvidenceCard: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "Tessl Registry. \(isLive ? "Live registry data" : (isHistorical ? "CLI unavailable, last known registry data" : "Registry comparison unavailable")). "
+                + "Security by Snyk: \(dashboard.tessl.registrySecurityDisplay). "
                 + dashboard.registryEvidenceCaption
         )
     }
@@ -519,6 +975,7 @@ private struct TesslEvidenceCard: View {
 
 private struct RegistryMetric: View {
     let label: String
+    var source: String? = nil
     let value: String
     let progress: Double?
     let tone: StatusTone
@@ -526,9 +983,14 @@ private struct RegistryMetric: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label)
-                .releaseFont(10, weight: .regular, relativeTo: .caption2)
-                .foregroundStyle(.bodyText)
+            HStack(spacing: 4) {
+                Text(label)
+                    .releaseFont(10, weight: .regular, relativeTo: .caption2)
+                    .foregroundStyle(.bodyText)
+                if let source {
+                    RegistrySourceBadge(source: source)
+                }
+            }
             Text(value)
                 .releaseFont(14, weight: .medium, design: .rounded, relativeTo: .subheadline)
                 .foregroundStyle(tone.color.opacity(muted ? 0.68 : 1))
@@ -548,6 +1010,22 @@ private struct RegistryMetric: View {
     }
 }
 
+private struct RegistrySourceBadge: View {
+    let source: String
+
+    var body: some View {
+        Text("by \(source)")
+            .releaseFont(7.5, weight: .semibold, relativeTo: .caption2)
+            .foregroundStyle(Color.primaryText.opacity(0.92))
+            .padding(.horizontal, 4)
+            .frame(height: 14)
+            .background(Color.white.opacity(0.07))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.10), lineWidth: 0.5))
+            .accessibilityLabel("Security assessment by \(source)")
+    }
+}
+
 private struct RegistryVerticalDivider: View {
     var body: some View {
         Rectangle()
@@ -558,17 +1036,29 @@ private struct RegistryVerticalDivider: View {
 
 private struct CanonicalIdentityAction: View {
     let receipt: PipelineStageReceipt?
+    let isRefreshing: Bool
+    let isInitialLoad: Bool
+    let onRefresh: () -> Void
     @ObservedObject private var feedback = CopyFeedbackModel.shared
 
     private var command: String { receipt?.command ?? "" }
+    private var isCandidateIdentityFailure: Bool {
+        receipt?.stage == .candidateBaseline && receipt?.evidenceStatus == .blocked
+    }
     private var title: String {
-        receipt.map { "\($0.stage.title) command" } ?? "All gates current"
+        if isInitialLoad { return "Checking candidate identity" }
+        if isCandidateIdentityFailure { return "Automatic identity check failed" }
+        return receipt.map { "\($0.stage.title) command" } ?? "All gates current"
     }
     private var subtitle: String {
-        receipt?.nextAction ?? "No held downstream gates"
+        if isInitialLoad {
+            return "SkillsBar is generating a read-only fingerprint of the local candidate."
+        }
+        return receipt?.nextAction ?? "No held downstream gates"
     }
     private var commandLabel: String {
-        receipt.map { "Copy the \($0.stage.title.lowercased()) command" } ?? "Copy pipeline command"
+        if isCandidateIdentityFailure { return "Copy diagnostic identity command" }
+        return receipt.map { "Copy the \($0.stage.title.lowercased()) command" } ?? "Copy pipeline command"
     }
     private var commandPreview: String {
         let executableCommand: String
@@ -592,7 +1082,7 @@ private struct CanonicalIdentityAction: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "terminal")
+            Image(systemName: isInitialLoad ? "arrow.triangle.2.circlepath" : "terminal")
                 .font(.system(size: 19, weight: .medium))
                 .frame(width: 38, height: 38)
                 .background(Color.white.opacity(0.05))
@@ -623,17 +1113,35 @@ private struct CanonicalIdentityAction: View {
             }
 
             Spacer(minLength: 4)
-            if !command.isEmpty {
-                Button { feedback.copy(command) } label: {
-                    Image(systemName: feedback.copiedCommand == command ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 36, height: 36)
+            if isInitialLoad {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 36, height: 36)
+                    .accessibilityLabel("Checking candidate identity automatically")
+            } else {
+                if isCandidateIdentityFailure {
+                    Button(action: onRefresh) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(ReleasePressButtonStyle())
+                    .disabled(isRefreshing)
+                    .help("Retry automatic identity check")
+                    .accessibilityLabel("Retry automatic identity check")
                 }
-                .buttonStyle(ReleasePressButtonStyle())
-                .foregroundStyle(feedback.copiedCommand == command ? Color.successAccent : Color.primaryText)
-                .help(commandLabel)
-                .accessibilityLabel(commandLabel)
-                .accessibilityValue(command)
+                if !command.isEmpty {
+                    Button { feedback.copy(command) } label: {
+                        Image(systemName: feedback.copiedCommand == command ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(ReleasePressButtonStyle())
+                    .foregroundStyle(feedback.copiedCommand == command ? Color.successAccent : Color.primaryText)
+                    .help(commandLabel)
+                    .accessibilityLabel(commandLabel)
+                    .accessibilityValue(command)
+                }
             }
         }
         .padding(10)
@@ -731,13 +1239,32 @@ private struct ReleaseTesslLogo: View {
     var body: some View {
         Group {
             if let image = TesslLogoLoader.image {
-                Image(nsImage: image).resizable().interpolation(.high).scaledToFit()
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .scaleEffect(1.28)
             } else {
                 Image(systemName: "shippingbox")
                     .font(.system(size: size * 0.48, weight: .medium))
             }
         }
         .frame(width: size, height: size)
+        .background(Color.black.opacity(0.78))
+        .clipShape(RoundedRectangle(cornerRadius: max(7, size * 0.2), style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: max(7, size * 0.2), style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.22), Color.white.opacity(0.07)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: Color.black.opacity(0.22), radius: 5, y: 2)
+        .accessibilityHidden(true)
     }
 }
 

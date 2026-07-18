@@ -119,7 +119,10 @@ if [[ ${#SWIFTPM_BUNDLES[@]} -eq 0 ]]; then
   fail "SwiftPM resource bundle was not found next to $APP_NAME"
 fi
 for bundle in "${SWIFTPM_BUNDLES[@]}"; do
-  cp -R "$bundle" "$RESOURCES_DIR/"
+  bundle_name="$(basename "$bundle")"
+  cp -R "$bundle" "$RESOURCES_DIR/$bundle_name"
+  [[ -d "$RESOURCES_DIR/$bundle_name" ]] \
+    || fail "SwiftPM resource bundle was not staged in Contents/Resources: $bundle_name"
 done
 
 /usr/bin/xattr -cr "$STAGE_DIR"

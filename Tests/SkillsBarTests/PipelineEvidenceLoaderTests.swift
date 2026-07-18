@@ -17,10 +17,21 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
 
         XCTAssertEqual(dashboard.pipeline.orderedReceipts.count, 9)
         XCTAssertEqual(dashboard.pipeline.orderedReceipts.first?.stage, .candidateBaseline)
-        XCTAssertEqual(dashboard.pipeline.orderedReceipts.first?.evidenceStatus, .passed)
+        XCTAssertEqual(
+            dashboard.pipeline.orderedReceipts.first?.evidenceStatus,
+            .passed
+        )
+        XCTAssertEqual(
+            dashboard.pipeline.orderedReceipts.first?.nextAction,
+            "Canonical package digest established"
+        )
         XCTAssertEqual(
             dashboard.pipeline.orderedReceipts.first { $0.stage == .mechanicalValidation }?.evidenceStatus,
             .passed
+        )
+        XCTAssertEqual(
+            dashboard.pipeline.orderedReceipts.first { $0.stage == .mechanicalValidation }?.nextAction,
+            "Package verify passed · strict audit passed"
         )
         XCTAssertNotNil(dashboard.pipeline.activeReceipt)
         XCTAssertTrue(dashboard.localEvidenceCommand.contains("sdk package build"))
@@ -44,6 +55,62 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
         XCTAssertFalse(command.contains("oss-local"))
         XCTAssertFalse(command.contains("oss-cloud"))
         XCTAssertFalse(command.contains("tessl-live"))
+        XCTAssertEqual(
+            DashboardLoader.impactCommand(for: selectedSkillPath),
+            "./bin/ask sdk eval scenario-quality 'Skills/example' --preview --json --robot"
+        )
+    }
+
+    func testLocalEvidenceCacheReusesOnlyTheExactPackageDigest() {
+        let cache = LocalEvidenceCache()
+        let checks = makeChecks(digest: digest)
+        let key = "/tmp/agent-skills::\(selectedSkillPath)"
+
+        cache.store(checks, packageDigest: digest, for: key)
+
+        XCTAssertNotNil(cache.entry(for: key, packageDigest: digest))
+        XCTAssertNil(cache.entry(for: key, packageDigest: otherDigest))
+        XCTAssertNil(cache.entry(for: "another-skill", packageDigest: digest))
+    }
+
+    func testTesslSessionCacheKeepsVersionsSeparateByExecutable() {
+        let cache = TesslSessionCache()
+
+        cache.store(version: "0.42.0", for: "/tmp/tessl-a")
+
+        XCTAssertEqual(cache.version(for: "/tmp/tessl-a"), "0.42.0")
+        XCTAssertNil(cache.version(for: "/tmp/tessl-b"))
+    }
+
+    func testCandidateIdentityFailureExplainsAutomaticCommandFailure() throws {
+        try withRepo { root in
+            let failedBuild = CommandResult(
+                exitCode: 1,
+                stdout: "",
+                stderr: "SDK runtime unavailable"
+            )
+            let receipts = makeLoader(root: root, packageBuild: failedBuild).stageReceipts()
+            let identity = try XCTUnwrap(receipts.first)
+
+            XCTAssertEqual(identity.stage, .candidateBaseline)
+            XCTAssertEqual(identity.evidenceStatus, .blocked)
+            XCTAssertEqual(
+                identity.nextAction,
+                "Automatic identity command failed: SDK runtime unavailable"
+            )
+        }
+    }
+
+    func testCandidateIdentityFailureExplainsUnreadableAutomaticOutput() throws {
+        try withRepo { root in
+            let unreadableBuild = CommandResult(exitCode: 0, stdout: "not json", stderr: "")
+            let receipts = makeLoader(root: root, packageBuild: unreadableBuild).stageReceipts()
+
+            XCTAssertEqual(
+                receipts.first?.nextAction,
+                "Automatic identity command returned unreadable JSON"
+            )
+        }
     }
 
     func testMissingDurableReceiptsNeverInventsDownstreamProof() throws {
@@ -201,7 +268,8 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
 
     private func makeLoader(
         root: URL,
-        checks: PipelineEvidenceLoader.LocalChecks? = nil
+        checks: PipelineEvidenceLoader.LocalChecks? = nil,
+        packageBuild: CommandResult? = nil
     ) -> PipelineEvidenceLoader {
         var tessl = SkillDashboard.reviewFixture.tessl
         tessl.ok = true
@@ -212,15 +280,18 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
             root: root,
             selectedSkillPath: selectedSkillPath,
             evidenceFingerprint: "candidate-fingerprint",
-            checks: checks ?? makeChecks(digest: digest),
+            checks: checks ?? makeChecks(digest: digest, packageBuild: packageBuild),
             tessl: tessl,
             observedAt: Date(timeIntervalSince1970: 1)
         )
     }
 
-    private func makeChecks(digest: String) -> PipelineEvidenceLoader.LocalChecks {
+    private func makeChecks(
+        digest: String,
+        packageBuild: CommandResult? = nil
+    ) -> PipelineEvidenceLoader.LocalChecks {
         PipelineEvidenceLoader.LocalChecks(
-            packageBuild: result([
+            packageBuild: packageBuild ?? result([
                 "status": "success",
                 "data": ["skills_sdk_package_build": [
                     "status": "built",

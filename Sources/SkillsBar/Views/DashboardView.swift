@@ -3,6 +3,7 @@ import SwiftUI
 
 struct DashboardView: View {
     @ObservedObject var model: DashboardModel
+    var isDemoFixture = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.skillsBarReduceTransparencyOverride) private var reduceTransparencyOverride
@@ -17,7 +18,13 @@ struct DashboardView: View {
                 snapshotMode: snapshotMode
             )
 
-            ReleaseEvidenceView(dashboard: model.dashboard, isRefreshing: model.isRefreshing)
+            ReleaseEvidenceView(
+                dashboard: model.dashboard,
+                isRefreshing: model.isRefreshing,
+                isInitialLoad: !model.hasLoadedEvidence,
+                isDemoFixture: isDemoFixture,
+                onRefresh: { Task { await model.refresh() } }
+            )
                 .padding(.horizontal, 12)
                 .padding(.vertical, 12)
         }
@@ -473,6 +480,7 @@ private struct TesslRegistryCard: View {
                 VerticalDivider().frame(height: 39)
                 HistoricalMetricColumn(
                     label: "Security",
+                    source: "Snyk",
                     value: dashboard.tessl.registrySecurityDisplay,
                     progress: dashboard.tessl.registrySecurityTone == .positive ? 1 : nil,
                     tone: dashboard.tessl.registrySecurityTone
@@ -509,21 +517,37 @@ private struct TesslRegistryCard: View {
         )
         .shadow(color: Color.black.opacity(0.18), radius: 8, y: 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Tessl Registry. \(dashboard.registryEvidenceCaption) Score \(dashboard.tessl.registryResultLabel).")
+        .accessibilityLabel(
+            "Tessl Registry. \(dashboard.registryEvidenceCaption) Score \(dashboard.tessl.registryResultLabel). "
+                + "Security by Snyk: \(dashboard.tessl.registrySecurityDisplay)."
+        )
     }
 }
 
 private struct HistoricalMetricColumn: View {
     let label: String
+    var source: String? = nil
     let value: String
     let progress: Double?
     let tone: StatusTone
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label)
-                .scaledSystemFont(size: 11, weight: .regular, relativeTo: .caption)
-                .foregroundStyle(.primaryText)
+            HStack(spacing: 4) {
+                Text(label)
+                    .scaledSystemFont(size: 11, weight: .regular, relativeTo: .caption)
+                    .foregroundStyle(.primaryText)
+                if let source {
+                    Text("by \(source)")
+                        .scaledSystemFont(size: 8, weight: .semibold, relativeTo: .caption2)
+                        .foregroundStyle(Color.primaryText.opacity(0.92))
+                        .padding(.horizontal, 4)
+                        .frame(height: 14)
+                        .background(Color.white.opacity(0.07))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.10), lineWidth: 0.5))
+                }
+            }
             Text(value)
                 .scaledSystemFont(size: 14, weight: .medium, design: .rounded, relativeTo: .subheadline)
                 .foregroundStyle(tone.color)
@@ -1286,6 +1310,7 @@ private struct TesslLogoView: View {
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
+                    .scaleEffect(1.28)
             } else {
                 Image(systemName: "shippingbox")
                     .font(.system(size: size * 0.48, weight: .medium))
@@ -1293,12 +1318,21 @@ private struct TesslLogoView: View {
             }
         }
         .frame(width: size, height: size)
-        .background(Color.black.opacity(0.30))
+        .background(Color.black.opacity(0.78))
         .clipShape(RoundedRectangle(cornerRadius: max(6, size * 0.22), style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: max(6, size * 0.22), style: .continuous)
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.22), Color.white.opacity(0.07)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
+        .shadow(color: Color.black.opacity(0.22), radius: 5, y: 2)
+        .accessibilityHidden(true)
     }
 }
 
@@ -1375,10 +1409,10 @@ enum SkillsSDKIconLoader {
 }
 
 private func resourceImage(named name: String) -> NSImage? {
-    if let url = Bundle.module.url(forResource: name, withExtension: "png") {
+    if let url = Bundle.main.url(forResource: name, withExtension: "png") {
         return NSImage(contentsOf: url)
     }
-    if let url = Bundle.main.url(forResource: name, withExtension: "png") {
+    if let url = Bundle.module.url(forResource: name, withExtension: "png") {
         return NSImage(contentsOf: url)
     }
     return nil

@@ -42,8 +42,20 @@ case "$MODE" in
     [[ -f "$LAUNCH_RECEIPT" ]]
     [[ "$(/usr/bin/plutil -extract launch_method raw "$LAUNCH_RECEIPT")" == "launchservices_open" ]]
     ;;
+  --demo|demo)
+    stop_existing
+    SKILLSBAR_DEMO_MODE=1 launch_app
+    [[ -f "$LAUNCH_RECEIPT" ]]
+    [[ "$(/usr/bin/plutil -extract status raw "$LAUNCH_RECEIPT")" == "launched" ]]
+    [[ "$(/usr/bin/plutil -extract evidence_mode raw "$LAUNCH_RECEIPT")" == "deterministic_demo_fixture" ]]
+    launch_method="$(/usr/bin/plutil -extract launch_method raw "$LAUNCH_RECEIPT")"
+    [[ "$launch_method" == "launchservices_open" || "$launch_method" == "direct_executable_fallback" ]]
+    echo "SkillsBar demo fixture is running. Click the Skills SDK document icon in the macOS menu bar."
+    echo "Launch method: $launch_method"
+    echo "Launch receipt: $LAUNCH_RECEIPT"
+    ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|--demo|--debug|--logs|--telemetry|--verify]" >&2
     exit 2
     ;;
 esac

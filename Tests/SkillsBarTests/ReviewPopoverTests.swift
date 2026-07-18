@@ -321,7 +321,7 @@ final class ReviewPopoverTests: XCTestCase {
 
         let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: firstURL)))
         XCTAssertEqual(bitmap.pixelsWide, 404)
-        XCTAssertEqual(bitmap.pixelsHigh, 720)
+        XCTAssertEqual(bitmap.pixelsHigh, 560)
         XCTAssertLessThanOrEqual(
             try pixelDifference(firstURL, secondURL),
             0.0005,
@@ -355,7 +355,7 @@ final class ReviewPopoverTests: XCTestCase {
             try SnapshotRenderer.render(dashboard: dashboard, configuration: configuration, to: outputURL)
             let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: outputURL)))
             XCTAssertEqual(bitmap.pixelsWide, 404)
-            XCTAssertEqual(bitmap.pixelsHigh, 720)
+            XCTAssertEqual(bitmap.pixelsHigh, 560)
         }
     }
 
@@ -373,6 +373,79 @@ final class ReviewPopoverTests: XCTestCase {
 
         XCTAssertEqual(liveLoadCount, 0)
         XCTAssertEqual(dashboard.reviewInspectCommand, expectedCommand)
+    }
+
+    func testSupportedDemoModeSelectsDeterministicFixture() throws {
+        var liveLoadCount = 0
+        let environment = [SkillsBarDemoMode.environmentKey: "1"]
+        let source = DashboardDataSource(
+            environment: environment,
+            liveLoad: {
+                liveLoadCount += 1
+                return .placeholder
+            }
+        )
+
+        let dashboard = try source.loadSync()
+
+        XCTAssertTrue(SkillsBarDemoMode.isEnabled(in: environment))
+        XCTAssertTrue(source.usesReviewFixture)
+        XCTAssertEqual(liveLoadCount, 0)
+        XCTAssertEqual(dashboard.pipeline.activeReceipt?.stage, .candidateBaseline)
+        XCTAssertEqual(dashboard.pipeline.orderedReceipts.count, 9)
+        XCTAssertEqual(dashboard.reviewInspectCommand, expectedCommand)
+    }
+
+    func testDemoModeRequiresAnExplicitTruthyValue() {
+        XCTAssertFalse(SkillsBarDemoMode.isEnabled(in: [:]))
+        XCTAssertFalse(SkillsBarDemoMode.isEnabled(in: [SkillsBarDemoMode.environmentKey: "0"]))
+        XCTAssertTrue(SkillsBarDemoMode.isEnabled(in: [SkillsBarDemoMode.environmentKey: "true"]))
+    }
+
+    func testDemoRegistryPresentationCannotClaimLiveEvidence() {
+        let presentation = RegistryEvidencePresentation(
+            dashboard: .reviewFixture,
+            isDemoFixture: true
+        )
+
+        XCTAssertEqual(presentation.statusLabel, "BASELINE")
+        XCTAssertEqual(presentation.caption, "Published baseline · not candidate proof.")
+        XCTAssertTrue(presentation.usesRegistryAccent)
+        XCTAssertFalse(presentation.statusLabel.contains("LIVE"))
+    }
+
+    func testLiveRegistryPresentationRemainsLiveOutsideDemoMode() {
+        let presentation = RegistryEvidencePresentation(
+            dashboard: .reviewFixture,
+            isDemoFixture: false
+        )
+
+        XCTAssertEqual(presentation.statusLabel, "LIVE")
+        XCTAssertEqual(presentation.caption, SkillDashboard.reviewFixture.registryEvidenceCaption)
+        XCTAssertTrue(presentation.usesRegistryAccent)
+    }
+
+    @MainActor
+    func testDisclosedDemoFixtureRendersAtStableCanvasSize() throws {
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-demo-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: outputURL) }
+
+        try SnapshotRenderer.render(
+            dashboard: .reviewFixture,
+            configuration: SnapshotConfiguration(isDemoFixture: true),
+            to: outputURL
+        )
+
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: outputURL)))
+        XCTAssertEqual(bitmap.pixelsWide, 404)
+        XCTAssertEqual(bitmap.pixelsHigh, 560)
+        let presentation = RegistryEvidencePresentation(
+            dashboard: .reviewFixture,
+            isDemoFixture: true
+        )
+        XCTAssertEqual(presentation.statusLabel, "BASELINE")
+        XCTAssertEqual(presentation.caption, "Published baseline · not candidate proof.")
     }
 
     @MainActor
@@ -766,7 +839,7 @@ final class ReviewPopoverTests: XCTestCase {
             let snapshot = try Data(contentsOf: outputURL)
             let bitmap = try XCTUnwrap(NSBitmapImageRep(data: snapshot))
             XCTAssertEqual(bitmap.pixelsWide, 404)
-            XCTAssertEqual(bitmap.pixelsHigh, 720)
+            XCTAssertEqual(bitmap.pixelsHigh, 560)
             renderedSnapshots.append(snapshot)
         }
 
@@ -893,7 +966,7 @@ final class ReviewPopoverTests: XCTestCase {
 
     func testMenuBarTemplateUsesApprovedPointMetrics() {
         XCTAssertEqual(MenuBarTemplateMetrics.width, 404)
-        XCTAssertEqual(MenuBarTemplateMetrics.height, 720)
+        XCTAssertEqual(MenuBarTemplateMetrics.height, 560)
         XCTAssertEqual(SkillsSDKIconLoader.menuBarImage?.size, NSSize(width: 18, height: 18))
         XCTAssertEqual(SkillsSDKIconLoader.menuBarImage?.isTemplate, true)
     }
@@ -918,6 +991,57 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertFalse(model.copy(expectedCommand))
         XCTAssertNil(model.copiedCommand)
         XCTAssertEqual(model.copyError, "Could not copy inspect command")
+    }
+
+    @MainActor
+    func testInitialAutomaticLoadIsPresentedAsLoadingUntilEvidenceArrives() async {
+        let gate = RefreshLoadGate()
+        let source = DashboardDataSource(
+            environment: [:],
+            liveLoadAsync: { await gate.load() }
+        )
+        let model = DashboardModel(autorefresh: false, source: source)
+
+        XCTAssertFalse(model.hasLoadedEvidence)
+
+        let refresh = Task { @MainActor in await model.refresh() }
+        await gate.waitForBlockedLoad()
+
+        XCTAssertTrue(model.isRefreshing)
+        XCTAssertFalse(model.hasLoadedEvidence)
+
+        await gate.releaseBlockedLoad()
+        await refresh.value
+
+        XCTAssertFalse(model.isRefreshing)
+        XCTAssertTrue(model.hasLoadedEvidence)
+    }
+
+    @MainActor
+    func testProgressiveRefreshPublishesLocalEvidenceBeforeRegistryCompletes() async {
+        let registryGate = RefreshLoadGate(dashboard: .reviewFixture)
+        let localDashboard = SkillDashboard.reviewNoCLIFixture
+        let source = DashboardDataSource(
+            environment: [:],
+            progressiveLoadAsync: { update in
+                update(localDashboard)
+                return await registryGate.load()
+            }
+        )
+        let model = DashboardModel(autorefresh: false, source: source)
+
+        let refresh = Task { @MainActor in await model.refresh() }
+        await registryGate.waitForBlockedLoad()
+
+        XCTAssertTrue(model.hasLoadedEvidence)
+        XCTAssertTrue(model.isRefreshing)
+        XCTAssertEqual(model.dashboard.tessl.dataOrigin, .cached)
+
+        await registryGate.releaseBlockedLoad()
+        await refresh.value
+
+        XCTAssertFalse(model.isRefreshing)
+        XCTAssertEqual(model.dashboard.tessl.dataOrigin, .liveCLI)
     }
 
     @MainActor
