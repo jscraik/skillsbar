@@ -1,0 +1,27 @@
+{
+  "schema_version": "steering-feedback/v1",
+  "feedback_signal": "The operator clarified that CodeRabbit's prepaid-credit status is a false-positive merge blocker because the PR has already received a substantive CodeRabbit review.",
+  "repeated": true,
+  "occurrence_count": 2,
+  "root_operational_failure": "The sweep treated a provider billing status as proof that independent review was absent, instead of separating existing review evidence from a later failed attempt to purchase or trigger another review.",
+  "failure_category": "weak_validation",
+  "durable_improvement": {
+    "kind": "workflow_rule",
+    "path": ".harness/steering-feedback/2026-07-18-coderabbit-reviewed-waiver.json",
+    "action": "Record an explicit, PR-scoped waiver whenever a provider billing or quota status follows already-inspected review evidence; retain the reviewer, reviewed commit, waiver scope, and all non-waived gates as separate lanes.",
+    "prevents": "Future sweeps from treating a post-review billing status as proof that review never occurred or from accidentally waiving unrelated CI, approval, or merge requirements."
+  },
+  "destination": "workflow_rule",
+  "proof": {
+    "commands": [
+      {
+        "command": "python3 /Users/jamiecraik/.codex/scripts/validate-steering-feedback.py --input .harness/steering-feedback/2026-07-18-coderabbit-reviewed-waiver.json --json",
+        "outcome": "pass",
+        "evidence": "The record is schema-valid and binds the CodeRabbit waiver to the #2 sweep without changing the independent Analyze (swift) compiler failure."
+      }
+    ],
+    "future_behavior": "For PR #2, CodeRabbit's prepaid-credit status is waived because CodeRabbit reviewed the branch before the failed re-review attempt; Analyze (swift), review-thread state, and any expressly unwaived approval policy remain independently evaluated."
+  },
+  "implementation_note": "This is a PR-scoped operator waiver based on the existing CodeRabbit COMMENTED reviews at c5c6def, 736766f, and 587cad7. It does not make the PR green and does not waive the failing GitHub Analyze (swift) build.",
+  "status": "implemented"
+}

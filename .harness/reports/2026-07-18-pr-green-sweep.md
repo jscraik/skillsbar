@@ -70,6 +70,18 @@ Command: `timeout 600 op run --env-file=/Users/jamiecraik/.codex/.env -- coderab
 
 The bounded CLI run was used as an independent review signal, not as an approval. Valid findings were applied in `fc21cdc` for Reduce Motion, Tessl registry wording and comparison gating, active-receipt action copy, CodeQL job permissions, animation units and plan ownership, superseded evidence labels, and live CLI observation semantics. Historical-handoff and prior-PR-description findings were retained as provenance and not reopened. The CLI did not produce current-head approval evidence.
 
+## Explicit CodeRabbit waiver
+
+The operator confirmed that the `Prepaid credits exhausted — enable usage-based reviews` status is a false-positive merge blocker because CodeRabbit had already reviewed PR #2. The waiver is recorded in `.harness/steering-feedback/2026-07-18-coderabbit-reviewed-waiver.json` and applies only to the later provider-credit status. It does not waive the separate GitHub Analyze (swift) check, branch mergeability, or any non-CodeRabbit review policy.
+
+## Follow-up compiler repair
+
+GitHub Analyze (swift) on `9e3059e` failed because a local `scenarioIDs` array shadowed the `scenarioIDs(in:)` helper. The implementation now uses `receiptScenarioIDs`, leaving the helper unambiguous for the hosted Swift toolchain.
+
+Command: XDG_CACHE_HOME=/private/tmp/skillsbar-pr2-shadow-focused-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-pr2-shadow-focused-clang DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer timeout 600 swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-pr2-shadow-focused --filter PipelineEvidenceLoaderTests -> pass (12 tests, 1 opt-in integration test skipped, 0 failures)
+
+Command: XDG_CACHE_HOME=/private/tmp/skillsbar-pr2-shadow-full-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-pr2-shadow-full-clang DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer timeout 600 swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-pr2-shadow-full -> pass (67 tests, 1 opt-in integration test skipped, 0 failures)
+
 ## Dirty ownership and cleanup
 
 - The canonical /Users/jamiecraik/dev/skillsbar checkout remains on dirty main and was not switched, staged, reset, cleaned, or merged.

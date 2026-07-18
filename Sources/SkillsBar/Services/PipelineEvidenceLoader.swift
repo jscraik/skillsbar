@@ -503,15 +503,15 @@ struct PipelineEvidenceLoader {
         guard digests == Set([digest]) else {
             return .stale(path: relativeReceipt)
         }
-        let scenarioIDs = Array(Set(documents.flatMap { scenarioIDs(in: $0) })).sorted()
+        let receiptScenarioIDs = Array(Set(documents.flatMap { scenarioIDs(in: $0) })).sorted()
         let scenarioBoundGates = [
             "oss_local", "oss_cloud", "tessl_local_proof", "tessl_dry_run",
             "handoff_readiness", "tessl_score"
         ]
-        if scenarioBoundGates.contains(expectedGate), scenarioIDs.isEmpty {
+        if scenarioBoundGates.contains(expectedGate), receiptScenarioIDs.isEmpty {
             return .unproven(reason: "\(expectedGate) receipt does not identify its scenarios")
         }
-        return .passed(path: relativeReceipt, scenarioIDs: scenarioIDs)
+        return .passed(path: relativeReceipt, scenarioIDs: receiptScenarioIDs)
     }
 
     private func runtimeGate(digest: String) -> ReceiptState {
