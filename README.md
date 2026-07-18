@@ -8,7 +8,7 @@ The app is currently a local prototype with a release-capable packaging path. It
 
 - **Candidate identity** from the non-mutating `./bin/ask sdk package build <skill> --json --robot` receipt and its canonical `package_digest`.
 - **Mechanical validation** from both `./bin/ask skills package verify <skill> --json --robot` and `./bin/ask skills audit <skill> --level strict --json --robot`.
-- **Local security posture** from the candidate-bound `./bin/ask sdk security risk-modes <skill> --preview --json --robot` receipt.
+- **Local security posture preview** from the candidate-bound `./bin/ask sdk security risk-modes <skill> --preview --json --robot` receipt. This is advisory; gate 3 proof requires the full governed security receipt.
 - **Eval preparation** from scenario-quality, scorer-quality, and scorer-calibration preview receipts collected in the same refresh window.
 - **Eval local, Eval cloud, and Tessl staging proof** from the canonical `.harness/evidence/handoff/<skill>/gate-chain.json` and its governed release receipts.
 - **Runtime truth** from `.harness/evidence/runtime-proof/<skill>/<runtime>/runtime-card.json` only when the card proves the installed digest, doctor result, and observed behavior for the current package digest.
@@ -26,7 +26,7 @@ These lanes are intentionally independent. Every downstream receipt must use the
 
 SkillsBar is not App-Sandboxed: it reads the configured Skills SDK checkout and runs its read-only SDK checks locally. For Tessl, it prefers `TESSL_BIN` when set, then the current user's `~/.local/bin/tessl`, then `PATH`. Keep `SKILLSBAR_REVIEW_FIXTURE` unset for normal use; that variable is reserved for deterministic tests and mockup work.
 
-SkillsBar never automatically runs provider-backed `oss-local` or `oss-cloud` evals, Tessl staging/publication, runtime installation, or runtime-proof commands when the menu opens. Those operations may cost money, require credentials, or mutate external/runtime state, so the app consumes their durable governed receipts instead. A live Tessl search remains a registry observation until a candidate-bound publication/score receipt exists, the package and registry versions match, and registry visibility is known.
+SkillsBar never automatically runs provider-backed `oss-local` or `oss-cloud` evals, Tessl staging/publication, runtime installation, or runtime-proof commands when the menu opens. Those operations may cost money, require credentials, or mutate external/runtime state, so the app consumes their durable governed receipts instead. A live Tessl CLI search is a registry observation even when the result has a version mismatch or no version. Candidate-bound publication/score receipts, package/registry version equality, and governed registry visibility remain requirements for promotion and identity verification.
 
 ## Run
 

@@ -1,8 +1,8 @@
 # SkillsBar pipeline-posture worker handoff (historical)
 
-> Superseded by the nine-gate PR #2 implementation and its current follow-up
-> validation. Retained as historical provenance; do not use this receipt as
-> current candidate proof.
+> Superseded by `.harness/reports/2026-07-14-skillsbar-nine-gate-ui-validation.md#pr-2-follow-up-validation`.
+> Retained as historical provenance; do not use this receipt as current
+> candidate proof.
 
 ## Changed files
 

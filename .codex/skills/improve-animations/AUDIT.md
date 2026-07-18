@@ -70,7 +70,7 @@ CSS **transitions** retarget from the current state mid-animation; **keyframes**
 - Spring configs, Apple-style (recommended): `{ type: "spring", duration: 0.5, bounce: 0.2 }`. Keep bounce subtle (0.1–0.3); reserve visible bounce for drag-to-dismiss and playful moments.
 - **Asymmetric timing**: deliberate phases (press, hold, destructive confirm) animate slower; the system's response snaps. Symmetric timing on press-and-release is a finding.
 
-Hunt for: `@keyframes` on toasts/toggles/rapidly-triggered UI, gesture handlers that tween with fixed-duration keyframes, drags without velocity-based dismissal (dismiss on `Math.abs(distance)/elapsedMs > ~0.11`, not distance thresholds alone), hard stops at drag boundaries instead of rising friction.
+Hunt for: `@keyframes` on toasts/toggles/rapidly-triggered UI, gesture handlers that tween with fixed-duration keyframes, drags without velocity-based dismissal (dismiss when `Math.abs(distance) / elapsedMs > 0.11 CSS px/ms`, not distance thresholds alone), hard stops at drag boundaries instead of rising friction. Treat 0.11 CSS px/ms as a heuristic when the platform cannot expose those units.
 
 ## 5. Performance
 

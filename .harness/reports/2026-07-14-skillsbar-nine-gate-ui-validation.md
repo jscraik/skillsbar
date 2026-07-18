@@ -25,7 +25,7 @@ status: local_validation_pass_live_ui_blocked
   composition is not a reliable off-screen proof surface. The normal live app
   retains its translucent material treatment.
 
-## Validation evidence
+## Historical validation evidence (superseded)
 
 Command: `HOME=/private/tmp/skillsbar-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-test-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-test-build --filter ReviewPopoverTests` -> pass (47 focused tests; includes 1,000 nine-gate ordering iterations, complete-content overflow proof, cache round-trip, live/no-CLI semantic checks, and both snapshot renders)
 

@@ -86,6 +86,9 @@ If the marker contains any other non-blank `workflow:` value, treat `plans/`
 as owned by another workflow and use `animation-plans/` instead. Use the one
 resolved directory for numbering, plan files, and its README; do not resolve a
 different directory for any later operation.
+If `plans/` already exists without a `.workflow-owner` marker, treat ownership
+as ambiguous and stop before writing; add the exact `workflow: improve-animations`
+marker or choose `animation-plans/` explicitly before continuing.
 
 One plan per selected finding, using [PLAN-TEMPLATE.md](PLAN-TEMPLATE.md), written into the resolved plan directory as `NNN-short-slug.md` (monotonic numbering; respect existing plans). Stamp each plan with the current commit (`git rev-parse --short HEAD`).
 

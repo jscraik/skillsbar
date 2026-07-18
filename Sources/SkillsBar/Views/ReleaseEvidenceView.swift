@@ -33,6 +33,7 @@ struct ReleaseEvidenceView: View {
 private struct ReleaseHeader: View {
     let dashboard: SkillDashboard
     let isRefreshing: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var candidate: PipelineCandidate { dashboard.pipeline }
     private var active: PipelineStageReceipt? { candidate.activeReceipt }
@@ -50,8 +51,14 @@ private struct ReleaseHeader: View {
                         .releaseFont(12, weight: .medium, relativeTo: .caption)
                         .foregroundStyle(.secondaryText)
                     if isRefreshing {
-                        ProgressView()
-                            .controlSize(.mini)
+                        if reduceMotion {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 10, weight: .medium))
+                        } else {
+                            ProgressView()
+                                .controlSize(.mini)
+                        }
+                        Color.clear
                             .accessibilityLabel("Refreshing evidence")
                     }
                 }
@@ -391,6 +398,9 @@ private struct TesslEvidenceCard: View {
             || dashboard.tessl.dataOrigin == .fixture
             || (dashboard.tessl.dataOrigin == .unavailable && hasRegistrySnapshot)
     }
+    private var hasCurrentCandidateDigest: Bool {
+        dashboard.pipeline.orderedReceipts.first(where: { $0.stage == .candidateBaseline })?.evidenceStatus == .passed
+    }
     private var statusLabel: String {
         if isLive { return "● LIVE" }
         if isHistorical { return "☁︎ CLI UNAVAILABLE" }
@@ -408,7 +418,7 @@ private struct TesslEvidenceCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("PUBLISHED BASELINE · TESSL REGISTRY")
+            Text(hasRegistrySnapshot ? "PUBLISHED BASELINE · TESSL REGISTRY" : "TESSL REGISTRY")
                 .releaseFont(9.5, weight: .medium, relativeTo: .caption2)
                 .foregroundStyle(.secondaryText)
             HStack(alignment: .top, spacing: 10) {
@@ -480,9 +490,11 @@ private struct TesslEvidenceCard: View {
                 .releaseFont(10.5, weight: .regular, relativeTo: .caption)
                 .foregroundStyle(Color.teal.opacity(isLive ? 0.84 : 0.58))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Content comparison blocked until candidate digest exists.")
-                .releaseFont(10, weight: .regular, relativeTo: .caption2)
-                .foregroundStyle(.secondaryText)
+            if !hasCurrentCandidateDigest {
+                Text("Content comparison blocked until candidate digest exists.")
+                    .releaseFont(10, weight: .regular, relativeTo: .caption2)
+                    .foregroundStyle(.secondaryText)
+            }
         }
         .padding(11)
         .background(
@@ -549,6 +561,15 @@ private struct CanonicalIdentityAction: View {
     @ObservedObject private var feedback = CopyFeedbackModel.shared
 
     private var command: String { receipt?.command ?? "" }
+    private var title: String {
+        receipt.map { "\($0.stage.title) command" } ?? "All gates current"
+    }
+    private var subtitle: String {
+        receipt?.nextAction ?? "No held downstream gates"
+    }
+    private var commandLabel: String {
+        receipt.map { "Copy the \($0.stage.title.lowercased()) command" } ?? "Copy pipeline command"
+    }
     private var commandPreview: String {
         let executableCommand: String
         if let separator = command.range(of: " && ") {
@@ -583,9 +604,9 @@ private struct CanonicalIdentityAction: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(receipt == nil ? "All gates current" : "Digest command")
+                Text(title)
                     .releaseFont(14, weight: .medium, relativeTo: .subheadline)
-                Text(receipt == nil ? "No held downstream gates" : "Copy the command that establishes canonical candidate identity.")
+                Text(subtitle)
                     .releaseFont(10.5, weight: .regular, relativeTo: .caption)
                     .foregroundStyle(.bodyText)
                 if !command.isEmpty {
@@ -610,8 +631,8 @@ private struct CanonicalIdentityAction: View {
                 }
                 .buttonStyle(ReleasePressButtonStyle())
                 .foregroundStyle(feedback.copiedCommand == command ? Color.successAccent : Color.primaryText)
-                .help("Copy full digest command")
-                .accessibilityLabel("Copy full digest command")
+                .help(commandLabel)
+                .accessibilityLabel(commandLabel)
                 .accessibilityValue(command)
             }
         }
