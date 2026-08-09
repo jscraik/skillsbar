@@ -16,7 +16,7 @@ final class DashboardModel: ObservableObject {
     // Scans can traverse every supporting file beside SKILL.md. Poll at a
     // calm cadence and move that work off the main actor so an open menu stays
     // responsive while local evidence is changing.
-    private let sourceChangePollNanoseconds: UInt64 = 10 * 1_000_000_000
+    private let sourceChangePollNanoseconds: UInt64 = 750_000_000
     private let sourceChangeDebounceNanoseconds: UInt64 = 350_000_000
     private var refreshLoopTask: Task<Void, Never>?
     private var sourceChangeTask: Task<Void, Never>?
@@ -85,6 +85,10 @@ final class DashboardModel: ObservableObject {
 
     var isSkillSelectionPinned: Bool {
         DashboardLoader.selectionIsPinnedByEnvironment
+    }
+
+    var usesReviewFixture: Bool {
+        source.usesReviewFixture
     }
 
     func selectSkill(path: String) {

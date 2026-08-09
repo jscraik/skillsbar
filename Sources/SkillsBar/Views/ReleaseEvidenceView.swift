@@ -74,6 +74,7 @@ private extension TesslSignal {
 struct ReleaseEvidenceView: View {
     let dashboard: SkillDashboard
     let isRefreshing: Bool
+    let isFixture: Bool
     let availableSkillPaths: [String]
     let selectedSkillPath: String
     let isSkillSelectionPinned: Bool
@@ -83,6 +84,7 @@ struct ReleaseEvidenceView: View {
     init(
         dashboard: SkillDashboard,
         isRefreshing: Bool,
+        isFixture: Bool = false,
         availableSkillPaths: [String] = [],
         selectedSkillPath: String? = nil,
         isSkillSelectionPinned: Bool = false,
@@ -91,6 +93,7 @@ struct ReleaseEvidenceView: View {
     ) {
         self.dashboard = dashboard
         self.isRefreshing = isRefreshing
+        self.isFixture = isFixture
         self.availableSkillPaths = availableSkillPaths
         self.selectedSkillPath = selectedSkillPath ?? dashboard.fleet.selectedSkillPath
         self.isSkillSelectionPinned = isSkillSelectionPinned
@@ -104,6 +107,7 @@ struct ReleaseEvidenceView: View {
                 ReleaseHeader(
                     dashboard: dashboard,
                     isRefreshing: isRefreshing,
+                    isFixture: isFixture,
                     availableSkillPaths: availableSkillPaths,
                     selectedSkillPath: selectedSkillPath,
                     isSkillSelectionPinned: isSkillSelectionPinned,
@@ -144,6 +148,7 @@ struct ReleaseEvidenceView: View {
 private struct ReleaseHeader: View {
     let dashboard: SkillDashboard
     let isRefreshing: Bool
+    let isFixture: Bool
     let availableSkillPaths: [String]
     let selectedSkillPath: String
     let isSkillSelectionPinned: Bool
@@ -153,10 +158,12 @@ private struct ReleaseHeader: View {
     private var active: PipelineStageReceipt? { candidate.activeReceipt }
     private var statusLabel: String {
         if isRefreshing { return "Refreshing" }
+        if active != nil { return "Needs attention" }
         return "Up to date"
     }
     private var statusColor: Color {
         if isRefreshing { return .advisoryAccent }
+        if active != nil { return .warningAccent }
         return .successAccent
     }
 
@@ -180,7 +187,11 @@ private struct ReleaseHeader: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 HStack(spacing: 6) {
-                    ReleasePill(text: "LOCAL", tone: .advisory)
+                    ReleasePill(text: isFixture ? "DEMO FIXTURE" : "LOCAL", tone: isFixture ? .pending : .advisory)
+                    Text("v\(dashboard.version.trimmingCharacters(in: CharacterSet(charactersIn: "vV")))")
+                        .releaseFont(12, weight: .regular, relativeTo: .caption)
+                        .foregroundStyle(.bodyText)
+                        .monospacedDigit()
                     Circle()
                         .fill(statusColor)
                         .frame(width: 8, height: 8)
@@ -851,6 +862,7 @@ private struct TesslEvidenceCard: View {
     }
     private var statusLabel: String {
         if isLive { return "LIVE" }
+        if !dashboard.tessl.cliAvailable { return "CLI UNAVAILABLE" }
         if isHistorical { return "LAST KNOWN" }
         return "UNAVAILABLE"
     }
@@ -888,6 +900,17 @@ private struct TesslEvidenceCard: View {
                         .monospacedDigit()
                 }
                 Spacer(minLength: 4)
+                VStack(alignment: .trailing, spacing: 5) {
+                    if let score = dashboard.tessl.registryScore {
+                        RegistryScoreHex(score: "\(score)", muted: !isLive)
+                    }
+                    if let multiplier = dashboard.tessl.registryImprovementMultiplier {
+                        ReleasePill(
+                            text: String(format: "%.2fx lift", multiplier),
+                            tone: dashboard.tessl.registryImpactTone
+                        )
+                    }
+                }
             }
 
             HStack(alignment: .top, spacing: 10) {
@@ -943,7 +966,7 @@ private struct TesslEvidenceCard: View {
                 }
             }
 
-            if !isLive, !dashboard.registryEvidenceCaption.isEmpty {
+            if !dashboard.registryEvidenceCaption.isEmpty {
                 Text(dashboard.registryEvidenceCaption)
                     .releaseFont(11, weight: .regular, relativeTo: .caption2)
                     .foregroundStyle(Color.advisoryAccent.opacity(isLive ? 0.84 : 0.68))

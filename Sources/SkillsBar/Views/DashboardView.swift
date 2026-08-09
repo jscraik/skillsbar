@@ -22,6 +22,7 @@ struct DashboardView: View {
             ReleaseEvidenceView(
                 dashboard: model.dashboard,
                 isRefreshing: model.isRefreshing,
+                isFixture: model.usesReviewFixture,
                 availableSkillPaths: model.availableSkillPaths,
                 selectedSkillPath: model.dashboard.fleet.selectedSkillPath,
                 isSkillSelectionPinned: model.isSkillSelectionPinned,

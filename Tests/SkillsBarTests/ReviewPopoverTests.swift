@@ -365,6 +365,26 @@ final class ReviewPopoverTests: XCTestCase {
     }
 
     @MainActor
+    func testDemoModePreservesFixtureBoundaryForThePopover() {
+        let source = DashboardDataSource(
+            environment: [SkillsBarDemoMode.environmentKey: "1"],
+            liveLoad: {
+                XCTFail("Demo mode must not invoke the live loader")
+                return .placeholder
+            }
+        )
+        let model = DashboardModel(
+            dashboard: source.initialDashboard,
+            autorefresh: false,
+            source: source
+        )
+
+        XCTAssertTrue(source.usesReviewFixture)
+        XCTAssertTrue(model.usesReviewFixture)
+        XCTAssertEqual(model.dashboard.tessl.dataOrigin, .liveCLI)
+    }
+
+    @MainActor
     func testAsyncNoCLIFixtureBypassesLiveLoader() async throws {
         var liveLoadCount = 0
         let source = DashboardDataSource(
