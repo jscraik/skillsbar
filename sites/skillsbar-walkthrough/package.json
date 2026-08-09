@@ -15,12 +15,12 @@
     "assets:cover": "xcrun swift scripts/generate-skillsbar-cover.swift public/og.png"
   },
   "dependencies": {
-    "next": "16.2.6",
-    "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.45.1",
+    "@cloudflare/vite-plugin": "1.51.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
@@ -28,15 +28,18 @@
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "16.3.0",
     "pngjs": "5.0.0",
     "qrcode": "1.5.4",
-    "react-server-dom-webpack": "19.2.6",
+    "react-server-dom-webpack": "19.2.8",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
     "vinext": "0.0.50",
     "vite": "8.1.5",
-    "wrangler": "4.112.0"
+    "wrangler": "4.120.0"
   },
-  "type": "module"
+  "type": "module",
+  "overrides": {
+    "nanoid": "3.3.17"
+  }
 }
