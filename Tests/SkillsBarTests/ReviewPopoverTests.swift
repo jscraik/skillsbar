@@ -264,6 +264,31 @@ final class ReviewPopoverTests: XCTestCase {
     }
 
     @MainActor
+    func testReviewFixtureRenderMatchesRetainedBaseline() throws {
+        let baselineURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent(".harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: baselineURL.path))
+
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-review-baseline-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: outputURL) }
+
+        try SnapshotRenderer.render(dashboard: .reviewFixture, to: outputURL)
+        let baselineBitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: baselineURL)))
+        let renderedBitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: outputURL)))
+        XCTAssertEqual(renderedBitmap.pixelsWide, baselineBitmap.pixelsWide)
+        XCTAssertEqual(renderedBitmap.pixelsHigh, baselineBitmap.pixelsHigh)
+        XCTAssertLessThanOrEqual(
+            try pixelDifference(outputURL, baselineURL),
+            0.05,
+            "The production fixture render must remain within the retained visual baseline contract"
+        )
+    }
+
+    @MainActor
     func testReviewFixtureRendersPipelinePostureDeterministically() throws {
         let firstURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("skillsbar-review-first-\(UUID().uuidString).png")
