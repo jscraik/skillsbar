@@ -19,19 +19,24 @@ struct DashboardView: View {
                 snapshotMode: snapshotMode
             )
 
-            ReleaseEvidenceView(
-                dashboard: model.dashboard,
-                isRefreshing: model.isRefreshing,
-                isFixture: model.usesReviewFixture,
-                availableSkillPaths: model.availableSkillPaths,
-                selectedSkillPath: model.dashboard.fleet.selectedSkillPath,
-                isSkillSelectionPinned: model.isSkillSelectionPinned,
-                onSelectSkill: { model.selectSkill(path: $0) },
-                onRefresh: { Task { await model.refresh() } }
-            )
-                .padding(.horizontal, 16)
-                .padding(.top, 32)
-                .padding(.bottom, 18)
+            if model.hasLoadedEvidence {
+                ReleaseEvidenceView(
+                    dashboard: model.dashboard,
+                    isRefreshing: model.isRefreshing,
+                    isFixture: model.usesReviewFixture,
+                    availableSkillPaths: model.availableSkillPaths,
+                    selectedSkillPath: model.dashboard.fleet.selectedSkillPath,
+                    isSkillSelectionPinned: model.isSkillSelectionPinned,
+                    onSelectSkill: { model.selectSkill(path: $0) },
+                    onRefresh: { Task { await model.refresh() } }
+                )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 32)
+                    .padding(.bottom, 18)
+            } else {
+                EvidenceLoadingView()
+                    .padding(24)
+            }
         }
         .frame(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
         .foregroundStyle(.primaryText)
@@ -54,6 +59,24 @@ struct DashboardView: View {
         )
         .shadow(color: Color.black.opacity(0.18), radius: 22, y: 12)
         .accessibilityElement(children: .contain)
+    }
+}
+
+private struct EvidenceLoadingView: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Loading local evidence")
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+            Text("Reading the selected skill and its governed receipts…")
+                .font(.system(size: 12.5, weight: .regular, design: .rounded))
+                .foregroundStyle(.bodyText)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Loading local evidence")
     }
 }
 

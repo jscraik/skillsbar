@@ -83,7 +83,7 @@ public enum Shell {
         ]
 
         var seen = Set<String>()
-        return (inheritedEntries + requiredEntries).filter { seen.insert($0).inserted }.joined(separator: ":")
+        return (requiredEntries + inheritedEntries).filter { seen.insert($0).inserted }.joined(separator: ":")
     }
 
     public static func run(_ command: String, cwd: URL, timeout: TimeInterval) -> CommandResult {

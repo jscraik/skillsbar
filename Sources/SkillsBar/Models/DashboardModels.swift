@@ -1245,6 +1245,10 @@ struct TesslSignal {
     var registryEvalCount: Int?
     var registryImprovementMultiplier: Double?
     var registryVisibility: String?
+    /// The registry observation time is distinct from the local dashboard refresh.
+    /// Cached snapshots must retain their original observation time so the UI does
+    /// not present stale external data as freshly observed.
+    var observedAt: Date? = nil
     var dataOrigin: TesslDataOrigin = .unavailable
     var recoveryCommand: String
 

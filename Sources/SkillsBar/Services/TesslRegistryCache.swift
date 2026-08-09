@@ -49,6 +49,7 @@ struct TesslRegistrySnapshot: Codable, Equatable {
             registryEvalCount: evalCount,
             registryImprovementMultiplier: improvementMultiplier,
             registryVisibility: visibility,
+            observedAt: observedAt,
             dataOrigin: .cached,
             recoveryCommand: "tessl doctor"
         )

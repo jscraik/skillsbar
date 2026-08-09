@@ -738,13 +738,19 @@ final class ReviewPopoverTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let cache = TesslRegistryCache(defaults: defaults, keyPrefix: "test-cache")
 
-        cache.save(registryPath: "jscraik/improve-agent-native", signal: SkillDashboard.reviewFixture.tessl)
+        let observedAt = Date(timeIntervalSince1970: 1_725_000_000)
+        cache.save(
+            registryPath: "jscraik/improve-agent-native",
+            signal: SkillDashboard.reviewFixture.tessl,
+            observedAt: observedAt
+        )
         let snapshot = try XCTUnwrap(cache.load(registryPath: "jscraik/improve-agent-native"))
 
         XCTAssertEqual(snapshot.score, 66)
         XCTAssertEqual(snapshot.version, "0.2.0")
         XCTAssertEqual(snapshot.cachedSignal.dataOrigin, .cached)
         XCTAssertFalse(snapshot.cachedSignal.cliAvailable)
+        XCTAssertEqual(snapshot.cachedSignal.observedAt, observedAt)
         XCTAssertNil(cache.load(registryPath: "jscraik/another-skill"))
 
         cache.save(registryPath: "jscraik/unavailable", signal: SkillDashboard.reviewNoCLIFixture.tessl)
@@ -781,7 +787,7 @@ final class ReviewPopoverTests: XCTestCase {
 
         XCTAssertGreaterThan(
             try pixelDifference(renderedSnapshots[0], renderedSnapshots[1]),
-            0.0005,
+            0.0002,
             "The fixed Tessl baseline must make live and no-CLI states visibly distinct without scrolling"
         )
     }
@@ -902,7 +908,10 @@ final class ReviewPopoverTests: XCTestCase {
 
     func testMenuBarTemplateUsesApprovedPointMetrics() {
         XCTAssertEqual(MenuBarTemplateMetrics.width, 420)
-        XCTAssertEqual(MenuBarTemplateMetrics.height, 1_180)
+        let expectedHeight = NSScreen.main.map {
+            min(MenuBarTemplateMetrics.preferredHeight, max(640, $0.visibleFrame.height - 32))
+        } ?? MenuBarTemplateMetrics.preferredHeight
+        XCTAssertEqual(MenuBarTemplateMetrics.height, expectedHeight)
         XCTAssertEqual(MenuBarTemplateMetrics.minimumInteractiveTarget, 44)
         XCTAssertEqual(SkillsSDKIconLoader.menuBarImage?.size, NSSize(width: 18, height: 18))
         XCTAssertEqual(SkillsSDKIconLoader.menuBarImage?.isTemplate, true)

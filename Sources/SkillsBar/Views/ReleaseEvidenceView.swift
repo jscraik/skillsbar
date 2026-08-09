@@ -340,7 +340,6 @@ private struct ReleaseGateList: View {
     }
 
     private var candidate: PipelineCandidate { dashboard.pipeline }
-    private var presentation: PipelinePresentation { PipelinePresentation(candidate: candidate) }
 
     private func isReceiptExpanded(_ receipt: PipelineStageReceipt) -> Bool {
         disclosure.expandedReceiptIDs.contains(receipt.stage.rawValue)
@@ -389,38 +388,11 @@ private struct ReleaseGateList: View {
             .padding(.horizontal, 3)
 
             PipelineSurface {
-                compactSection(
-                    presentation.completedReceipts,
-                    id: "completed",
-                    title: stageRangeTitle(presentation.completedReceipts),
-                    detail: stageRangeDetail(presentation.completedReceipts)
-                )
-                if !presentation.completedReceipts.isEmpty && !presentation.focusedReceipts.isEmpty {
-                    ReleaseDivider()
-                }
-                ForEach(presentation.focusedReceipts) { receipt in
+                ForEach(candidate.orderedReceipts) { receipt in
                     gateRow(receipt)
-                    if receipt.id != presentation.focusedReceipts.last?.id { ReleaseDivider() }
-                }
-
-                if !presentation.remainingLocalReceipts.isEmpty {
-                    ReleaseDivider()
-                    compactSection(
-                        presentation.remainingLocalReceipts,
-                        id: "remaining-local",
-                        title: stageRangeTitle(presentation.remainingLocalReceipts),
-                        detail: stageRangeDetail(presentation.remainingLocalReceipts)
-                    )
-                }
-
-                if !presentation.remainingDeliveryReceipts.isEmpty {
-                    ReleaseDivider()
-                    compactSection(
-                        presentation.remainingDeliveryReceipts,
-                        id: "remaining-delivery",
-                        title: "Downstream gates \(presentation.remainingDeliveryReceipts.first?.stage.number ?? PipelineStage.tesslStaging.number)+",
-                        detail: groupDetail(presentation.remainingDeliveryReceipts)
-                    )
+                    if receipt.id != candidate.orderedReceipts.last?.id {
+                        ReleaseDivider()
+                    }
                 }
             }
 
@@ -580,33 +552,49 @@ private struct NextRequiredCard: View {
             }
             Spacer(minLength: 4)
             }
-            ReleaseDivider()
-            HStack(alignment: .center, spacing: 8) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Next step: copy command")
-                        .releaseFont(15, weight: .medium, relativeTo: .subheadline)
-                    Text("Paste into Terminal to run local proof.")
-                        .releaseFont(12.5, weight: .regular, relativeTo: .caption)
-                        .foregroundStyle(.bodyText)
+            if receipt.command.isEmpty {
+                ReleaseDivider()
+                HStack(alignment: .center, spacing: 8) {
+                    Image(systemName: "doc.badge.ellipsis")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Color.warningAccent)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Next step: receipt required")
+                            .releaseFont(15, weight: .medium, relativeTo: .subheadline)
+                        Text("Complete the governed \(receipt.stage.title.lowercased()) step, then refresh to bind its receipt.")
+                            .releaseFont(12.5, weight: .regular, relativeTo: .caption)
+                            .foregroundStyle(.bodyText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                .layoutPriority(1)
-                Spacer(minLength: 4)
-                Button {
-                    feedback.copy(receipt.command)
-                } label: {
-                    Text(feedback.copiedCommand == receipt.command ? "Copied" : "Copy command")
-                        .releaseFont(14, weight: .medium, relativeTo: .subheadline)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                        .padding(.horizontal, 15)
-                        .frame(height: 42)
+            } else {
+                ReleaseDivider()
+                HStack(alignment: .center, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Next step: copy command")
+                            .releaseFont(15, weight: .medium, relativeTo: .subheadline)
+                        Text("Paste into Terminal to run local proof.")
+                            .releaseFont(12.5, weight: .regular, relativeTo: .caption)
+                            .foregroundStyle(.bodyText)
+                    }
+                    .layoutPriority(1)
+                    Spacer(minLength: 4)
+                    Button {
+                        feedback.copy(receipt.command)
+                    } label: {
+                        Text(feedback.copiedCommand == receipt.command ? "Copied" : "Copy command")
+                            .releaseFont(14, weight: .medium, relativeTo: .subheadline)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                            .padding(.horizontal, 15)
+                            .frame(height: 42)
+                    }
+                    .buttonStyle(ReleasePressButtonStyle(tint: .advisoryAccent))
+                    .frame(width: 132, height: 46)
+                    .foregroundStyle(.primaryText)
+                    .help("Copy the full \(receipt.stage.title.lowercased()) command")
+                    .accessibilityLabel("Copy the full \(receipt.stage.title.lowercased()) command")
                 }
-                .buttonStyle(ReleasePressButtonStyle(tint: .advisoryAccent))
-                .frame(width: 132, height: 46)
-                .foregroundStyle(.primaryText)
-                .disabled(receipt.command.isEmpty)
-                .help("Copy the full \(receipt.stage.title.lowercased()) command")
-                .accessibilityLabel("Copy the full \(receipt.stage.title.lowercased()) command")
             }
         }
         .padding(.horizontal, 14)
@@ -876,8 +864,9 @@ private struct TesslEvidenceCard: View {
         return "v" + version.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
     }
     private var observedText: String {
-        let elapsed = Date().timeIntervalSince(dashboard.refreshedAt)
-        guard dashboard.refreshedAt.timeIntervalSince1970 > 0, elapsed >= 0 else { return "last observation unavailable" }
+        let observation = dashboard.tessl.observedAt ?? dashboard.refreshedAt
+        let elapsed = Date().timeIntervalSince(observation)
+        guard observation.timeIntervalSince1970 > 0, elapsed >= 0 else { return "last observation unavailable" }
         if elapsed < 60 { return "observed \(max(1, Int(elapsed.rounded())))s ago" }
         if elapsed < 3_600 { return "observed \(Int(elapsed / 60))m ago" }
         return "observed \(Int(elapsed / 3_600))h ago"
