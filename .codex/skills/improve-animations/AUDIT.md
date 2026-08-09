@@ -33,8 +33,7 @@ Decision order for easing:
 --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);     /* iOS-like drawer curve */
 ```
 
-Duration budgets — **ordinary UI animations stay under 300ms**; modal, drawer,
-and marketing motion use the explicit exceptions below:
+Duration budgets — **UI animations stay under 300ms**:
 
 | Element | Duration |
 | --- | --- |
@@ -44,18 +43,15 @@ and marketing motion use the explicit exceptions below:
 | Modals, drawers | 200–500ms |
 | Marketing / explanatory | Can be longer |
 
-Hunt for: `ease-in` anywhere, bare `ease`/`linear` on entrances, durations > 300ms on ordinary UI elements (excluding the documented modal, drawer, and marketing exceptions), tooltip delay + animation on every tooltip in a toolbar (after the first, they should be instant).
+Hunt for: `ease-in` anywhere, bare `ease`/`linear` on entrances, durations > 300ms on UI elements, tooltip delay + animation on every tooltip in a toolbar (after the first, they should be instant).
 
 ## 3. Physicality & origin
 
 - **Never `scale(0)`** — nothing in the real world appears from nothing. Target: `scale(0.9–0.97)` + `opacity: 0`.
 - **Popovers/dropdowns/tooltips scale from their trigger**, not center:
-
   ```css
-  .popover { transform-origin: var(--radix-popover-content-transform-origin); } /* Radix */
-  .popover { transform-origin: var(--transform-origin); }                       /* Base UI */
+  .popover { transform-origin: var(--transform-origin); } /* Base UI */
   ```
-
   **Modals are exempt** — they appear centered; `transform-origin: center` is correct there. Do not report it.
 - **Press feedback**: `transform: scale(0.97)` on `:active` with `transition: transform 160ms ease-out`. Keep it subtle (0.95–0.98).
 
@@ -70,7 +66,7 @@ CSS **transitions** retarget from the current state mid-animation; **keyframes**
 - Spring configs, Apple-style (recommended): `{ type: "spring", duration: 0.5, bounce: 0.2 }`. Keep bounce subtle (0.1–0.3); reserve visible bounce for drag-to-dismiss and playful moments.
 - **Asymmetric timing**: deliberate phases (press, hold, destructive confirm) animate slower; the system's response snaps. Symmetric timing on press-and-release is a finding.
 
-Hunt for: `@keyframes` on toasts/toggles/rapidly-triggered UI, gesture handlers that tween with fixed-duration keyframes, drags without velocity-based dismissal (dismiss when `Math.abs(distance) / elapsedMs > 0.11 CSS px/ms`, not distance thresholds alone), hard stops at drag boundaries instead of rising friction. Treat 0.11 CSS px/ms as a heuristic when the platform cannot expose those units.
+Hunt for: `@keyframes` on toasts/toggles/rapidly-triggered UI, gesture handlers that tween with fixed-duration keyframes, drags without velocity-based dismissal (dismiss on `Math.abs(distance)/elapsedMs > ~0.11`, not distance thresholds alone), hard stops at drag boundaries instead of rising friction.
 
 ## 5. Performance
 
