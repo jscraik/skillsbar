@@ -222,6 +222,28 @@ struct PipelineStageReceipt: Equatable, Identifiable {
     }
 
     var id: PipelineStage { stage }
+
+    /// A short, stable label for dense pipeline rows. The full `nextAction`
+    /// remains available to accessibility, help, and diagnostic surfaces.
+    var compactActionLabel: String {
+        let normalized = nextAction.lowercased()
+        if normalized.contains("package digest") {
+            return "Digest required"
+        }
+        if normalized.contains("execution receipt") {
+            return "Receipt required"
+        }
+        if normalized.contains("same scenario") {
+            return "Scenario binding required"
+        }
+        if normalized.contains("profile") {
+            return "Profile required"
+        }
+        if normalized.contains("current package") {
+            return "Digest required"
+        }
+        return nextAction.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+    }
 }
 
 struct PipelineCandidate: Equatable {
@@ -359,6 +381,35 @@ struct PipelineCandidate: Equatable {
                 )
             }
         )
+    }
+}
+
+/// The compact pipeline layout is derived from the evidence-backed candidate,
+/// never from a visual gate number. It keeps completed evidence, the active
+/// blocker, and later proof in their respective sequential sections.
+struct PipelinePresentation: Equatable {
+    let completedReceipts: [PipelineStageReceipt]
+    let focusedReceipts: [PipelineStageReceipt]
+    let remainingLocalReceipts: [PipelineStageReceipt]
+    let remainingDeliveryReceipts: [PipelineStageReceipt]
+
+    init(candidate: PipelineCandidate) {
+        let receipts = candidate.orderedReceipts
+        guard let activeIndex = receipts.firstIndex(where: { $0.evidenceStatus != .passed }) else {
+            completedReceipts = receipts
+            focusedReceipts = []
+            remainingLocalReceipts = []
+            remainingDeliveryReceipts = []
+            return
+        }
+
+        let focusedEnd = min(activeIndex + 2, receipts.count)
+        let remainingReceipts = Array(receipts.dropFirst(focusedEnd))
+
+        completedReceipts = Array(receipts.prefix(activeIndex))
+        focusedReceipts = Array(receipts[activeIndex..<focusedEnd])
+        remainingLocalReceipts = remainingReceipts.filter { $0.stage.number <= PipelineStage.ossCloud.number }
+        remainingDeliveryReceipts = remainingReceipts.filter { $0.stage.number > PipelineStage.ossCloud.number }
     }
 }
 
@@ -645,6 +696,68 @@ struct SkillDashboard {
         )
     )
 
+    /// Opt-in visual-composition fixture for the reference popover. It is only
+    /// selected by `SKILLSBAR_REVIEW_FIXTURE=reference`; normal and live
+    /// evidence always retain their real active stage and provenance.
+    static let visualReferenceFixture: SkillDashboard = {
+        var dashboard = reviewFixture
+        let fingerprint = "visual-reference-fixture-v1"
+        let observedAt = Date()
+
+        dashboard.version = "0.3.3"
+        dashboard.tessl = TesslSignal(
+            ok: true,
+            cliAvailable: true,
+            authenticated: true,
+            displayStatus: "Live registry",
+            detail: "Visual composition fixture; local evidence remains separate.",
+            cliVersion: "fixture",
+            registryScore: 100,
+            registryVersion: "0.3.3",
+            registryQualityScore: 100,
+            registryImpactScore: 100,
+            registrySecurityLabel: "Passed",
+            registryEvalCount: nil,
+            registryImprovementMultiplier: nil,
+            registryVisibility: nil,
+            dataOrigin: .liveCLI,
+            recoveryCommand: "tessl search --json --type skills jscraik/improve-agent-native"
+        )
+        dashboard.pipeline = PipelineCandidate(
+            fingerprint: fingerprint,
+            governedInputPaths: dashboard.pipeline.governedInputPaths,
+            observedAt: observedAt,
+            stageReceipts: PipelineStage.allCases.map { stage in
+                let passed = stage.number < PipelineStage.ossLocal.number
+                let status: PipelineEvidenceStatus = passed ? .passed : (stage == .ossLocal ? .blocked : .unproven)
+                let action: String
+                switch stage {
+                case .ossLocal:
+                    action = "Execution receipt required"
+                case .ossCloud:
+                    action = "Candidate + scenario binding required"
+                default:
+                    action = passed ? "Current for this candidate" : "Evidence not yet established"
+                }
+                return PipelineStageReceipt(
+                    stage: stage,
+                    candidateFingerprint: fingerprint,
+                    evidenceStatus: status,
+                    stageScore: passed ? 100 : nil,
+                    command: stage == .ossLocal
+                        ? "skills eval run --candidate . --scenario-set ./scenarios --bind --out ./evidence/local-proof.json"
+                        : "",
+                    receiptPath: passed ? "visual:gate-\(stage.number)" : nil,
+                    modelProfile: stage == .ossLocal ? "oss-local" : nil,
+                    observedAt: passed ? observedAt : nil,
+                    nextAction: action
+                )
+            }
+        )
+        dashboard.refreshedAt = observedAt
+        return dashboard
+    }()
+
     private static func makeReviewFixture(tessl: TesslSignal) -> SkillDashboard {
         SkillDashboard(
         displayName: "improve-agent-native",
@@ -825,130 +938,6 @@ func normalizeSemanticVersion(_ value: String) -> String {
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     guard trimmed.lowercased().hasPrefix("v") else { return trimmed }
     return String(trimmed.dropFirst())
-}
-
-struct ReviewPresentation {
-    let dashboard: SkillDashboard
-
-    enum State: Equatable {
-        case loading
-        case reviewRequired
-        case advisory
-        case degradedLocalEvidence
-        case healthy
-        case registryUnavailable
-    }
-
-    var isReviewState: Bool {
-        dashboard.security.disposition.requiresReview || state == .degradedLocalEvidence
-    }
-
-    var state: State {
-        if dashboard.security.disposition == .failed || dashboard.security.disposition == .flagged {
-            return .reviewRequired
-        }
-        if dashboard.security.disposition == .advisory { return .advisory }
-        if dashboard.score == nil { return .loading }
-        if !dashboard.tessl.ok { return .registryUnavailable }
-        if dashboard.scoreTone != .positive { return .degradedLocalEvidence }
-        return .healthy
-    }
-
-    var emphasisTone: StatusTone {
-        switch state {
-        case .loading: return .pending
-        case .reviewRequired: return dashboard.security.tone
-        case .advisory: return .advisory
-        case .degradedLocalEvidence: return dashboard.scoreTone
-        case .healthy: return .positive
-        case .registryUnavailable: return .pending
-        }
-    }
-
-    var triggerTitle: String {
-        switch state {
-        case .loading: return "Evidence pending"
-        case .reviewRequired: return "Review trigger"
-        case .advisory: return "Advisory review"
-        case .degradedLocalEvidence: return "Local score needs review"
-        case .healthy: return "Local evidence"
-        case .registryUnavailable: return "Registry unavailable"
-        }
-    }
-
-    var triggerSystemName: String {
-        switch state {
-        case .loading: return "clock"
-        case .reviewRequired: return "exclamationmark.triangle"
-        case .advisory: return "info.circle"
-        case .degradedLocalEvidence: return "exclamationmark.triangle"
-        case .healthy: return "checkmark.seal"
-        case .registryUnavailable: return "network.slash"
-        }
-    }
-
-    var qualityDetail: String {
-        dashboard.quality.score == 100 ? "Follows best\npractices" : dashboard.quality.compactDetail
-    }
-
-    var impactDetail: String {
-        guard let ratio = dashboard.impact.ratioLabel else {
-            return dashboard.impact.compactDetail
-        }
-        let values = ratio.split(separator: "/")
-        if values.count == 2, values[0] == values[1] {
-            return "All \(ratio) local\nscenarios passed"
-        }
-        return dashboard.impact.compactDetail
-    }
-
-    var bridgeSystemName: String {
-        if !dashboard.tessl.ok { return "network.slash" }
-        if dashboard.tessl.evidenceRequiresReview { return "exclamationmark.triangle" }
-        return isReviewState ? "checkmark" : "checkmark.seal"
-    }
-
-    var bridgeTone: StatusTone {
-        guard dashboard.tessl.ok else { return .pending }
-        return dashboard.tessl.evidenceRequiresReview ? .warning : .positive
-    }
-
-    var showsBridgeWarningBadge: Bool {
-        dashboard.tessl.ok && (isReviewState || dashboard.tessl.evidenceRequiresReview)
-    }
-
-    var packageIdentity: String {
-        dashboard.registryPath
-    }
-
-    var bridgeTitle: String {
-        if !dashboard.tessl.ok { return "Registry evidence unavailable." }
-        if isReviewState && dashboard.tessl.evidenceRequiresReview {
-            return "Local and registry evidence need review."
-        }
-        if isReviewState { return "Registry evidence healthy. Local source has findings." }
-        if dashboard.tessl.evidenceRequiresReview { return "Registry evidence needs review." }
-        return "Local and registry evidence are available."
-    }
-
-    var bridgeDetail: String {
-        dashboard.tessl.registryEvalCount.map { "\($0) registry eval scenarios" }
-            ?? "Registry eval count unavailable"
-    }
-
-    var actionTitle: String {
-        "Copy inspect command"
-    }
-
-    var actionDetail: String {
-        isReviewState
-            ? "Inspect \(dashboard.security.severityLine) in SKILL.md"
-            : "Inspect local security evidence in SKILL.md"
-    }
-
-    var actionCommand: String {
-        dashboard.reviewInspectCommand
-    }
 }
 
 struct RegistryMetricPresentation {

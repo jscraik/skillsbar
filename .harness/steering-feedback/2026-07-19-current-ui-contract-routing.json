@@ -1,0 +1,27 @@
+{
+  "schema_version": "steering-feedback/v1",
+  "feedback_signal": "UI changes repeatedly needed a correction from a superseded review-popover contract or inactive DashboardView component toward the approved pipeline-posture contract and active ReleaseEvidenceView surface.",
+  "repeated": true,
+  "occurrence_count": 2,
+  "root_operational_failure": "Repository guidance still names a superseded specification and mockup as the default UI entrypoint while the active app renders a newer release-evidence surface, leaving agents without a deterministic route from current intent to current implementation.",
+  "failure_category": "stale_state",
+  "durable_improvement": {
+    "kind": "validator",
+    "path": "Tests/SkillsBarTests/SkillContractTests.swift",
+    "action": "Add a repository-contract test that requires the approved pipeline-posture specification to be the default UI route and preserves the older review-popover specification as explicitly historical.",
+    "prevents": "Future UI work from treating a superseded specification or inactive private component graph as the current implementation authority."
+  },
+  "destination": "validator",
+  "proof": {
+    "commands": [
+      {
+        "command": "HOME=/private/tmp/skillsbar-contract-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-contract-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-contract-test-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-contract-test-build --filter SkillContractTests",
+        "outcome": "pass",
+        "evidence": "The focused regression test passed after AGENTS.md and README.md were routed to the approved 2026-07-10 pipeline-posture contract and after the inactive private legacy DashboardView graph was removed. The same command first failed in the red phase because those current-route references were absent. A fresh QA disproof then found the guard incomplete; the test now also asserts, in both maintained documents, that the 2026-07-09 materials are historical/reference-only and non-default. The exact focused command passed again after that test-only recovery."
+      }
+    ],
+    "future_behavior": "Current UI guidance and the focused contract test must agree that the pipeline-posture specification and ReleaseEvidenceView are the default route, while the review-popover materials remain historical reference only."
+  },
+  "implementation_note": "The approved correction is deliberately narrow: update routing documentation, add a contract-level regression test, and remove only source roots independently verified as private and unreferenced. No runtime or Tessl claim changes are authorized.",
+  "status": "implemented"
+}

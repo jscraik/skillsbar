@@ -19,25 +19,83 @@ final class SkillContractTests: XCTestCase {
 
     deinit {}
 
-    func testAnimationPlanCommandsShareTheResolvedDirectory() throws {
-        let repoRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+    func testDefaultUIWorkRoutesToApprovedPipelinePostureContract() throws {
+        let repoRoot = repositoryRoot
+        let approvedSpec = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                ".harness/specs/2026-07-10-skillsbar-pipeline-posture-spec.md"
+            ),
+            encoding: .utf8
+        )
+        let historicalSpec = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                ".harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md"
+            ),
+            encoding: .utf8
+        )
+        let agents = try String(contentsOf: repoRoot.appendingPathComponent("AGENTS.md"), encoding: .utf8)
+        let readme = try String(contentsOf: repoRoot.appendingPathComponent("README.md"), encoding: .utf8)
+
+        XCTAssertTrue(approvedSpec.contains("status: approved_documentation_contract"))
+        XCTAssertTrue(approvedSpec.contains("visual_reference: .harness/media/2026-07-10-skillsbar-pipeline-posture-approved.png"))
+        XCTAssertTrue(historicalSpec.contains("status: superseded_by_pipeline_posture_spec"))
+        XCTAssertTrue(historicalSpec.contains("successor_spec: .harness/specs/2026-07-10-skillsbar-pipeline-posture-spec.md"))
+
+        XCTAssertTrue(agents.contains(".harness/specs/2026-07-10-skillsbar-pipeline-posture-spec.md"))
+        XCTAssertTrue(agents.contains("ReleaseEvidenceView"))
+        XCTAssertTrue(agents.contains("The 2026-07-09 review-popover spec and its materials are historical reference only"))
+        XCTAssertTrue(agents.contains("do not use them as the default implementation contract."))
+        XCTAssertFalse(agents.contains("check `.harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md` and its referenced mockup before changing popover semantics."))
+        XCTAssertTrue(readme.contains(".harness/specs/2026-07-10-skillsbar-pipeline-posture-spec.md"))
+        XCTAssertTrue(readme.contains(".harness/media/2026-07-10-skillsbar-pipeline-posture-approved.png"))
+        XCTAssertTrue(readme.contains("Superseded review-popover spec retained as historical/reference-only evidence."))
+        XCTAssertTrue(readme.contains("historical/reference-only material for intentionally retained legacy context; they do not govern new pipeline-posture changes."))
+        XCTAssertFalse(readme.contains("For the review popover, read the spec and current implementation-handoff mockup first"))
+    }
+
+    func testDashboardViewDoesNotRetainDeletedFocusAccent() throws {
+        let dashboardView = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Sources/SkillsBar/Views/DashboardView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(dashboardView.contains("focusAccent"))
+    }
+
+    func testRetiredReviewPresentationIsAbsentFromModelAndLegacyTests() throws {
+        let model = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Sources/SkillsBar/Models/DashboardModels.swift"),
+            encoding: .utf8
+        )
+        let legacyTests = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Tests/SkillsBarTests/ReviewPopoverTests.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(model.contains("ReviewPresentation"))
+        XCTAssertFalse(legacyTests.contains("ReviewPresentation"))
+    }
+
+    func testAnimationPlanCommandsUseTheCanonicalPlansDirectory() throws {
+        let repoRoot = repositoryRoot
         let skillURL = repoRoot.appendingPathComponent(".codex/skills/improve-animations/SKILL.md")
         let templateURL = repoRoot.appendingPathComponent(".codex/skills/improve-animations/PLAN-TEMPLATE.md")
         let skill = try String(contentsOf: skillURL, encoding: .utf8)
         let template = try String(contentsOf: templateURL, encoding: .utf8)
 
-        XCTAssertTrue(skill.contains("`.workflow-owner`"))
-        XCTAssertTrue(skill.contains("`workflow: improve-animations`"))
-        XCTAssertTrue(skill.contains("any other non-blank `workflow:` value"))
-        XCTAssertTrue(skill.contains("use `animation-plans/` instead"))
-        XCTAssertTrue(skill.contains("resolved directory for numbering, plan files, and its README"))
-        XCTAssertTrue(skill.contains("`reconcile` | Resolve the plan directory with the Phase 4 rule"))
-        XCTAssertFalse(skill.contains("`reconcile` | Re-check `plans/`"))
-        XCTAssertTrue(template.contains("`<recon-verified-token-file-or-no-shared-token-file>`"))
-        XCTAssertTrue(template.contains("`<resolved-plan-directory>/README.md`"))
-        XCTAssertTrue(template.contains("must be reused for numbering, plan files, and README updates"))
+        XCTAssertTrue(skill.contains("written into `plans/` as `NNN-short-slug.md`"))
+        XCTAssertTrue(skill.contains("Finish by creating or updating `plans/README.md`"))
+        XCTAssertTrue(skill.contains("`execute <plan>` | Dispatch an executor subagent"))
+        XCTAssertTrue(skill.contains("`reconcile` | Re-check `plans/`"))
+        XCTAssertFalse(skill.contains("`.workflow-owner`"))
+        XCTAssertTrue(skill.contains("or `animation-plans/` if `plans/` already exists"))
+        XCTAssertTrue(template.contains("After writing plans, create or update `plans/README.md`"))
+    }
+
+    private var repositoryRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 }

@@ -49,14 +49,19 @@ struct DashboardDataSource {
             return "live"
         }
         guard let value = environment["SKILLSBAR_REVIEW_FIXTURE"]?.lowercased(),
-              ["1", "live", "no-cli", "offline"].contains(value) else { return nil }
+              ["1", "live", "no-cli", "offline", "reference"].contains(value) else { return nil }
         return value
     }
 
     private var fixtureDashboard: SkillDashboard {
-        fixtureValue == "no-cli" || fixtureValue == "offline"
-            ? .reviewNoCLIFixture
-            : .reviewFixture
+        switch fixtureValue {
+        case "no-cli", "offline":
+            return .reviewNoCLIFixture
+        case "reference":
+            return .visualReferenceFixture
+        default:
+            return .reviewFixture
+        }
     }
 
     var initialDashboard: SkillDashboard {

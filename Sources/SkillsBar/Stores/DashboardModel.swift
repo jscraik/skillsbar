@@ -13,7 +13,10 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var hasLoadedEvidence: Bool
     @Published private(set) var availableSkillPaths: [String] = []
     private let refreshIntervalNanoseconds: UInt64 = 5 * 60 * 1_000_000_000
-    private let sourceChangePollNanoseconds: UInt64 = 500_000_000
+    // Scans can traverse every supporting file beside SKILL.md. Poll at a
+    // calm cadence and move that work off the main actor so an open menu stays
+    // responsive while local evidence is changing.
+    private let sourceChangePollNanoseconds: UInt64 = 10 * 1_000_000_000
     private let sourceChangeDebounceNanoseconds: UInt64 = 350_000_000
     private var refreshLoopTask: Task<Void, Never>?
     private var sourceChangeTask: Task<Void, Never>?
@@ -107,7 +110,7 @@ final class DashboardModel: ObservableObject {
         sourceChangeTask?.cancel()
         sourceChangeTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: self?.sourceChangePollNanoseconds ?? 500_000_000)
+                try? await Task.sleep(nanoseconds: self?.sourceChangePollNanoseconds ?? 10 * 1_000_000_000)
                 guard !Task.isCancelled else { return }
                 await self?.queueRefreshIfSelectedSkillChanged()
             }

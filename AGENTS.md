@@ -14,7 +14,7 @@ SkillsBar is a local macOS SwiftUI menu-bar prototype for Skills SDK evidence vi
 
 1. Read this file and `README.md` before editing.
 2. Inspect `Package.swift`, `Launch.command`, and the specific `Sources/**` or `Tests/**` files in scope.
-3. For UI or behavior work, check `.harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md` and its referenced mockup before changing popover semantics.
+3. For UI or behavior work, start with `.harness/specs/2026-07-10-skillsbar-pipeline-posture-spec.md`, its approved `.harness/media/2026-07-10-skillsbar-pipeline-posture-approved.png` mockup, the active `ReleaseEvidenceView`, and focused `ReviewPopoverTests`. The 2026-07-09 review-popover spec and its materials are historical reference only; do not use them as the default implementation contract.
 4. Treat `.codex/environments/environment.toml` as generated. Do not edit it directly.
 
 ## Repo Rules
@@ -76,4 +76,6 @@ Report validation as `Command: <exact command> -> pass|fail|blocked (<reason>)`.
 
 ## Harness Context
 
-The `.harness` directory contains project context and design artifacts. The current review-popover spec is draft supporting evidence, not runtime proof. Before implementing or closing UI changes from it, refresh against the live app and report screenshot, clipboard, focus, reduced-motion, and height evidence when applicable.
+The `.harness` directory contains project context and design artifacts. The approved pipeline-posture spec is the current documentation contract; its mockup remains supporting evidence, not runtime proof. The earlier review-popover spec is historical reference only. Before implementing or closing UI changes, refresh against the live app and report screenshot, clipboard, focus, reduced-motion, and height evidence when applicable.
+
+- When explaining something to the user, use the [$visualize:visualize](/Users/jamiecraik/.codex/plugins/cache/openai-bundled/visualize/1.0.19/skills/visualize/SKILL.md) skill
