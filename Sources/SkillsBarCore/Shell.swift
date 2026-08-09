@@ -57,6 +57,35 @@ public struct CommandResult: Sendable {
 }
 
 public enum Shell {
+    /// Returns a deterministic tool path for read-only Skills SDK checks.
+    ///
+    /// SkillsBar launches commands from a non-login shell, but the inherited
+    /// environment can still put mise shims ahead of the real tools. That
+    /// makes the same SDK command behave differently in the app than it does
+    /// in a developer terminal (for example when mise's global config is not
+    /// trusted). Keep the user's usable paths while removing mise entries and
+    /// appending the known local/system tool locations exactly once.
+    internal static func sanitizedPath(_ existingPath: String, localBin: String) -> String {
+        let inheritedEntries = existingPath
+            .split(separator: ":")
+            .map(String.init)
+            .filter { entry in
+                !entry.split(separator: "/").contains("mise")
+            }
+        let requiredEntries = [
+            localBin,
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            "/usr/sbin",
+            "/sbin"
+        ]
+
+        var seen = Set<String>()
+        return (requiredEntries + inheritedEntries).filter { seen.insert($0).inserted }.joined(separator: ":")
+    }
+
     public static func run(_ command: String, cwd: URL, timeout: TimeInterval) -> CommandResult {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
@@ -68,19 +97,13 @@ public enum Shell {
             .path
         let managedPython = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".venvs/pyyaml/bin/python")
-        let stablePath = [
-            localBin,
-            "/opt/homebrew/bin",
-            "/usr/local/bin",
-            "/usr/bin",
-            "/bin",
-            "/usr/sbin",
-            "/sbin",
-            existingPath
-        ].joined(separator: ":")
         var overrides = [
-            "PATH": stablePath,
+            "PATH": sanitizedPath(existingPath, localBin: localBin),
             "ZDOTDIR": "/private/tmp/skillsbar-zdotdir",
+            "MISE_CONFIG_FILE": "/dev/null",
+            "MISE_NO_CONFIG": "1",
+            "MISE_NO_ENV": "1",
+            "MISE_NO_HOOKS": "1",
             "XDG_CACHE_HOME": "/private/tmp/skillsbar-xdg",
             "MISE_CACHE_DIR": "/private/tmp/skillsbar-mise-cache",
             "MISE_OFFLINE": "1",

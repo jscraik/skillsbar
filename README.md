@@ -49,7 +49,7 @@ For the supported hackathon walkthrough, launch the real menu-bar app with deter
 ./script/build_and_run.sh --demo
 ```
 
-This mode launches the packaged `MenuBarExtra`, selects the deterministic Gate 1 nine-gate fixture, and shows a `DEMO FIXTURE` disclosure in the popover. It prefers LaunchServices and accepts the launcher's sustained direct-executable fallback when LaunchServices is unavailable; the receipt records the exact method. Click the Skills SDK document icon in the macOS menu bar to reveal it. The receipt also records `evidence_mode` as `deterministic_demo_fixture`; the fixture demonstrates the product flow but is not live SDK, Tessl, hosted CI, notarization, or review-readiness proof. Use `--verify`, rather than `--demo`, when LaunchServices itself is the behavior under test.
+This mode launches the packaged `MenuBarExtra` with a deterministic Gate 1 nine-gate fixture. It prefers LaunchServices and accepts the launcher's sustained direct-executable fallback when LaunchServices is unavailable; the receipt records the exact method. Click the Skills SDK document icon in the macOS menu bar to reveal it. The receipt also records `evidence_mode` as `deterministic_demo_fixture`; the fixture demonstrates the product flow but is not live SDK, Tessl, hosted CI, notarization, or review-readiness proof. Use `--verify`, rather than `--demo`, when LaunchServices itself is the behavior under test.
 
 The timed judge walkthrough and proof-boundary answers are in [`DEMO.md`](DEMO.md).
 
@@ -118,7 +118,9 @@ TESSL_BIN=/absolute/path/to/tessl ./Launch.command
 
 For fixture-based Tessl UI work, set `TESSL_REGISTRY_FIXTURE=1` or `TESSL_REGISTRY_FIXTURE_SCORE=<0-100>` with the optional fixture variables used in `DashboardLoader.swift`. Add `TESSL_REGISTRY_FIXTURE_MODE=cached` to exercise the CLI-unavailable historical treatment.
 
-For product demos, use the supported `./script/build_and_run.sh --demo` path above. For deterministic test and mockup work only, `SKILLSBAR_REVIEW_FIXTURE=live` (or `1`) bypasses live package, scenario, security, and registry parsing before constructing the model, so snapshots consistently render candidate identity as the active gate, held mechanical/security/eval-preparation observations, registry score 66, and the canonical SDK-start command. Use `SKILLSBAR_REVIEW_FIXTURE=no-cli` to render the same last-known registry metrics with `CLI UNAVAILABLE` and `Historical external baseline · not proof for this candidate.`
+For product demos, use the supported `./script/build_and_run.sh --demo` path above. For deterministic test and mockup work only, `SKILLSBAR_REVIEW_FIXTURE=live` (or `1`) bypasses live package, scenario, security, and registry parsing before constructing the model, so snapshots consistently render the nine-gate implementation state, held local observations, registry score 66, and the canonical SDK-start command. Use `SKILLSBAR_REVIEW_FIXTURE=no-cli` to render the same last-known registry metrics with `CLI UNAVAILABLE` and `Historical external baseline · not proof for this candidate.`
+
+Use `SKILLSBAR_REVIEW_FIXTURE=reference` only to review the tall visual composition against the approved design. It renders Gate 05, live-looking Tessl metrics, and the expanded utility panel as a **visual fixture**; it never substitutes for the selected skill's real evidence or registry state.
 
 A successful live Tessl CLI search stores only sanitized registry fields (version, score, Quality, Impact, Security, eval count, multiplier, and visibility) in local preferences. If the CLI later becomes unavailable, SkillsBar can show that last-known snapshot as historical context. It does not cache credentials, raw command output, or package contents, and cached registry data never promotes a local pipeline gate.
 
@@ -164,11 +166,13 @@ swift test --build-system native --disable-sandbox --build-path /private/tmp/ski
 | `Sources/SkillsBar`                                                                      | SwiftUI app, models, services, stores, resources, and views.                                             |
 | `Sources/SkillsBarCore`                                                                  | Shared shell execution and JSON parsing helpers.                                                         |
 | `Tests/SkillsBarCoreTests`                                                               | Unit tests for core shell behavior.                                                                      |
-| `.harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md`                    | Implementation-handoff visual and behavior spec for the review popover.                                  |
+| `.harness/specs/2026-07-10-skillsbar-pipeline-posture-spec.md`                           | Approved current documentation contract for the nine-gate pipeline-posture UI.                            |
+| `.harness/media/2026-07-10-skillsbar-pipeline-posture-approved.png`                      | Approved pipeline-posture mockup; supporting visual evidence, not runtime proof.                          |
+| `.harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md`                    | Superseded review-popover spec retained as historical/reference-only evidence.                            |
 | `.harness/reviews/2026-07-09-review-popover-3lane-synthesis.md`                          | Three-lane implementation handoff for the final-polish review popover refactor.                          |
 | `.harness/reviews/2026-07-09-review-popover-pass3-synthesis.md`                          | Pass-three review closeout separating spec/doc handoff defects from remaining implementation blockers.   |
-| `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-implementation-handoff.png` | Current full-height implementation-handoff mockup referenced by the review popover spec.                 |
-| `.harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png`              | Deterministic `404 x 560` app-rendered implementation snapshot; not live MenuBarExtra interaction proof. |
+| `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-implementation-handoff.png` | Historical full-height implementation-handoff mockup for the superseded review-popover spec.              |
+| `.harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png`              | Deterministic `404 x 720` app-rendered implementation snapshot; not live MenuBarExtra interaction proof. |
 | `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-final-polish.png`           | Earlier final-polish mockup retained as historical comparison evidence.                                  |
 | `.harness/media/2026-07-09-skills-sdk-menubar-final-mockup.png`                          | Earlier persisted mockup retained as historical comparison evidence.                                     |
 
@@ -178,7 +182,7 @@ swift test --build-system native --disable-sandbox --build-path /private/tmp/ski
 - Do not route Computer Use directly through a client notifier from this project; keep Computer Use behind `SkyComputerUseService` when adjacent Codex config work appears.
 - Do not edit `.codex/environments/environment.toml` directly; it is generated.
 - Treat `.harness` artifacts as supporting project context. Refresh runtime evidence before using the implementation-handoff spec as runtime proof.
-- For the review popover, read the spec and current implementation-handoff mockup first, then the three-lane synthesis for component boundaries, fixture requirements, copy-command guardrails, and validation route. Read the pass-three synthesis for the review history behind the now-resolved spec decisions and the remaining product-code blockers.
+- For current UI work, read the approved pipeline-posture spec and mockup first, then inspect `Sources/SkillsBar/Views/ReleaseEvidenceView.swift` and run focused `ReviewPopoverTests`. The 2026-07-09 review-popover spec, mockups, and three-lane syntheses are historical/reference-only material for intentionally retained legacy context; they do not govern new pipeline-posture changes.
 - Keep generated app bundles and build output out of the repository; `dist/` is ignored and the default app bundle lives under `~/.codex/usage-data/skillsbar`.
 - Keep `Launch.command` as the development runner, `script/package_app.sh` as the sole bundle-construction path, and `script/release.sh` as the credentialed distribution boundary.
 - Automatic updates, Homebrew distribution, launch-at-login UI, and hosted release automation should be added only after the first notarized release fixes the public bundle identifier and update ownership. They are delivery features, not substitutes for signing and notarization.

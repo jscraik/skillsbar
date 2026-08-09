@@ -1,0 +1,32 @@
+{
+  "schema_version": "steering-feedback/v1",
+  "feedback_signal": "After the inactive DashboardView review graph was removed, adversarial review found that ReviewPresentation and its tests remained even though no production source constructs or consumes that model.",
+  "repeated": true,
+  "occurrence_count": 2,
+  "root_operational_failure": "The first legacy-cleanup boundary enumerated private view roots but did not trace model and test-only dependencies to a fixed point, allowing an obsolete production model to remain after its last production consumer was removed.",
+  "failure_category": "architecture_drift",
+  "durable_improvement": {
+    "kind": "validator",
+    "path": "Tests/SkillsBarTests/SkillContractTests.swift",
+    "action": "Add a focused source-contract assertion that the retired ReviewPresentation model and its legacy-only ReviewPopoverTests constructions are absent after the explicitly scoped cleanup.",
+    "prevents": "Future legacy-view deletions from leaving a production model and test cluster with no active caller."
+  },
+  "destination": "validator",
+  "proof": {
+    "commands": [
+      {
+        "command": "HOME=/private/tmp/skillsbar-contract-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-contract-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-contract-test-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-contract-test-build --filter SkillContractTests",
+        "outcome": "fail",
+        "evidence": "Before cleanup, testRetiredReviewPresentationIsAbsentFromModelAndLegacyTests failed its two absence assertions because ReviewPresentation remained in DashboardModels.swift and ReviewPopoverTests.swift. This was the expected red state."
+      },
+      {
+        "command": "HOME=/private/tmp/skillsbar-contract-test-home XDG_CACHE_HOME=/private/tmp/skillsbar-contract-test-xdg CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-contract-test-clang-cache DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-contract-test-build --filter SkillContractTests",
+        "outcome": "pass",
+        "evidence": "After cleanup, SkillContractTests executed 4 tests with 0 failures. The focused target compiled DashboardModels.swift, the retained ReviewPopoverTests.swift test target, and ReleaseEvidenceView.swift without restoring a ReviewPresentation reference."
+      }
+    ],
+    "future_behavior": "A private UI graph removal that retires its last production model consumer must either retain an explicit supported caller or remove the model and its legacy-only tests under a focused source-contract guard."
+  },
+  "implementation_note": "This is a separate approved cleanup slice limited to DashboardModels.swift, ReviewPopoverTests.swift, the focused contract test, and governed evidence artifacts. It must not touch staged ReleaseEvidenceView.swift or the retained visual baseline.",
+  "status": "implemented"
+}

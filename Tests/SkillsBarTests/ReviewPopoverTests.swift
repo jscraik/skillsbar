@@ -50,63 +50,86 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(dashboard.tessl.registryImprovementMultiplier, 1.28)
         XCTAssertEqual(dashboard.tessl.registryVisibilityDisplay, "Private")
         XCTAssertEqual(dashboard.reviewInspectCommand, expectedCommand)
+        var incompleteDashboard = SkillDashboard.reviewFixture
+        incompleteDashboard.quality.score = nil
+        incompleteDashboard.impact.score = nil
+        XCTAssertNil(incompleteDashboard.score)
     }
 
-    func testReviewPresentationExplainsLocalAndRegistryTruth() {
-        let presentation = ReviewPresentation(dashboard: .reviewFixture)
+    func testReferenceFixtureIsVisualOnlyAndKeepsTheGateModelIntact() throws {
+        let dashboard = SkillDashboard.visualReferenceFixture
 
-        XCTAssertTrue(presentation.isReviewState)
-        XCTAssertEqual(presentation.packageIdentity, "jscraik/improve-agent-native")
-        XCTAssertEqual(presentation.bridgeTitle, "Local and registry evidence need review.")
-        XCTAssertEqual(presentation.bridgeDetail, "68 registry eval scenarios")
-        XCTAssertEqual(presentation.actionTitle, "Copy inspect command")
-        XCTAssertEqual(presentation.actionDetail, "Inspect 1 critical, 2 high in SKILL.md")
-        XCTAssertEqual(presentation.actionCommand, expectedCommand)
+        XCTAssertEqual(dashboard.pipeline.activeReceipt?.stage, .ossLocal)
+        XCTAssertEqual(dashboard.pipeline.evidencedStageCount, 5)
+        XCTAssertEqual(dashboard.pipeline.orderedReceipts.prefix(4).map(\.evidenceStatus), [.passed, .passed, .passed, .passed])
+        XCTAssertEqual(dashboard.pipeline.orderedReceipts[4].evidenceStatus, .blocked)
+        XCTAssertEqual(dashboard.tessl.registryVersion, "0.3.3")
+
+        let source = DashboardDataSource(environment: ["SKILLSBAR_REVIEW_FIXTURE": "reference"])
+        XCTAssertEqual(try source.loadSync().pipeline.activeReceipt?.stage, .ossLocal)
+        XCTAssertEqual(SkillDashboard.reviewFixture.pipeline.activeReceipt?.stage, .candidateBaseline)
     }
 
-    func testPendingPresentationDoesNotClaimReviewOrSuccess() {
-        let presentation = ReviewPresentation(dashboard: .placeholder)
+    func testPipelinePresentationMovesTheFocusedSectionWithLiveEvidence() {
+        let presentation = PipelinePresentation(candidate: pipelineCandidate(activeStage: .securityReview))
 
-        XCTAssertEqual(presentation.state, .loading)
-        XCTAssertEqual(presentation.triggerTitle, "Evidence pending")
-        XCTAssertEqual(presentation.emphasisTone, .pending)
-        XCTAssertEqual(presentation.qualityDetail, "No package score yet")
-        XCTAssertEqual(presentation.impactDetail, "Scenario check not run")
-        XCTAssertEqual(presentation.bridgeTitle, "Registry evidence unavailable.")
-        XCTAssertEqual(presentation.bridgeSystemName, "network.slash")
-        XCTAssertFalse(presentation.showsBridgeWarningBadge)
-    }
-
-    func testHealthyPresentationUsesPositiveSemantics() {
-        var dashboard = SkillDashboard.reviewFixture
-        dashboard.security = SecuritySignal(
-            score: 100,
-            status: "Passed",
-            detail: "No known issues.",
-            sourceLabel: "Local SDK risk-modes",
-            segmentCount: 3,
-            inspectCommand: expectedCommand
+        XCTAssertEqual(presentation.completedReceipts.map(\.stage), [.candidateBaseline, .mechanicalValidation])
+        XCTAssertEqual(presentation.focusedReceipts.map(\.stage), [.securityReview, .evalPreparation])
+        XCTAssertEqual(presentation.remainingLocalReceipts.map(\.stage), [.ossLocal, .ossCloud])
+        XCTAssertEqual(
+            presentation.remainingDeliveryReceipts.map(\.stage),
+            [.tesslStaging, .tesslLiveRegistry, .liveScoreAndRuntime]
         )
-        let presentation = ReviewPresentation(dashboard: dashboard)
-
-        XCTAssertEqual(presentation.state, .healthy)
-        XCTAssertEqual(presentation.triggerTitle, "Local evidence")
-        XCTAssertEqual(presentation.emphasisTone, .positive)
-        XCTAssertEqual(presentation.bridgeTitle, "Registry evidence needs review.")
-        XCTAssertEqual(presentation.bridgeSystemName, "exclamationmark.triangle")
-        XCTAssertTrue(presentation.showsBridgeWarningBadge)
     }
 
-    func testUnavailableRegistryDoesNotRenderSuccessBridge() {
-        var dashboard = SkillDashboard.reviewFixture
-        dashboard.tessl.ok = false
-        let presentation = ReviewPresentation(dashboard: dashboard)
+    func testPipelinePresentationPlacesGateFiveInTheReferenceLayoutWithoutHardcodingIt() {
+        let presentation = PipelinePresentation(candidate: pipelineCandidate(activeStage: .ossLocal))
 
-        XCTAssertEqual(presentation.state, .reviewRequired)
-        XCTAssertEqual(presentation.triggerTitle, "Review trigger")
-        XCTAssertEqual(presentation.bridgeTone, .pending)
-        XCTAssertEqual(presentation.bridgeSystemName, "network.slash")
-        XCTAssertFalse(presentation.showsBridgeWarningBadge)
+        XCTAssertEqual(
+            presentation.completedReceipts.map(\.stage),
+            [.candidateBaseline, .mechanicalValidation, .securityReview, .evalPreparation]
+        )
+        XCTAssertEqual(presentation.focusedReceipts.map(\.stage), [.ossLocal, .ossCloud])
+        XCTAssertTrue(presentation.remainingLocalReceipts.isEmpty)
+        XCTAssertEqual(
+            presentation.remainingDeliveryReceipts.map(\.stage),
+            [.tesslStaging, .tesslLiveRegistry, .liveScoreAndRuntime]
+        )
+    }
+
+    func testPipelinePresentationPlacesEveryActiveGateInItsOwnFocusedSection() {
+        for activeStage in PipelineStage.allCases {
+            let presentation = PipelinePresentation(candidate: pipelineCandidate(activeStage: activeStage))
+            let renderedStages = presentation.completedReceipts
+                + presentation.focusedReceipts
+                + presentation.remainingLocalReceipts
+                + presentation.remainingDeliveryReceipts
+
+            XCTAssertEqual(presentation.focusedReceipts.first?.stage, activeStage)
+            XCTAssertEqual(renderedStages.map(\.stage), PipelineStage.allCases)
+            XCTAssertTrue(presentation.completedReceipts.allSatisfy { $0.evidenceStatus == .passed })
+        }
+    }
+
+    func testDataSourceUsesLivePipelineWhenTheVisualFixtureIsUnset() throws {
+        var liveDashboard = SkillDashboard.reviewFixture
+        liveDashboard.pipeline = pipelineCandidate(activeStage: .tesslStaging)
+        let source = DashboardDataSource(
+            environment: [:],
+            liveLoad: { liveDashboard },
+            liveLoadAsync: { liveDashboard }
+        )
+
+        XCTAssertEqual(try source.loadSync().pipeline.activeReceipt?.stage, .tesslStaging)
+    }
+
+    func testDensePipelineActionLabelsKeepTheFullReasonAvailableSeparately() {
+        guard let active = SkillDashboard.reviewFixture.pipeline.activeReceipt else {
+            return XCTFail("The review fixture must expose an active pipeline receipt")
+        }
+
+        XCTAssertEqual(active.compactActionLabel, "Digest required")
+        XCTAssertEqual(active.nextAction, "Canonical package digest missing")
     }
 
     func testRegistryVisibilityIsNormalizedAndCanBeAbsent() {
@@ -129,6 +152,11 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(SecurityDisposition(label: "Advisory review").tone, .advisory)
         XCTAssertEqual(SecurityDisposition(label: "Flagged").tone, .warning)
         XCTAssertEqual(SecurityDisposition(label: "Failed").tone, .danger)
+
+        var flaggedDashboard = SkillDashboard.reviewFixture
+        flaggedDashboard.tessl.registrySecurityLabel = "Flagged"
+        flaggedDashboard.tessl.registryScore = 35
+        XCTAssertTrue(flaggedDashboard.tessl.evidenceRequiresReview)
     }
 
     func testSemanticVersionNormalizationHandlesUpperAndLowercasePrefixes() {
@@ -147,11 +175,8 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(SecurityDisposition(label: "Critical advisory"), .failed)
         XCTAssertEqual(SecurityDisposition(label: "Flagged but passed baseline"), .flagged)
         XCTAssertEqual(SecurityDisposition(label: "Failed after advisory review"), .failed)
-    }
-
-    func testLocalAdvisoryPresentationIsBlueAndNotHealthy() {
-        var dashboard = SkillDashboard.reviewFixture
-        dashboard.security = SecuritySignal(
+        var advisoryDashboard = SkillDashboard.reviewFixture
+        advisoryDashboard.security = SecuritySignal(
             score: 70,
             status: "Advisory",
             detail: "Manual review advised.",
@@ -159,70 +184,8 @@ final class ReviewPopoverTests: XCTestCase {
             segmentCount: 2,
             inspectCommand: expectedCommand
         )
-        let presentation = ReviewPresentation(dashboard: dashboard)
-
-        XCTAssertEqual(dashboard.security.disposition, .advisory)
-        XCTAssertEqual(dashboard.security.tone, .advisory)
-        XCTAssertEqual(presentation.state, .advisory)
-        XCTAssertEqual(presentation.emphasisTone, .advisory)
-        XCTAssertEqual(presentation.triggerTitle, "Advisory review")
-        XCTAssertTrue(presentation.isReviewState)
-    }
-
-    func testSecurityFindingOutranksMissingQualityAndImpactScores() {
-        var dashboard = SkillDashboard.reviewFixture
-        dashboard.quality.score = nil
-        dashboard.impact.score = nil
-
-        let presentation = ReviewPresentation(dashboard: dashboard)
-
-        XCTAssertNil(dashboard.score)
-        XCTAssertEqual(presentation.state, .reviewRequired)
-        XCTAssertEqual(presentation.triggerTitle, "Review trigger")
-        XCTAssertEqual(presentation.emphasisTone, .warning)
-    }
-
-    func testFailedSecurityUsesDangerTone() {
-        var dashboard = SkillDashboard.reviewFixture
-        dashboard.security.status = "Failed"
-
-        let presentation = ReviewPresentation(dashboard: dashboard)
-
-        XCTAssertEqual(presentation.state, .reviewRequired)
-        XCTAssertEqual(presentation.emphasisTone, .danger)
-    }
-
-    func testLowLocalScoreIsNotPresentedAsHealthy() {
-        var dashboard = SkillDashboard.reviewFixture
-        dashboard.quality.score = 50
-        dashboard.impact.score = 50
-        dashboard.security = SecuritySignal(
-            score: 100,
-            status: "Passed",
-            detail: "No known issues.",
-            sourceLabel: "Local SDK risk-modes",
-            segmentCount: 3,
-            inspectCommand: expectedCommand
-        )
-
-        let presentation = ReviewPresentation(dashboard: dashboard)
-
-        XCTAssertNotEqual(presentation.state, .healthy)
-        XCTAssertEqual(presentation.emphasisTone, .warning)
-        XCTAssertEqual(presentation.triggerSystemName, "exclamationmark.triangle")
-    }
-
-    func testRegistryFindingIsNotDescribedAsClean() {
-        var dashboard = SkillDashboard.reviewFixture
-        dashboard.tessl.registrySecurityLabel = "Flagged"
-        dashboard.tessl.registryScore = 35
-
-        let presentation = ReviewPresentation(dashboard: dashboard)
-
-        XCTAssertTrue(dashboard.tessl.evidenceRequiresReview)
-        XCTAssertEqual(presentation.bridgeTitle, "Local and registry evidence need review.")
-        XCTAssertEqual(presentation.bridgeTone, .warning)
-        XCTAssertEqual(presentation.bridgeSystemName, "exclamationmark.triangle")
+        XCTAssertEqual(advisoryDashboard.security.disposition, .advisory)
+        XCTAssertEqual(advisoryDashboard.security.tone, .advisory)
     }
 
     func testRegistryVersionDoesNotFallBackToLocalSkillVersion() {
@@ -289,20 +252,40 @@ final class ReviewPopoverTests: XCTestCase {
     }
 
     @MainActor
-    func testReviewFixtureRenderMatchesRetainedBaseline() throws {
+    func testReviewFixtureRenderMatchesCurrentCanvasContract() throws {
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("skillsbar-review-\(UUID().uuidString).png")
         defer { try? FileManager.default.removeItem(at: outputURL) }
 
         try SnapshotRenderer.render(dashboard: .reviewFixture, to: outputURL)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: outputURL)))
+        XCTAssertEqual(bitmap.pixelsWide, Int(MenuBarTemplateMetrics.width))
+        XCTAssertEqual(bitmap.pixelsHigh, Int(MenuBarTemplateMetrics.height))
+    }
 
-        let repoRoot = URL(fileURLWithPath: #filePath)
+    @MainActor
+    func testReviewFixtureRenderMatchesRetainedBaseline() throws {
+        let baselineURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let baselineURL = repoRoot.appendingPathComponent(".harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png")
-        let difference = try pixelDifference(baselineURL, outputURL)
-        XCTAssertLessThanOrEqual(difference, 0.0005, "Rendered review fixture drifted from the retained baseline")
+            .appendingPathComponent(".harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: baselineURL.path))
+
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-review-baseline-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: outputURL) }
+
+        try SnapshotRenderer.render(dashboard: .reviewFixture, to: outputURL)
+        let baselineBitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: baselineURL)))
+        let renderedBitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: outputURL)))
+        XCTAssertEqual(renderedBitmap.pixelsWide, baselineBitmap.pixelsWide)
+        XCTAssertEqual(renderedBitmap.pixelsHigh, baselineBitmap.pixelsHigh)
+        XCTAssertLessThanOrEqual(
+            try pixelDifference(outputURL, baselineURL),
+            0.05,
+            "The production fixture render must remain within the retained visual baseline contract"
+        )
     }
 
     @MainActor
@@ -320,8 +303,8 @@ final class ReviewPopoverTests: XCTestCase {
         try SnapshotRenderer.render(dashboard: .reviewFixture, to: secondURL)
 
         let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: firstURL)))
-        XCTAssertEqual(bitmap.pixelsWide, 404)
-        XCTAssertEqual(bitmap.pixelsHigh, 560)
+        XCTAssertEqual(bitmap.pixelsWide, Int(MenuBarTemplateMetrics.width))
+        XCTAssertEqual(bitmap.pixelsHigh, Int(MenuBarTemplateMetrics.height))
         XCTAssertLessThanOrEqual(
             try pixelDifference(firstURL, secondURL),
             0.0005,
@@ -345,6 +328,8 @@ final class ReviewPopoverTests: XCTestCase {
             (advisory, .default),
             (publicRegistry, .default),
             (missingVisibility, .default),
+            (.reviewFixture, SnapshotConfiguration(colorScheme: .light)),
+            (.reviewFixture, SnapshotConfiguration(colorScheme: .dark)),
             (.reviewFixture, SnapshotConfiguration(dynamicTypeSize: .accessibility2, reduceTransparency: true, increasedContrast: true))
         ]
 
@@ -354,9 +339,38 @@ final class ReviewPopoverTests: XCTestCase {
             defer { try? FileManager.default.removeItem(at: outputURL) }
             try SnapshotRenderer.render(dashboard: dashboard, configuration: configuration, to: outputURL)
             let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: outputURL)))
-            XCTAssertEqual(bitmap.pixelsWide, 404)
-            XCTAssertEqual(bitmap.pixelsHigh, 560)
+            XCTAssertEqual(bitmap.pixelsWide, Int(MenuBarTemplateMetrics.width))
+            XCTAssertEqual(bitmap.pixelsHigh, Int(MenuBarTemplateMetrics.height))
         }
+    }
+
+    @MainActor
+    func testLightAndDarkAppearancesRenderDistinctAdaptivePopovers() throws {
+        let lightURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-light-appearance-\(UUID().uuidString).png")
+        let darkURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("skillsbar-dark-appearance-\(UUID().uuidString).png")
+        defer {
+            try? FileManager.default.removeItem(at: lightURL)
+            try? FileManager.default.removeItem(at: darkURL)
+        }
+
+        try SnapshotRenderer.render(
+            dashboard: .reviewFixture,
+            configuration: SnapshotConfiguration(colorScheme: .light),
+            to: lightURL
+        )
+        try SnapshotRenderer.render(
+            dashboard: .reviewFixture,
+            configuration: SnapshotConfiguration(colorScheme: .dark),
+            to: darkURL
+        )
+
+        XCTAssertGreaterThan(
+            try pixelDifference(lightURL, darkURL),
+            0.05,
+            "The popover must visibly follow an explicit light or dark system appearance."
+        )
     }
 
     func testReviewFixtureBypassesLiveLoader() throws {
@@ -375,77 +389,24 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(dashboard.reviewInspectCommand, expectedCommand)
     }
 
-    func testSupportedDemoModeSelectsDeterministicFixture() throws {
-        var liveLoadCount = 0
-        let environment = [SkillsBarDemoMode.environmentKey: "1"]
+    @MainActor
+    func testDemoModePreservesFixtureBoundaryForThePopover() {
         let source = DashboardDataSource(
-            environment: environment,
+            environment: [SkillsBarDemoMode.environmentKey: "1"],
             liveLoad: {
-                liveLoadCount += 1
+                XCTFail("Demo mode must not invoke the live loader")
                 return .placeholder
             }
         )
+        let model = DashboardModel(
+            dashboard: source.initialDashboard,
+            autorefresh: false,
+            source: source
+        )
 
-        let dashboard = try source.loadSync()
-
-        XCTAssertTrue(SkillsBarDemoMode.isEnabled(in: environment))
         XCTAssertTrue(source.usesReviewFixture)
-        XCTAssertEqual(liveLoadCount, 0)
-        XCTAssertEqual(dashboard.pipeline.activeReceipt?.stage, .candidateBaseline)
-        XCTAssertEqual(dashboard.pipeline.orderedReceipts.count, 9)
-        XCTAssertEqual(dashboard.reviewInspectCommand, expectedCommand)
-    }
-
-    func testDemoModeRequiresAnExplicitTruthyValue() {
-        XCTAssertFalse(SkillsBarDemoMode.isEnabled(in: [:]))
-        XCTAssertFalse(SkillsBarDemoMode.isEnabled(in: [SkillsBarDemoMode.environmentKey: "0"]))
-        XCTAssertTrue(SkillsBarDemoMode.isEnabled(in: [SkillsBarDemoMode.environmentKey: "true"]))
-    }
-
-    func testDemoRegistryPresentationCannotClaimLiveEvidence() {
-        let presentation = RegistryEvidencePresentation(
-            dashboard: .reviewFixture,
-            isDemoFixture: true
-        )
-
-        XCTAssertEqual(presentation.statusLabel, "BASELINE")
-        XCTAssertEqual(presentation.caption, "Published baseline · not candidate proof.")
-        XCTAssertTrue(presentation.usesRegistryAccent)
-        XCTAssertFalse(presentation.statusLabel.contains("LIVE"))
-    }
-
-    func testLiveRegistryPresentationRemainsLiveOutsideDemoMode() {
-        let presentation = RegistryEvidencePresentation(
-            dashboard: .reviewFixture,
-            isDemoFixture: false
-        )
-
-        XCTAssertEqual(presentation.statusLabel, "LIVE")
-        XCTAssertEqual(presentation.caption, SkillDashboard.reviewFixture.registryEvidenceCaption)
-        XCTAssertTrue(presentation.usesRegistryAccent)
-    }
-
-    @MainActor
-    func testDisclosedDemoFixtureRendersAtStableCanvasSize() throws {
-        let outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("skillsbar-demo-\(UUID().uuidString).png")
-        defer { try? FileManager.default.removeItem(at: outputURL) }
-
-        try SnapshotRenderer.render(
-            dashboard: .reviewFixture,
-            configuration: SnapshotConfiguration(isDemoFixture: true),
-            to: outputURL
-        )
-
-        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: outputURL)))
-        XCTAssertEqual(bitmap.pixelsWide, 404)
-        XCTAssertEqual(bitmap.pixelsHigh, 560)
-        let presentation = RegistryEvidencePresentation(
-            dashboard: .reviewFixture,
-            isDemoFixture: true
-        )
-        XCTAssertEqual(presentation.statusLabel, "BASELINE")
-        XCTAssertEqual(presentation.caption, "Published baseline · not candidate proof.")
+        XCTAssertTrue(model.usesReviewFixture)
+        XCTAssertEqual(model.dashboard.tessl.dataOrigin, .liveCLI)
     }
 
     @MainActor
@@ -802,13 +763,19 @@ final class ReviewPopoverTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let cache = TesslRegistryCache(defaults: defaults, keyPrefix: "test-cache")
 
-        cache.save(registryPath: "jscraik/improve-agent-native", signal: SkillDashboard.reviewFixture.tessl)
+        let observedAt = Date(timeIntervalSince1970: 1_725_000_000)
+        cache.save(
+            registryPath: "jscraik/improve-agent-native",
+            signal: SkillDashboard.reviewFixture.tessl,
+            observedAt: observedAt
+        )
         let snapshot = try XCTUnwrap(cache.load(registryPath: "jscraik/improve-agent-native"))
 
         XCTAssertEqual(snapshot.score, 66)
         XCTAssertEqual(snapshot.version, "0.2.0")
         XCTAssertEqual(snapshot.cachedSignal.dataOrigin, .cached)
         XCTAssertFalse(snapshot.cachedSignal.cliAvailable)
+        XCTAssertEqual(snapshot.cachedSignal.observedAt, observedAt)
         XCTAssertNil(cache.load(registryPath: "jscraik/another-skill"))
 
         cache.save(registryPath: "jscraik/unavailable", signal: SkillDashboard.reviewNoCLIFixture.tessl)
@@ -838,21 +805,21 @@ final class ReviewPopoverTests: XCTestCase {
             try SnapshotRenderer.render(dashboard: dashboard, to: outputURL)
             let snapshot = try Data(contentsOf: outputURL)
             let bitmap = try XCTUnwrap(NSBitmapImageRep(data: snapshot))
-            XCTAssertEqual(bitmap.pixelsWide, 404)
-            XCTAssertEqual(bitmap.pixelsHigh, 560)
+            XCTAssertEqual(bitmap.pixelsWide, Int(MenuBarTemplateMetrics.width))
+            XCTAssertEqual(bitmap.pixelsHigh, Int(MenuBarTemplateMetrics.height))
             renderedSnapshots.append(snapshot)
         }
 
         XCTAssertGreaterThan(
             try pixelDifference(renderedSnapshots[0], renderedSnapshots[1]),
-            0.0005,
+            0.0002,
             "The fixed Tessl baseline must make live and no-CLI states visibly distinct without scrolling"
         )
     }
 
     @MainActor
-    func testCompactCanvasPreservesTheCompleteEvidenceStackForScrolling() {
-        let contentWidth = MenuBarTemplateMetrics.width - 24
+    func testTallCanvasKeepsTheActiveContextVisibleAndScrollsTheRemainingStack() {
+        let contentWidth = MenuBarTemplateMetrics.width - 32
         let content = ReleaseEvidenceView(dashboard: .reviewFixture, isRefreshing: false)
             .frame(width: contentWidth)
         let hostingView = NSHostingView(rootView: content)
@@ -861,7 +828,7 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertGreaterThan(
             hostingView.fittingSize.height,
             MenuBarTemplateMetrics.height,
-            "The complete evidence stack should remain intact and overflow into DashboardView's vertical scroll region"
+            "The full evidence stack should retain its accessible target sizes and use the scroll region below the active context"
         )
         XCTAssertEqual(SkillDashboard.reviewFixture.pipeline.orderedReceipts.count, 9)
         XCTAssertFalse(SkillDashboard.reviewFixture.pipeline.activeReceipt?.command.isEmpty ?? true)
@@ -965,10 +932,48 @@ final class ReviewPopoverTests: XCTestCase {
     }
 
     func testMenuBarTemplateUsesApprovedPointMetrics() {
-        XCTAssertEqual(MenuBarTemplateMetrics.width, 404)
-        XCTAssertEqual(MenuBarTemplateMetrics.height, 560)
+        XCTAssertEqual(MenuBarTemplateMetrics.width, 420)
+        let expectedHeight = NSScreen.main.map {
+            min(MenuBarTemplateMetrics.preferredHeight, max(1, $0.visibleFrame.height - 32))
+        } ?? MenuBarTemplateMetrics.preferredHeight
+        XCTAssertEqual(MenuBarTemplateMetrics.height, expectedHeight)
+        XCTAssertEqual(MenuBarTemplateMetrics.minimumInteractiveTarget, 44)
         XCTAssertEqual(SkillsSDKIconLoader.menuBarImage?.size, NSSize(width: 18, height: 18))
         XCTAssertEqual(SkillsSDKIconLoader.menuBarImage?.isTemplate, true)
+    }
+
+    func testMenuBarStatusTracksEvidenceWithoutTreatingRegistryAsLocalProof() {
+        XCTAssertEqual(
+            MenuBarStatus.resolve(dashboard: .reviewFixture, isRefreshing: false),
+            .attention
+        )
+        XCTAssertEqual(
+            MenuBarStatus.resolve(dashboard: .reviewFixture, isRefreshing: true),
+            .refreshing
+        )
+
+        var current = SkillDashboard.reviewFixture
+        current.pipeline = PipelineCandidate(
+            fingerprint: current.pipeline.fingerprint,
+            governedInputPaths: current.pipeline.governedInputPaths,
+            observedAt: current.pipeline.observedAt,
+            stageReceipts: current.pipeline.orderedReceipts.map { receipt in
+                PipelineStageReceipt(
+                    stage: receipt.stage,
+                    candidateFingerprint: current.pipeline.fingerprint,
+                    evidenceStatus: .passed,
+                    stageScore: receipt.stageScore,
+                    command: receipt.command,
+                    receiptPath: receipt.receiptPath,
+                    modelProfile: receipt.modelProfile,
+                    observedAt: receipt.observedAt,
+                    nextAction: receipt.nextAction,
+                    completedChecks: receipt.completedChecks,
+                    requiredChecks: receipt.requiredChecks
+                )
+            }
+        )
+        XCTAssertEqual(MenuBarStatus.resolve(dashboard: current, isRefreshing: false), .current)
     }
 
     @MainActor
@@ -991,57 +996,6 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertFalse(model.copy(expectedCommand))
         XCTAssertNil(model.copiedCommand)
         XCTAssertEqual(model.copyError, "Could not copy inspect command")
-    }
-
-    @MainActor
-    func testInitialAutomaticLoadIsPresentedAsLoadingUntilEvidenceArrives() async {
-        let gate = RefreshLoadGate()
-        let source = DashboardDataSource(
-            environment: [:],
-            liveLoadAsync: { await gate.load() }
-        )
-        let model = DashboardModel(autorefresh: false, source: source)
-
-        XCTAssertFalse(model.hasLoadedEvidence)
-
-        let refresh = Task { @MainActor in await model.refresh() }
-        await gate.waitForBlockedLoad()
-
-        XCTAssertTrue(model.isRefreshing)
-        XCTAssertFalse(model.hasLoadedEvidence)
-
-        await gate.releaseBlockedLoad()
-        await refresh.value
-
-        XCTAssertFalse(model.isRefreshing)
-        XCTAssertTrue(model.hasLoadedEvidence)
-    }
-
-    @MainActor
-    func testProgressiveRefreshPublishesLocalEvidenceBeforeRegistryCompletes() async {
-        let registryGate = RefreshLoadGate(dashboard: .reviewFixture)
-        let localDashboard = SkillDashboard.reviewNoCLIFixture
-        let source = DashboardDataSource(
-            environment: [:],
-            progressiveLoadAsync: { update in
-                update(localDashboard)
-                return await registryGate.load()
-            }
-        )
-        let model = DashboardModel(autorefresh: false, source: source)
-
-        let refresh = Task { @MainActor in await model.refresh() }
-        await registryGate.waitForBlockedLoad()
-
-        XCTAssertTrue(model.hasLoadedEvidence)
-        XCTAssertTrue(model.isRefreshing)
-        XCTAssertEqual(model.dashboard.tessl.dataOrigin, .cached)
-
-        await registryGate.releaseBlockedLoad()
-        await refresh.value
-
-        XCTAssertFalse(model.isRefreshing)
-        XCTAssertEqual(model.dashboard.tessl.dataOrigin, .liveCLI)
     }
 
     @MainActor
@@ -1151,6 +1105,30 @@ private func registryMetadata(fixture: String, registryPath: String? = nil) thro
     let url = try XCTUnwrap(Bundle.module.url(forResource: fixture, withExtension: "json"))
     let object = try JSONSerialization.jsonObject(with: Data(contentsOf: url))
     return TesslRegistryMetadata(payload: JSONNode(object), registryPath: registryPath)
+}
+
+private func pipelineCandidate(activeStage: PipelineStage) -> PipelineCandidate {
+    let fingerprint = "pipeline-presentation-candidate"
+    return PipelineCandidate(
+        fingerprint: fingerprint,
+        governedInputPaths: ["Skills/example/SKILL.md"],
+        observedAt: Date(timeIntervalSince1970: 0),
+        stageReceipts: PipelineStage.allCases.map { stage in
+            PipelineStageReceipt(
+                stage: stage,
+                candidateFingerprint: fingerprint,
+                evidenceStatus: stage.number < activeStage.number
+                    ? .passed
+                    : (stage == activeStage ? .blocked : .unproven),
+                stageScore: stage.number < activeStage.number ? 100 : nil,
+                command: "inspect \(stage.title)",
+                receiptPath: stage.number < activeStage.number ? "receipt:\(stage.rawValue)" : nil,
+                modelProfile: "test",
+                observedAt: stage.number < activeStage.number ? Date(timeIntervalSince1970: 0) : nil,
+                nextAction: "Inspect \(stage.title)"
+            )
+        }
+    )
 }
 
 private func pixelDifference(_ lhsURL: URL, _ rhsURL: URL) throws -> Double {

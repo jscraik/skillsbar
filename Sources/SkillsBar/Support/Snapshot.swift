@@ -16,7 +16,9 @@ struct SnapshotConfiguration {
     var dynamicTypeSize: DynamicTypeSize = .large
     var reduceTransparency = false
     var increasedContrast = false
-    var isDemoFixture = false
+    /// `nil` inherits the host appearance. Snapshot tests set an explicit
+    /// scheme so light and dark rendering stay independently verifiable.
+    var colorScheme: ColorScheme? = nil
 
     static let `default` = SnapshotConfiguration()
 }
@@ -56,11 +58,7 @@ enum SnapshotRenderer {
         do {
             _ = NSApplication.shared
             let dashboard = try DashboardDataSource().loadSync()
-            try render(
-                dashboard: dashboard,
-                configuration: SnapshotConfiguration(isDemoFixture: SkillsBarDemoMode.isEnabled()),
-                to: outputURL
-            )
+            try render(dashboard: dashboard, to: outputURL)
             print("Wrote snapshot \(outputURL.path)")
         } catch {
             fputs("Snapshot failed: \(error.localizedDescription)\n", stderr)
@@ -79,15 +77,28 @@ enum SnapshotRenderer {
         configuration: SnapshotConfiguration,
         to outputURL: URL
     ) throws {
-        let model = DashboardModel(dashboard: dashboard, autorefresh: false)
-        let view = DashboardView(model: model, isDemoFixture: configuration.isDemoFixture)
+        // Preserve fixture selection in snapshot mode so a review fixture cannot
+        // silently become a live dashboard during model construction.
+        let source = DashboardDataSource()
+        let model = DashboardModel(dashboard: dashboard, autorefresh: false, source: source)
+        let view = DashboardView(model: model)
             .frame(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
-            .background(Color.black)
             .environment(\.dynamicTypeSize, configuration.dynamicTypeSize)
             .environment(\.skillsBarReduceTransparencyOverride, configuration.reduceTransparency)
             .environment(\.skillsBarIncreasedContrastOverride, configuration.increasedContrast)
             .environment(\.skillsBarSnapshotMode, true)
+            .preferredColorScheme(configuration.colorScheme)
         let hostingView = NSHostingView(rootView: view)
+        switch configuration.colorScheme {
+        case .light:
+            hostingView.appearance = NSAppearance(named: .aqua)
+        case .dark:
+            hostingView.appearance = NSAppearance(named: .darkAqua)
+        case nil:
+            break
+        @unknown default:
+            break
+        }
         hostingView.frame = NSRect(
             origin: .zero,
             size: NSSize(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)

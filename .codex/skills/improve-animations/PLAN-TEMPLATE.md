@@ -30,19 +30,17 @@ configs, media queries. Never "use a nicer easing":
 /* target */
 .dropdown {
   transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
-  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+  transform-origin: var(--transform-origin);
 }
 ```
 
 ## Repo conventions to follow
 
 How this codebase already does it, with one exemplar the executor should
-imitate (token names, file placement, prop patterns). Populate the token-file
-path from the recon; if no shared token file exists, say so explicitly rather
-than inventing a repository path:
+imitate (token names, file placement, prop patterns):
 
-- Easing tokens live in `<recon-verified-token-file-or-no-shared-token-file>`; add new curves there only when recon confirms the file, e.g. `--ease-out: cubic-bezier(0.23, 1, 0.32, 1);`
-- <exemplar file:line that already does this correctly>
+- Use the repository's actual shared token file discovered during recon; if no shared token file exists, state that explicitly in the plan and keep the curve value local to the affected component.
+- <exemplar file:line that already does this correctly, or `n.a.` with the recon evidence>
 
 ## Steps
 
@@ -58,10 +56,8 @@ than inventing a repository path:
 
 ## Verification
 
-- **Mechanical**: for every check, record `<exact command> -> PASS | FAIL | BLOCKED
-  (<concise evidence or blocker>)`; planned or expected outcomes are not results.
-- **Feel check**: for every interaction, record `<interaction> -> PASS | FAIL |
-  BLOCKED (<concise evidence or blocker>)`, then confirm:
+- **Mechanical**: <exact commands — typecheck, lint, build — with expected outcome>.
+- **Feel check**: run the UI, trigger <interaction>, and confirm:
   - <observable check, e.g. "the dropdown scales from its trigger, not from center">
   - <e.g. "spamming the toggle never restarts the animation from zero">
   - In DevTools, set playback to 10% (Animations panel) and confirm <detail>.
@@ -74,4 +70,4 @@ than inventing a repository path:
 - One plan per finding. If two findings share every file and the same fix pattern (e.g. the same easing token swap across components), they may merge into one plan.
 - Pull every value from [AUDIT.md](AUDIT.md) — never approximate from memory.
 - The feel check is not optional. Motion can be mechanically correct and still feel wrong; give the executor (or the human reviewing the executor's diff) concrete things to watch for in slow motion.
-- After writing plans, create or update `<resolved-plan-directory>/README.md` with: a table of plans (number, title, severity, status), the recommended execution order, and any dependencies between plans. `<resolved-plan-directory>` is the single directory resolved by the skill before plan creation and must be reused for numbering, plan files, and README updates.
+- After writing plans, create or update `plans/README.md` with: a table of plans (number, title, severity, status), the recommended execution order, and any dependencies between plans.

@@ -1,5 +1,5 @@
 import Foundation
-import SkillsBarCore
+@testable import SkillsBarCore
 import XCTest
 
 final class ShellTests: XCTestCase {
@@ -41,6 +41,30 @@ final class ShellTests: XCTestCase {
         let result = Shell.run(command, cwd: URL(fileURLWithPath: "/private/tmp"), timeout: 10)
 
         XCTAssertEqual(result.exitCode, 0)
+    }
+
+    func testSanitizedPathRemovesMiseEntriesAndKeepsRequiredTools() {
+        let result = Shell.sanitizedPath(
+            "/Users/jamie/.local/share/mise/shims:/Users/jamie/.local/bin:/usr/bin:/Users/jamie/.local/share/mise/bin",
+            localBin: "/Users/jamie/.local/bin"
+        )
+
+        XCTAssertFalse(result.split(separator: ":").contains { $0.split(separator: "/").contains("mise") })
+        XCTAssertTrue(result.split(separator: ":").contains("/Users/jamie/.local/bin"))
+        XCTAssertTrue(result.split(separator: ":").contains("/usr/bin"))
+        XCTAssertTrue(result.split(separator: ":").contains("/opt/homebrew/bin"))
+        XCTAssertEqual(result.split(separator: ":").count, Set(result.split(separator: ":")).count)
+    }
+
+    func testRunDisablesMiseConfigForSdkChildren() {
+        let result = Shell.run(
+            "printf '%s\\n' \"$MISE_NO_CONFIG\" \"$MISE_NO_ENV\" \"$MISE_NO_HOOKS\" \"$MISE_CONFIG_FILE\"",
+            cwd: URL(fileURLWithPath: "/private/tmp"),
+            timeout: 5
+        )
+
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(result.stdout, "1\n1\n1\n/dev/null\n")
     }
 
     func testRunCapturesLargeStdoutAndStderrWithoutDeadlock() {
