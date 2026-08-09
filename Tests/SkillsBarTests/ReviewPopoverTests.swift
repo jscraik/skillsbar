@@ -934,7 +934,7 @@ final class ReviewPopoverTests: XCTestCase {
     func testMenuBarTemplateUsesApprovedPointMetrics() {
         XCTAssertEqual(MenuBarTemplateMetrics.width, 420)
         let expectedHeight = NSScreen.main.map {
-            min(MenuBarTemplateMetrics.preferredHeight, max(640, $0.visibleFrame.height - 32))
+            min(MenuBarTemplateMetrics.preferredHeight, max(1, $0.visibleFrame.height - 32))
         } ?? MenuBarTemplateMetrics.preferredHeight
         XCTAssertEqual(MenuBarTemplateMetrics.height, expectedHeight)
         XCTAssertEqual(MenuBarTemplateMetrics.minimumInteractiveTarget, 44)

@@ -578,6 +578,13 @@ private struct NextRequiredCard: View {
                             .foregroundStyle(.bodyText)
                     }
                     .layoutPriority(1)
+                    Text(receipt.command)
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        .foregroundStyle(.secondaryText)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 170, alignment: .leading)
                     Spacer(minLength: 4)
                     Button {
                         feedback.copy(receipt.command)
@@ -687,9 +694,20 @@ private struct ReleaseGateRow: View {
         receipt.evidenceStatus == .blocked ? .warningAccent : receipt.evidenceStatus.tone.color
     }
     private var actionLabel: String {
+        if let completedChecks = receipt.completedChecks,
+           let requiredChecks = receipt.requiredChecks,
+           requiredChecks > 0,
+           completedChecks < requiredChecks {
+            return "\(completedChecks) / \(requiredChecks) checks"
+        }
         if receipt.evidenceStatus == .unproven { return "Binding required" }
         if receipt.evidenceStatus == .held { return "Held observation" }
         return receipt.compactActionLabel
+    }
+
+    private var stateTone: Color {
+        if receipt.evidenceStatus == .passed { return .successAccent }
+        return isActive ? presentationTone : .bodyText
     }
 
     var body: some View {
@@ -706,11 +724,11 @@ private struct ReleaseGateRow: View {
                             .lineLimit(1)
                         HStack(spacing: 5) {
                             Circle()
-                                .fill(isActive ? presentationTone : Color.pendingAccent)
+                                .fill(stateTone)
                                 .frame(width: 8, height: 8)
                             Text(receipt.evidenceStatus.label.uppercased())
                                 .releaseFont(12, weight: isActive ? .medium : .regular, relativeTo: .caption)
-                                .foregroundStyle(isActive ? presentationTone : .bodyText)
+                                .foregroundStyle(stateTone)
                             Text("•")
                                 .foregroundStyle(.secondaryText)
                             Text(actionLabel)
@@ -795,6 +813,11 @@ private struct GateSymbol: View {
         receipt.evidenceStatus == .blocked ? .warningAccent : receipt.evidenceStatus.tone.color
     }
 
+    private var symbolTone: Color {
+        if receipt.evidenceStatus == .passed { return .successAccent }
+        return isActive ? presentationTone : .bodyText
+    }
+
     var body: some View {
         Group {
             if receipt.evidenceStatus == .unproven {
@@ -813,7 +836,7 @@ private struct GateSymbol: View {
                         .fill(Color.primary.opacity(0.08))
                     Circle()
                         .stroke(
-                            isActive ? presentationTone.opacity(0.72) : Color.secondaryText.opacity(0.65),
+                            symbolTone.opacity(isActive || receipt.evidenceStatus == .passed ? 0.72 : 0.65),
                             lineWidth: 1.5
                     )
                     Text(String(format: "%02d", receipt.stage.number))
@@ -823,7 +846,7 @@ private struct GateSymbol: View {
                 .frame(width: isActive ? 44 : 34, height: isActive ? 44 : 34)
             }
         }
-        .foregroundStyle(isActive ? presentationTone : .bodyText)
+        .foregroundStyle(symbolTone)
         .padding(.top, isActive ? 0 : 1)
         .accessibilityHidden(true)
     }
@@ -887,6 +910,12 @@ private struct TesslEvidenceCard: View {
                         .foregroundStyle(.bodyText)
                         .lineLimit(1)
                         .monospacedDigit()
+                    Text(dashboard.registryPath)
+                        .releaseFont(11.5, weight: .regular, relativeTo: .caption2)
+                        .foregroundStyle(.secondaryText)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help("Tessl package identity: \(dashboard.registryPath)")
                 }
                 Spacer(minLength: 4)
                 VStack(alignment: .trailing, spacing: 5) {

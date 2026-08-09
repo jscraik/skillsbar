@@ -77,7 +77,10 @@ enum SnapshotRenderer {
         configuration: SnapshotConfiguration,
         to outputURL: URL
     ) throws {
-        let model = DashboardModel(dashboard: dashboard, autorefresh: false)
+        // Preserve fixture selection in snapshot mode so a review fixture cannot
+        // silently become a live dashboard during model construction.
+        let source = DashboardDataSource()
+        let model = DashboardModel(dashboard: dashboard, autorefresh: false, source: source)
         let view = DashboardView(model: model)
             .frame(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
             .environment(\.dynamicTypeSize, configuration.dynamicTypeSize)

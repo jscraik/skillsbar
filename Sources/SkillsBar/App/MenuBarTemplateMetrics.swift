@@ -8,7 +8,7 @@ enum MenuBarTemplateMetrics {
     static let preferredHeight: CGFloat = 1_180
     static var height: CGFloat {
         guard let visibleFrame = NSScreen.main?.visibleFrame else { return preferredHeight }
-        return min(preferredHeight, max(640, visibleFrame.height - 32))
+        return min(preferredHeight, max(1, visibleFrame.height - 32))
     }
     static let minimumInteractiveTarget: CGFloat = 44
 }
