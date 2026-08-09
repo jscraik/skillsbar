@@ -887,7 +887,9 @@ private struct TesslEvidenceCard: View {
         return "v" + version.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
     }
     private var observedText: String {
-        let observation = dashboard.tessl.observedAt ?? dashboard.refreshedAt
+        guard let observation = dashboard.tessl.observedAt ?? (isLive ? dashboard.refreshedAt : nil) else {
+            return "last observation unavailable"
+        }
         let elapsed = Date().timeIntervalSince(observation)
         guard observation.timeIntervalSince1970 > 0, elapsed >= 0 else { return "last observation unavailable" }
         if elapsed < 60 { return "observed \(max(1, Int(elapsed.rounded())))s ago" }
