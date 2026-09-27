@@ -266,6 +266,52 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
         }
     }
 
+    func testProductionCandidateRejectsInputsChangedDuringCollection() throws {
+        try withRepo { root in
+            let bound = try DashboardLoader.collectEvidence(root: root, selectedSkillPath: selectedSkillPath) {
+                try "# Changed while checking".write(
+                    to: root.appendingPathComponent(selectedSkillPath), atomically: true, encoding: .utf8
+                )
+                return makeChecks(digest: digest)
+            }
+
+            let candidate = DashboardLoader.productionPipelineCandidate(
+                root: root, selectedSkillPath: selectedSkillPath,
+                evidenceFingerprint: bound.candidateFingerprint, checks: bound.evidence,
+                tessl: SkillDashboard.reviewFixture.tessl
+            )
+
+            XCTAssertNotEqual(candidate.fingerprint, bound.candidateFingerprint)
+            XCTAssertTrue(candidate.orderedReceipts.prefix(4).allSatisfy { $0.evidenceStatus == .stale })
+            XCTAssertEqual(candidate.postureScore, 0)
+        }
+    }
+
+    func testProductionCandidateAcceptsStableInputAndRejectsRemovedInput() throws {
+        try withRepo { root in
+            let bound = DashboardLoader.collectEvidence(root: root, selectedSkillPath: selectedSkillPath) {
+                makeChecks(digest: digest)
+            }
+            func candidate() -> PipelineCandidate {
+                DashboardLoader.productionPipelineCandidate(
+                    root: root, selectedSkillPath: selectedSkillPath,
+                    evidenceFingerprint: bound.candidateFingerprint, checks: bound.evidence,
+                    tessl: SkillDashboard.reviewFixture.tessl
+                )
+            }
+
+            XCTAssertEqual(
+                candidate().orderedReceipts.prefix(4).map(\.evidenceStatus),
+                Array(repeating: .passed, count: 4)
+            )
+
+            try FileManager.default.removeItem(at: root.appendingPathComponent(selectedSkillPath))
+
+            XCTAssertEqual(candidate().fingerprint, "unreadable-candidate")
+            XCTAssertTrue(candidate().orderedReceipts.allSatisfy { $0.evidenceStatus == .unproven })
+        }
+    }
+
     private func makeLoader(
         root: URL,
         checks: PipelineEvidenceLoader.LocalChecks? = nil,
