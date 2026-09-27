@@ -132,6 +132,24 @@ Security presentation is severity-first and shared by local and registry evidenc
 
 Run the narrow checks first, then widen only when the changed surface requires it.
 
+The repository-owned pull-request contract can be checked without SwiftPM or
+third-party dependencies:
+
+```bash
+python3 script/validate_pr_template.py --template .github/PULL_REQUEST_TEMPLATE.md
+python3 script/test_validate_pr_template.py
+```
+
+To validate a completed PR body, keep the body file inside the checkout and
+run:
+
+```bash
+python3 script/validate_pr_template.py --body-file .pr-body.md --json
+```
+
+The validator proves local template shape and body-format rules only. It does
+not prove hosted CI, GitHub review state, merge readiness, or release status.
+
 ```bash
 HOME=/private/tmp/skillsbar-home \
 XDG_CACHE_HOME=/private/tmp/skillsbar-xdg \
