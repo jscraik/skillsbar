@@ -23,28 +23,34 @@ test("server-renders the SkillsBar evidence landing page", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>When evidence goes stale · SkillsBar<\/title>/i);
-  assert.match(html, /When evidence goes stale/);
+  assert.match(html, /<title>A score is not a candidate · SkillsBar<\/title>/i);
+  assert.match(html, /A score is not a candidate/);
   assert.match(html, /Build/);
   assert.match(html, /Prove/);
   assert.match(html, /Ship/);
   assert.match(html, /Candidate digest is missing/);
-  assert.match(html, /SUPPORTED DEMO FIXTURE/);
-  assert.match(html, /NATIVE APP CAPTURE/);
-  assert.match(html, /Use this explainer in Q&amp;A; the native app is the product demo\./);
+  assert.match(html, /Supported demo fixture/);
+  assert.match(html, /App-rendered snapshot/);
+  assert.match(html, /skillsbar-demo-render\.webp/);
+  assert.match(html, /skillsbar-icon-168\.webp/);
+  assert.match(html, /This walkthrough explains the model; the native app is the product demo\./);
   assert.doesNotMatch(html, /Run the proof/);
   assert.match(html, /Inspect all nine evidence gates/);
-  assert.match(html, /CONCEPT MOCKUP/);
-  assert.match(html, /NOT RUNTIME EVIDENCE/);
+  assert.match(html, /Concept mockup/);
+  assert.match(html, /Not runtime evidence/);
+  assert.match(html, /Open full-size diagram/);
+  assert.match(html, /Close atlas/);
+  assert.doesNotMatch(html, /data-reveal/);
   assert.match(html, /Meaningful use of Codex/);
-  assert.match(html, /Fixture disclosure\. Build receipt\. Launch receipt\./);
+  assert.match(html, /The fixture says what it is\./);
   assert.doesNotMatch(html, /LIVE PRODUCT CAPTURE/);
   assert.doesNotMatch(html, /Safe to release|Production ready|Live runtime proof/i);
 });
 
 test("keeps four views and nine gates in one fixed evidence scenario", async () => {
   const page = await readFile(new URL("app/page.tsx", root), "utf8");
-  const beatNumbers = [...page.matchAll(/number: "0[1-4]"/g)];
+  const interactive = await readFile(new URL("app/interactive-evidence.tsx", root), "utf8");
+  const beatNumbers = [...interactive.matchAll(/number: "0[1-4]"/g)];
   const gateNames = [
     "Candidate identity",
     "Mechanical validation",
@@ -58,14 +64,15 @@ test("keeps four views and nine gates in one fixed evidence scenario", async () 
   ];
 
   assert.equal(beatNumbers.length, 7, "four beats plus three chapter numbers should be declared");
-  for (const gateName of gateNames) assert.match(page, new RegExp(gateName.replace("&", "&")));
-  assert.match(page, /const scenarioStatuses/);
-  assert.match(page, /const cameraPositions/);
-  assert.match(page, /camera: "overview" as Camera/);
-  assert.match(page, /event\.key === "ArrowRight" \|\| event\.key === " "/);
-  assert.match(page, /event\.key === "ArrowLeft"/);
-  assert.match(page, /event\.key\.toLowerCase\(\) === "r"/);
-  assert.match(page, /aria-live="polite"/);
+  for (const gateName of gateNames) assert.match(interactive, new RegExp(gateName.replace("&", "&")));
+  assert.doesNotMatch(page, /"use client"/);
+  assert.match(interactive, /const scenarioStatuses/);
+  assert.match(interactive, /const cameraPositions/);
+  assert.match(interactive, /camera: "overview" as Camera/);
+  assert.match(interactive, /event\.key === "ArrowRight" \|\| event\.key === " "/);
+  assert.match(interactive, /event\.key === "ArrowLeft"/);
+  assert.match(interactive, /event\.key\.toLowerCase\(\) === "r"/);
+  assert.match(interactive, /aria-live="polite"/);
 });
 
 test("ships an opaque, non-empty repository QR code", async () => {
