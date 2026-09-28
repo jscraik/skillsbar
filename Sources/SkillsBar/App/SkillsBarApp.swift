@@ -7,7 +7,10 @@ struct SkillsBarApp: App {
 
     init() {
         if let outputPath = SnapshotRequest.outputPath {
-            SnapshotRenderer.render(to: URL(fileURLWithPath: outputPath))
+            SnapshotRenderer.render(
+                to: URL(fileURLWithPath: outputPath),
+                configuration: SnapshotRequest.configuration()
+            )
             Foundation.exit(0)
         }
     }

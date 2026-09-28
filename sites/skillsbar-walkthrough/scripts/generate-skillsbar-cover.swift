@@ -117,8 +117,8 @@ draw("SkillsBar", in: CGRect(x: 132, y: 800, width: 220, height: 34), font: font
 draw("by brAInwav", in: CGRect(x: 134, y: 780, width: 160, height: 20), font: font(size: 12, weight: .medium), color: color(0x6d6b66), tracking: 0.25)
 
 draw("OPENAI HACKATHON · BUILT WITH CODEX", in: CGRect(x: 62, y: 691, width: 510, height: 22), font: font(name: "SFMono-Semibold", size: 12, weight: .semibold), color: color(0x55575b), tracking: 1.3)
-draw("When evidence\ngoes stale.", in: CGRect(x: 58, y: 350, width: 600, height: 310), font: font(name: "SF Pro Display", size: 92, weight: .bold), color: paperInk, lineHeight: 91, tracking: -4.2)
-draw("A changed Skill can still look healthy when its registry score belongs to yesterday’s candidate.", in: CGRect(x: 62, y: 236, width: 548, height: 90), font: font(size: 23, weight: .regular), color: color(0x4f5155), lineHeight: 33)
+draw("A score is not\na candidate.", in: CGRect(x: 58, y: 350, width: 600, height: 310), font: font(name: "SF Pro Display", size: 92, weight: .bold), color: paperInk, lineHeight: 91, tracking: -4.2)
+draw("A published score cannot prove a local skill whose package digest is missing.", in: CGRect(x: 62, y: 236, width: 548, height: 90), font: font(size: 23, weight: .regular), color: color(0x4f5155), lineHeight: 33)
 draw("CONCEPT MOCKUP · NOT RUNTIME EVIDENCE", in: CGRect(x: 62, y: 64, width: 470, height: 22), font: font(name: "SFMono-Regular", size: 11), color: color(0x6f6c67), tracking: 1.25)
 
 let technicalX: CGFloat = 720

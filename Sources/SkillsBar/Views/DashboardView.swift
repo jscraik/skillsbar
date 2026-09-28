@@ -38,7 +38,10 @@ struct DashboardView: View {
                     .padding(24)
             }
         }
-        .frame(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
+        .frame(
+            width: MenuBarTemplateMetrics.width,
+            height: snapshotMode ? MenuBarTemplateMetrics.preferredHeight : MenuBarTemplateMetrics.height
+        )
         .foregroundStyle(.primaryText)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(alignment: .topTrailing) {

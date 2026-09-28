@@ -51,6 +51,9 @@ export default defineConfig(async () => {
       vinext(),
       sites(),
       cloudflare({
+        // The presentation demo uses local assets and no remote services.
+        remoteBindings: false,
+        tunnel: false,
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: localBindingConfig,
       }),
