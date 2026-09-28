@@ -35,8 +35,10 @@ const cameraPositions: Record<Exclude<Camera, "overview">, string> = {
   build: "0%", prove: "-33.333%", ship: "-66.666%",
 };
 
+/** Return the display label for a gate in the fixed candidate scenario. */
 const statusLabel = (status: GateStatus) => status === "required" ? "Required" : "Held";
 
+/** Render the fixed evidence gates, focusing the camera or hiding details in compact mode. */
 export function CandidateRail({ camera = "overview", compact = false }: { camera?: Camera; compact?: boolean }) {
   const railStyle: CSSProperties & { "--camera-x": string } = {
     "--camera-x": camera === "overview" ? "0%" : cameraPositions[camera],
@@ -71,6 +73,7 @@ export function CandidateRail({ camera = "overview", compact = false }: { camera
   );
 }
 
+/** Show the selectable identity command with clipboard feedback and a manual-copy fallback. */
 export function CopyCommand({ className, label }: { className: string; label?: string }) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "unavailable">("idle");
 
@@ -80,6 +83,7 @@ export function CopyCommand({ className, label }: { className: string; label?: s
     return () => window.clearTimeout(timeout);
   }, [copyState]);
 
+  /** Copy the command and announce success or clipboard unavailability. */
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(command);
@@ -99,12 +103,14 @@ export function CopyCommand({ className, label }: { className: string; label?: s
   );
 }
 
+/** Navigate four views of one evidence scenario using buttons or scoped keyboard shortcuts. */
 export function Walkthrough() {
   const [activeBeat, setActiveBeat] = useState(0);
   const [inputMode, setInputMode] = useState<"pointer" | "keyboard">("pointer");
   const beat = beats[activeBeat];
 
   useEffect(() => {
+    /** Handle unmodified walkthrough shortcuts while preserving nested controls and command selection. */
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.target instanceof HTMLElement)) return;
       const target = event.target;

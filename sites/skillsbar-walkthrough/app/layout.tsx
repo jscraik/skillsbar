@@ -11,6 +11,7 @@ export const viewport: Viewport = {
   themeColor: "#101216",
 };
 
+/** Build page and social-preview metadata using the walkthrough's local image assets. */
 export function generateMetadata(): Metadata {
   const socialImage = "/og.png";
   return {
@@ -35,6 +36,7 @@ export function generateMetadata(): Metadata {
   };
 }
 
+/** Wrap the walkthrough in an English document using the shared global styles. */
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">

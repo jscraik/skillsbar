@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { CandidateRail, CopyCommand, Walkthrough } from "./interactive-evidence";
 
+/** Render the landing page with native-demo evidence, the interactive scenario, and source links. */
 export default function Home() {
   return (
     <main>
