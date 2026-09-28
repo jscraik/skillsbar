@@ -15,12 +15,12 @@
     "assets:cover": "xcrun swift scripts/generate-skillsbar-cover.swift public/og.png"
   },
   "dependencies": {
-    "next": "16.3.0",
+    "next": "16.3.6",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.51.1",
+    "@cloudflare/vite-plugin": "1.61.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
@@ -36,7 +36,7 @@
     "typescript": "5.9.3",
     "vinext": "0.0.50",
     "vite": "8.1.5",
-    "wrangler": "4.120.0"
+    "wrangler": "4.142.0"
   },
   "type": "module",
   "overrides": {
