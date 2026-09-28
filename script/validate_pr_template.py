@@ -158,6 +158,8 @@ def strip_comments(value: str) -> str:
 
 
 def normalize(value: str) -> str:
+    """Remove comments and enclosing code markers, then collapse whitespace."""
+
     value = strip_comments(value).strip()
     fenced = re.fullmatch(r"```[\w-]*\s*([\s\S]*?)\s*```", value)
     if fenced:
@@ -193,11 +195,15 @@ def extract_field(section_body: str, label: str) -> str | None:
 
 
 def field_value(body: str, section: str, label: str) -> str | None:
+    """Return a normalized field value, or None if its section or label is absent."""
+
     section_body = extract_section(body, section)
     return extract_field(section_body, label) if section_body is not None else None
 
 
 def missing_sections(body: str) -> list[str]:
+    """Report required headings that have no matching section in the body."""
+
     return [
         f"Missing required section: {section}"
         for section in REQUIRED_SECTIONS
@@ -206,6 +212,8 @@ def missing_sections(body: str) -> list[str]:
 
 
 def field_errors(body: str) -> list[str]:
+    """Report missing or empty required fields and unexplained n.a. values."""
+
     errors: list[str] = []
     for section, labels in REQUIRED_FIELDS.items():
         section_body = extract_section(body, section)
@@ -224,6 +232,8 @@ def field_errors(body: str) -> list[str]:
 
 
 def release_boundary_errors(body: str) -> list[str]:
+    """Check that a supplied release mode is concrete or has an n.a. reason."""
+
     value = field_value(body, "## Release boundary", "Release mode")
     if value is None:
         return []
@@ -235,6 +245,8 @@ def release_boundary_errors(body: str) -> list[str]:
 
 
 def checklist_errors(body: str) -> list[str]:
+    """Check checklist identity, order, and explicit status for unchecked items."""
+
     checklist = extract_section(body, "## Checklist")
     if checklist is None:
         return ["Missing checklist block."]
@@ -246,6 +258,8 @@ def checklist_errors(body: str) -> list[str]:
     expected = [line.strip() for line in template_checklist.splitlines() if CHECKBOX_RE.match(line.strip())]
 
     def item_text(item: str) -> str:
+        """Remove checkbox and status markers to compare checklist wording."""
+
         return STATUS_MARKER_RE.sub("", CHECKBOX_RE.sub("", item)).strip()
 
     if [item_text(item) for item in expected] != list(REQUIRED_CHECKLIST_ITEMS):
@@ -263,6 +277,8 @@ def checklist_errors(body: str) -> list[str]:
 
 
 def command_evidence_errors(body: str) -> list[str]:
+    """Require command evidence with recognized outcomes and blocked reasons."""
+
     validation = extract_section(body, "## Validation")
     if validation is None:
         return []
@@ -288,6 +304,8 @@ def command_evidence_errors(body: str) -> list[str]:
 
 
 def linked_issue_errors(body: str) -> list[str]:
+    """Check issue references and acceptance evidence for completion or deferral."""
+
     plan_ids = field_value(body, "## Change details", "Plan IDs") or ""
     linear_reference = field_value(body, "## Change details", "Linear reference") or ""
     relationship = field_value(body, "## Change details", "Linked issue relationship") or ""
@@ -342,6 +360,8 @@ def linked_issue_errors(body: str) -> list[str]:
 
 
 def placeholder_errors(body: str) -> list[str]:
+    """Report unresolved template placeholders and nonportable evidence paths."""
+
     errors = [f"Replace template placeholder: {placeholder}" for placeholder in TEMPLATE_PLACEHOLDERS if placeholder in body]
     review = extract_section(body, "## Review and closeout")
     if review is not None:
@@ -355,6 +375,8 @@ def placeholder_errors(body: str) -> list[str]:
 
 
 def validate_body(body: str) -> list[str]:
+    """Return contract violations for a filled PR body, ignoring HTML comments."""
+
     if len(body) > MAX_BODY_LENGTH:
         return [f"PR body exceeds maximum length of {MAX_BODY_LENGTH} characters."]
     if not body.strip():
@@ -399,6 +421,8 @@ def validate_template(template: str) -> list[str]:
 
 
 def read_text(path: Path) -> str:
+    """Read UTF-8 text or exit with a diagnostic when the file cannot be read."""
+
     try:
         return path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -406,6 +430,8 @@ def read_text(path: Path) -> str:
 
 
 def render(errors: Iterable[str], as_json: bool) -> None:
+    """Print validation errors or success as JSON or human-readable text."""
+
     errors = list(errors)
     if as_json:
         print(json.dumps({"status": "fail" if errors else "pass", "errors": errors}, indent=2))
@@ -417,6 +443,8 @@ def render(errors: Iterable[str], as_json: bool) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Validate the selected template or body file and return an exit status."""
+
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group()
     source.add_argument(

@@ -90,6 +90,7 @@ VALID_BODY = """## Summary
 
 class PullRequestTemplateValidatorTests(unittest.TestCase):
     def test_missing_or_blank_reviewer_fields_fail(self) -> None:
+        """Reject omitted review fields and fields populated only by comments."""
         for label in ["CodeRabbit", "Codex", "Independent reviewer evidence", "CodeRabbit Semgrep"]:
             for replacement in ["", f"- {label}: <!-- no evidence -->\n"]:
                 with self.subTest(label=label, replacement=replacement):
@@ -97,6 +98,7 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
                     self.assertTrue(validate_body(body))
 
     def test_replaced_removed_or_reordered_checklist_fails(self) -> None:
+        """Reject changes to the required checklist wording, membership, or order."""
         items = re.findall(r"^- \[[ xX]\].*$", VALID_BODY, re.M)
         variants = [
             VALID_BODY.replace(items[0], "- [x] Anything at all."),
@@ -107,17 +109,21 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
             self.assertIn("Checklist must preserve every template item in its original order.", validate_body(body))
 
     def test_comment_cannot_supply_a_review_section(self) -> None:
+        """Treat a review section hidden in an HTML comment as missing."""
         body = VALID_BODY.replace("## Review and closeout", "<!--\n## Review and closeout") + "\n-->"
         self.assertTrue(validate_body(body))
 
     def test_checked_in_template_shape(self) -> None:
+        """Accept the repository template as a valid unfilled contract."""
         with open(".github/PULL_REQUEST_TEMPLATE.md", encoding="utf-8") as template:
             self.assertEqual(validate_template(template.read()), [])
 
     def test_complete_body_passes(self) -> None:
+        """Accept a complete body with explicit validation and review outcomes."""
         self.assertEqual(validate_body(VALID_BODY), [])
 
     def test_html_comments_do_not_fill_blank_fields(self) -> None:
+        """Reject a blank release field even when guidance follows in a comment."""
         body = VALID_BODY.replace(
             "- Completion condition: The template shape and filled-body validator pass locally.",
             "- Completion condition:\n\n<!-- guidance must not count -->",
@@ -128,6 +134,7 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
         )
 
     def test_indented_multiline_field_is_populated(self) -> None:
+        """Accept verification steps supplied as an indented multiline list."""
         body = VALID_BODY.replace(
             "- Verification steps: python3 script/validate_pr_template.py --template .github/PULL_REQUEST_TEMPLATE.md.",
             "- Verification steps:\n  1. Run the local validator.\n  2. Inspect the result.",
@@ -142,6 +149,7 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
         self.assertIn("Missing required summary field: Problem", validate_body(body))
 
     def test_required_not_applicable_field_needs_reason(self) -> None:
+        """Reject a required field marked n.a. without an explanation."""
         body = VALID_BODY.replace(
             "- Risk and rollback: Revert the template and script together.",
             "- Risk and rollback: n.a.",
@@ -149,6 +157,7 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
         self.assertTrue(any("needs a reason for n.a." in error for error in validate_body(body)))
 
     def test_empty_blocked_command_reason_fails(self) -> None:
+        """Reject blocked command reasons that are empty or whitespace only."""
         command = "- Command: `python3 script/validate_pr_template.py --template .github/PULL_REQUEST_TEMPLATE.md` -> pass"
         for reason in ["", "   "]:
             with self.subTest(reason=reason):
@@ -156,6 +165,7 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
                 self.assertTrue(any("Command evidence must use" in error for error in validate_body(body)))
 
     def test_template_requires_fixed_checklist_items(self) -> None:
+        """Reject a template that omits a required checklist item."""
         template = Path(".github/PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
         removed = template.replace(
             "- [ ] Merge is blocked until all required checks pass.\n", ""
@@ -163,6 +173,7 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
         self.assertTrue(any("checklist" in error.lower() for error in validate_template(removed)))
 
     def test_release_mode_must_be_concrete(self) -> None:
+        """Reject the unfilled release-mode options from the template."""
         body = VALID_BODY.replace(
             "- Release mode: Harness",
             "- Release mode: Prototype / Portfolio / Product / Harness / n.a. because reason",
@@ -173,6 +184,7 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
         )
 
     def test_command_evidence_requires_blocked_reason(self) -> None:
+        """Reject a blocked command outcome with no reason attached."""
         body = VALID_BODY.replace(
             "- Command: `python3 script/validate_pr_template.py --template .github/PULL_REQUEST_TEMPLATE.md` -> pass",
             "- Command: `python3 script/validate_pr_template.py --template .github/PULL_REQUEST_TEMPLATE.md` -> blocked",
@@ -180,6 +192,7 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
         self.assertTrue(any("Command evidence must use" in error for error in validate_body(body)))
 
     def test_linked_issue_acceptance_trace_is_issue_bound(self) -> None:
+        """Accept an issue reference tied to a concrete acceptance ID and evidence."""
         body = VALID_BODY.replace(
             "- Plan IDs: n.a. because no external plan is linked.",
             "- Plan IDs: JSC-123",
@@ -196,6 +209,7 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
         self.assertEqual(validate_body(body), [])
 
     def test_local_absolute_paths_are_not_portable_evidence(self) -> None:
+        """Reject evidence that depends on a workstation-specific absolute path."""
         body = VALID_BODY.replace(
             "- Evidence after fix: The validator returned a passing result for the checked-in template.",
             "- Evidence after fix: /Users/example/skillsbar/result.json.",
