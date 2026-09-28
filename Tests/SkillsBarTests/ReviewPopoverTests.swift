@@ -373,6 +373,14 @@ final class ReviewPopoverTests: XCTestCase {
         )
     }
 
+    func testSnapshotDarkFlagPinsTheCaptureAppearance() {
+        XCTAssertNil(SnapshotRequest.configuration(arguments: ["SkillsBar", "--snapshot", "capture.png"]).colorScheme)
+        XCTAssertEqual(
+            SnapshotRequest.configuration(arguments: ["SkillsBar", "--snapshot-dark", "--snapshot", "capture.png"]).colorScheme,
+            .dark
+        )
+    }
+
     func testReviewFixtureBypassesLiveLoader() throws {
         var liveLoadCount = 0
         let source = DashboardDataSource(

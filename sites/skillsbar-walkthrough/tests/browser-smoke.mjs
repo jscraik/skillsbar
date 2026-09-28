@@ -16,10 +16,16 @@ try {
     page.on("pageerror", (error) => pageErrors.push(error.message));
     await page.goto(baseURL, { waitUntil: "networkidle" });
 
+    await page.locator(".atlas-disclosure summary").click();
+    for (const image of await page.locator("img").all()) {
+      await image.scrollIntoViewIfNeeded();
+      await image.evaluate((element) => element.decode().catch(() => {}));
+    }
+
     const layout = await page.evaluate(() => ({
       overflow: document.documentElement.scrollWidth > innerWidth,
       brokenImages: [...document.images]
-        .filter((image) => image.complete && image.naturalWidth === 0)
+        .filter((image) => !image.complete || image.naturalWidth === 0)
         .map((image) => image.src),
       smallButtons: [...document.querySelectorAll("button")]
         .filter((button) => {
@@ -34,8 +40,10 @@ try {
     assert.deepEqual(layout.smallButtons, [], `${width}px page has undersized buttons`);
     assert.deepEqual(pageErrors, [], `${width}px page has JavaScript errors`);
     assert.equal(layout.cameraDuration, "0s", `${width}px reduced-motion camera still animates`);
+    await page.locator(".atlas-disclosure summary").click();
 
     if (width === 390) {
+      await page.goto(baseURL, { waitUntil: "networkidle" });
       await page.keyboard.press("Tab");
       assert.equal(await page.locator(".skip-link").evaluate((link) => link === document.activeElement), true);
       await page.keyboard.press("Enter");

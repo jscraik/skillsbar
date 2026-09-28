@@ -10,6 +10,10 @@ enum SnapshotRequest {
         }
         return args[index + 1]
     }
+
+    static func configuration(arguments: [String] = CommandLine.arguments) -> SnapshotConfiguration {
+        SnapshotConfiguration(colorScheme: arguments.contains("--snapshot-dark") ? .dark : nil)
+    }
 }
 
 struct SnapshotConfiguration {
@@ -54,11 +58,11 @@ extension EnvironmentValues {
 
 enum SnapshotRenderer {
     @MainActor
-    static func render(to outputURL: URL) {
+    static func render(to outputURL: URL, configuration: SnapshotConfiguration = .default) {
         do {
             _ = NSApplication.shared
             let dashboard = try DashboardDataSource().loadSync()
-            try render(dashboard: dashboard, to: outputURL)
+            try render(dashboard: dashboard, configuration: configuration, to: outputURL)
             print("Wrote snapshot \(outputURL.path)")
         } catch {
             fputs("Snapshot failed: \(error.localizedDescription)\n", stderr)

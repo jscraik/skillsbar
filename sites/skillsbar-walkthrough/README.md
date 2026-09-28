@@ -27,7 +27,7 @@ held while the published registry baseline stays visible as separate context.
 ## Proof boundary
 
 - `CONCEPT MOCKUP · NOT RUNTIME EVIDENCE` identifies the system diagram.
-- `SUPPORTED DEMO FIXTURE · APP-RENDERED SNAPSHOT` identifies a render from the packaged app with `SKILLSBAR_DEMO_MODE=1` and `--snapshot`. It does not prove live menu-bar interaction.
+- `SUPPORTED DEMO FIXTURE · APP-RENDERED SNAPSHOT` identifies a render from the packaged app with `SKILLSBAR_DEMO_MODE=1`, `--snapshot-dark`, and `--snapshot`. It does not prove live menu-bar interaction.
 - The expanded nine-gate SVG is a concept evidence atlas, not live product proof.
 - The Tessl baseline remains visually separate from current local proof.
 - SkillsBar exposes evidence and the next command; the release decision remains
@@ -41,15 +41,16 @@ without opening the menu bar:
 ```bash
 SKILLSBAR_BUILD_ROOT="$PWD/.build/skillsbar-demo" bash script/package_app.sh debug
 SKILLSBAR_DEMO_MODE=1 "$PWD/.build/skillsbar-demo/SkillsBar.app/Contents/MacOS/SkillsBar" \
-  --snapshot sites/skillsbar-walkthrough/public/skillsbar-demo-render.png
+  --snapshot-dark --snapshot sites/skillsbar-walkthrough/public/skillsbar-demo-render.png
 cwebp -lossless -exact -m 6 \
   sites/skillsbar-walkthrough/public/skillsbar-demo-render.png \
   -o sites/skillsbar-walkthrough/public/skillsbar-demo-render.webp
 ```
 
 The page serves the WebP, so regenerate it whenever the source PNG changes.
-The conversion uses the `cwebp` command-line tool; the current committed WebP
-matches the output of the command above byte for byte.
+The conversion uses the `cwebp` command-line tool. It reproduces the committed
+WebP byte for byte from the committed PNG; a fresh app capture can change as
+the app evolves, so inspect it before replacing the site fixture.
 
 ## Local validation
 
