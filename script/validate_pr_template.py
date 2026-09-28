@@ -185,7 +185,7 @@ def extract_field(section_body: str, label: str) -> str | None:
 
     escaped = re.escape(label)
     match = re.search(
-        rf"^-\s*{escaped}:[ \t]*([\s\S]*?)(?=\r?\n-\s*[A-Za-z][^\n:]{{0,80}}:|\r?\n##\s|\Z)",
+        rf"^-[ \t]+{escaped}:[ \t]*([\s\S]*?)(?=\r?\n-[ \t]+[A-Za-z][^\n:]{{0,80}}:|\r?\n##[ \t]|\Z)",
         section_body,
         re.I | re.M,
     )

@@ -134,6 +134,13 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
         )
         self.assertEqual(validate_body(body), [])
 
+    def test_field_label_must_follow_bullet_on_same_line(self) -> None:
+        body = VALID_BODY.replace(
+            "- Problem: Maintainers need a consistent, evidence-led PR body.",
+            "-\nProblem: Maintainers need a consistent, evidence-led PR body.",
+        )
+        self.assertIn("Missing required summary field: Problem", validate_body(body))
+
     def test_required_not_applicable_field_needs_reason(self) -> None:
         body = VALID_BODY.replace(
             "- Risk and rollback: Revert the template and script together.",
