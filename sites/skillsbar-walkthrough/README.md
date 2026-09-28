@@ -27,11 +27,22 @@ held while the published registry baseline stays visible as separate context.
 ## Proof boundary
 
 - `CONCEPT MOCKUP · NOT RUNTIME EVIDENCE` identifies the system diagram.
-- `SUPPORTED DEMO FIXTURE · APP-RENDERED SNAPSHOT` identifies a render from the packaged app's `--demo --snapshot` path. It does not prove live menu-bar interaction.
+- `SUPPORTED DEMO FIXTURE · APP-RENDERED SNAPSHOT` identifies a render from the packaged app with `SKILLSBAR_DEMO_MODE=1` and `--snapshot`. It does not prove live menu-bar interaction.
 - The expanded nine-gate SVG is a concept evidence atlas, not live product proof.
 - The Tessl baseline remains visually separate from current local proof.
 - SkillsBar exposes evidence and the next command; the release decision remains
   human.
+
+To regenerate the app snapshot, run these commands from the repository root.
+The first step packages the app without launching or stopping a running copy;
+the executable then renders the deterministic fixture to the site asset
+without opening the menu bar:
+
+```bash
+SKILLSBAR_BUILD_ROOT="$PWD/.build/skillsbar-demo" bash script/package_app.sh debug
+SKILLSBAR_DEMO_MODE=1 "$PWD/.build/skillsbar-demo/SkillsBar.app/Contents/MacOS/SkillsBar" \
+  --snapshot sites/skillsbar-walkthrough/public/skillsbar-demo-render.png
+```
 
 ## Local validation
 
@@ -50,6 +61,22 @@ security or hosted release readiness.
 npm run lint
 npm test
 ```
+
+To replay the production browser smoke check, install dependencies and start
+the built site in one terminal, then run the browser check in another:
+
+```bash
+npm ci --ignore-scripts
+npm test
+npm run start -- --port 3008
+# In a second terminal:
+npm run test:browser -- http://localhost:3008/
+```
+
+The browser check uses a locally installed Chrome. It covers layout at four
+widths, keyboard focus and shortcuts, clipboard feedback, reduced motion,
+image loading, and the no-JavaScript hero. It does not prove native menu-bar
+interaction, hosted deployment, or other browser engines.
 
 The QR assets are generated with the pinned project-local encoder and can be
 independently decoded on macOS with the Vision verifier under `scripts/`:

@@ -109,7 +109,7 @@ export function Walkthrough() {
       if (!(event.target instanceof HTMLElement)) return;
       const target = event.target;
       if (!target.closest(".walkthrough-shell") || event.altKey || event.ctrlKey || event.metaKey) return;
-      if (target.closest("button, a, input, textarea, select, [contenteditable], summary")) return;
+      if (target.closest("button, a, input, textarea, select, code, [contenteditable], summary")) return;
       if (event.key === "ArrowRight" || event.key === " ") {
         event.preventDefault();
         setInputMode("keyboard");
