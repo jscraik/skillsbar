@@ -22,7 +22,7 @@ SkillsBar is a local macOS SwiftUI menu-bar prototype for Skills SDK evidence vi
 - Prefer current repo evidence and command output over memory or prior prototype assumptions.
 - Preserve unrelated dirty or untracked work. This repository may start on an unborn branch with all files untracked.
 - Keep edits narrowly scoped to the requested surface.
-- Use `zsh -lc` for shell commands and invoke shell scripts explicitly with `bash` when running them through automation.
+- Use the configured non-login shell and invoke shell scripts explicitly with `bash` when running them through automation. Use a login shell only for a bounded shell-startup investigation.
 - Use `rg` or `rg --files` for discovery.
 - Use `apply_patch` for manual file edits.
 - Do not put generated app bundles, SwiftPM build output, raw telemetry, or local-only runtime databases into durable docs or commits unless explicitly requested.
@@ -76,6 +76,4 @@ Report validation as `Command: <exact command> -> pass|fail|blocked (<reason>)`.
 
 ## Harness Context
 
-The `.harness` directory contains project context and design artifacts. The approved pipeline-posture spec is the current documentation contract; its mockup remains supporting evidence, not runtime proof. The earlier review-popover spec is historical reference only. Before implementing or closing UI changes, refresh against the live app and report screenshot, clipboard, focus, reduced-motion, and height evidence when applicable.
-
-- When explaining something to the user, use the [$visualize:visualize](/Users/jamiecraik/.codex/plugins/cache/openai-bundled/visualize/1.0.19/skills/visualize/SKILL.md) skill
+The `.harness` directory contains project context and design artifacts. The approved pipeline-posture spec is the current documentation contract; its mockup remains supporting evidence, not runtime proof. The earlier review-popover spec is historical reference only. For UI changes that require visual verification, refresh against the live app and report screenshot, clipboard, focus, reduced-motion, and height evidence when applicable.
