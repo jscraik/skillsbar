@@ -256,6 +256,7 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
         }
     }
 
+    /// Verifies that a malformed package digest blocks identity and leaves downstream evidence unproven.
     func testMalformedCanonicalDigestBlocksIdentityAndDownstreamEvidence() throws {
         try withRepo { root in
             let checks = makeChecks(digest: "not-a-digest")
@@ -266,6 +267,7 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
         }
     }
 
+    /// Verifies that changing the skill during collection makes the first four receipts stale and the posture score zero.
     func testProductionCandidateRejectsInputsChangedDuringCollection() throws {
         try withRepo { root in
             let bound = try DashboardLoader.collectEvidence(root: root, selectedSkillPath: selectedSkillPath) {
@@ -287,11 +289,13 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
         }
     }
 
+    /// Verifies that stable input passes the first four stages and removing it leaves every receipt unproven.
     func testProductionCandidateAcceptsStableInputAndRejectsRemovedInput() throws {
         try withRepo { root in
             let bound = DashboardLoader.collectEvidence(root: root, selectedSkillPath: selectedSkillPath) {
                 makeChecks(digest: digest)
             }
+            /// Rebuilds the candidate from current files using the evidence captured before any input removal.
             func candidate() -> PipelineCandidate {
                 DashboardLoader.productionPipelineCandidate(
                     root: root, selectedSkillPath: selectedSkillPath,
@@ -312,6 +316,7 @@ final class PipelineEvidenceLoaderTests: XCTestCase {
         }
     }
 
+    /// Creates a loader with deterministic observation time, live Tessl fixture state, and optional check overrides.
     private func makeLoader(
         root: URL,
         checks: PipelineEvidenceLoader.LocalChecks? = nil,
