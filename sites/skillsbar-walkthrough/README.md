@@ -42,7 +42,14 @@ without opening the menu bar:
 SKILLSBAR_BUILD_ROOT="$PWD/.build/skillsbar-demo" bash script/package_app.sh debug
 SKILLSBAR_DEMO_MODE=1 "$PWD/.build/skillsbar-demo/SkillsBar.app/Contents/MacOS/SkillsBar" \
   --snapshot sites/skillsbar-walkthrough/public/skillsbar-demo-render.png
+cwebp -lossless -exact -m 6 \
+  sites/skillsbar-walkthrough/public/skillsbar-demo-render.png \
+  -o sites/skillsbar-walkthrough/public/skillsbar-demo-render.webp
 ```
+
+The page serves the WebP, so regenerate it whenever the source PNG changes.
+The conversion uses the `cwebp` command-line tool; the current committed WebP
+matches the output of the command above byte for byte.
 
 ## Local validation
 
