@@ -17,7 +17,7 @@ held while the published registry baseline stays visible as separate context.
   movement while keeping color feedback on controls.
 - Both command presentations have a copy button. Copy success resets after
   1.8 seconds. If clipboard access fails, the full command remains selectable
-  with a manual-copy instruction.
+  on keyboard focus with a manual-copy instruction.
 - Marketing sections render without scroll-triggered reveals. The walkthrough
   alone changes its camera in response to the visitor's controls.
 - The candidate-identity command is a copy-only demonstration. The page does not execute
@@ -36,7 +36,8 @@ held while the published registry baseline stays visible as separate context.
 To regenerate the app snapshot, run these commands from the repository root.
 The first step packages the app without launching or stopping a running copy;
 the executable then renders the deterministic fixture to the site asset
-without opening the menu bar:
+without opening the menu bar. Snapshot export uses the fixed 1180-point canvas
+even when the live menu bar adapts to a shorter display:
 
 ```bash
 SKILLSBAR_BUILD_ROOT="$PWD/.build/skillsbar-demo" bash script/package_app.sh debug

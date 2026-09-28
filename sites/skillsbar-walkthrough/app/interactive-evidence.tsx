@@ -96,9 +96,16 @@ export function CopyCommand({ className, label }: { className: string; label?: s
   return (
     <div className={className}>
       {label && <small>{label}</small>}
-      <code tabIndex={0} aria-label="Candidate identity command">{command}</code>
+      <textarea
+        aria-label="Candidate identity command"
+        readOnly
+        spellCheck={false}
+        rows={className === "command-bar" ? 2 : 3}
+        value={command}
+        onFocus={(event) => event.currentTarget.select()}
+      />
       <button type="button" onClick={copy}>{copyState === "copied" ? "Copied ✓" : "Copy command"}</button>
-      <span className="copy-status" role="status">{copyState === "unavailable" ? "Copy unavailable—select the command manually." : copyState === "copied" ? "Command copied." : ""}</span>
+      <span className="copy-status" role="status">{copyState === "unavailable" ? "Copy unavailable—focus the command, then press ⌘C or Ctrl+C." : copyState === "copied" ? "Command copied." : ""}</span>
     </div>
   );
 }

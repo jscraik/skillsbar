@@ -137,7 +137,7 @@ a:active { opacity: 0.8; }
 .proof-reading li.held { opacity: 0.54; }
 .proof-command { margin-top: 28px; padding: 17px; border: 1px solid #665020; border-radius: 12px; background: #15120c; }
 .proof-command small { display: block; color: var(--orange); font-family: var(--mono); font-size: 7px; text-transform: uppercase; letter-spacing: 0.1em; }
-.proof-command code { display: block; margin-top: 11px; overflow-wrap: anywhere; color: #d4d0c7; font-family: var(--mono); font-size: 9px; line-height: 1.6; }
+.proof-command textarea { display: block; width: 100%; margin-top: 11px; padding: 0; border: 0; resize: none; background: transparent; color: #d4d0c7; font-family: var(--mono); font-size: 9px; line-height: 1.6; }
 .proof-command button { min-height: 44px; margin-top: 14px; padding: 0 12px; border: 1px solid #715220; border-radius: 8px; background: #211a0f; color: var(--orange); font-size: 13px; font-weight: 720; cursor: pointer; }
 .proof-command .copy-status:not(:empty) { display: block; margin-top: 10px; }
 
@@ -154,7 +154,7 @@ a:active { opacity: 0.8; }
 .technical-stage > header strong { display: block; margin-top: 6px; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .technical-stage > header > span { color: #adb2ba; font-family: var(--mono); font-size: 8px; }
 .command-bar { min-height: 68px; padding: 11px 13px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; border-top: 1px solid var(--rule); background: #13161a; }
-.command-bar code { overflow: hidden; color: #c3c7cd; font-family: var(--mono); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.command-bar textarea { width: 100%; min-width: 0; padding: 0; border: 0; resize: none; background: transparent; color: #c3c7cd; font-family: var(--mono); font-size: 8px; }
 .command-bar button { min-height: 38px; padding: 0 12px; border: 1px solid #715220; border-radius: 8px; background: #211a0f; color: var(--orange); font-size: 8px; font-weight: 720; cursor: pointer; }
 .baseline-bar { min-height: 39px; padding: 0 15px; display: flex; align-items: center; gap: 8px; border-top: 1px solid #175965; background: #0b181b; color: #72a6ad; font-family: var(--mono); font-size: 7px; text-transform: uppercase; letter-spacing: 0.06em; }
 .baseline-bar i { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 0 4px rgb(41 198 212 / 10%); }
@@ -327,8 +327,8 @@ a:active { opacity: 0.8; }
 .beat-copy h3 { font-size: clamp(32px, 2.6vw, 40px); line-height: 1.12; letter-spacing: -0.035em; text-wrap: pretty; }
 .beat-copy > span { font-size: 16px; }
 .walkthrough-help { grid-column: 1 / -1; margin: 0; color: var(--evidence-muted); font-size: 13px; line-height: 1.5; }
-.walkthrough-shell:focus-visible, .command-bar code:focus-visible { outline: 3px solid var(--blue); outline-offset: 5px; }
-.command-bar code, .proof-command code { font-size: 13px; white-space: normal; overflow-wrap: anywhere; line-height: 1.6; user-select: text; }
+.walkthrough-shell:focus-visible, .command-bar textarea:focus-visible, .proof-command textarea:focus-visible { outline: 3px solid var(--blue); outline-offset: 5px; }
+.command-bar textarea, .proof-command textarea { font-size: 13px; white-space: normal; overflow-wrap: anywhere; line-height: 1.6; user-select: text; }
 .command-bar button, .step-buttons button, .nav-links .nav-cta { min-height: 44px; font-size: 13px; }
 .copy-status { grid-column: 1 / -1; color: var(--secondary); font-size: 13px; line-height: 1.5; }
 .copy-status:empty { display: none; }

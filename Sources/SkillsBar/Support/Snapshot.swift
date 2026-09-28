@@ -86,7 +86,7 @@ enum SnapshotRenderer {
         let source = DashboardDataSource()
         let model = DashboardModel(dashboard: dashboard, autorefresh: false, source: source)
         let view = DashboardView(model: model)
-            .frame(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
+            .frame(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.preferredHeight)
             .environment(\.dynamicTypeSize, configuration.dynamicTypeSize)
             .environment(\.skillsBarReduceTransparencyOverride, configuration.reduceTransparency)
             .environment(\.skillsBarIncreasedContrastOverride, configuration.increasedContrast)
@@ -105,7 +105,7 @@ enum SnapshotRenderer {
         }
         hostingView.frame = NSRect(
             origin: .zero,
-            size: NSSize(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
+            size: NSSize(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.preferredHeight)
         )
         hostingView.layoutSubtreeIfNeeded()
         // AppKit material layers can complete after the first layout pass in a

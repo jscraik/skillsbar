@@ -260,7 +260,7 @@ final class ReviewPopoverTests: XCTestCase {
         try SnapshotRenderer.render(dashboard: .reviewFixture, to: outputURL)
         let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: outputURL)))
         XCTAssertEqual(bitmap.pixelsWide, Int(MenuBarTemplateMetrics.width))
-        XCTAssertEqual(bitmap.pixelsHigh, Int(MenuBarTemplateMetrics.height))
+        XCTAssertEqual(bitmap.pixelsHigh, Int(MenuBarTemplateMetrics.preferredHeight))
     }
 
     @MainActor
@@ -304,7 +304,7 @@ final class ReviewPopoverTests: XCTestCase {
 
         let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: firstURL)))
         XCTAssertEqual(bitmap.pixelsWide, Int(MenuBarTemplateMetrics.width))
-        XCTAssertEqual(bitmap.pixelsHigh, Int(MenuBarTemplateMetrics.height))
+        XCTAssertEqual(bitmap.pixelsHigh, Int(MenuBarTemplateMetrics.preferredHeight))
         XCTAssertLessThanOrEqual(
             try pixelDifference(firstURL, secondURL),
             0.0005,
@@ -340,7 +340,7 @@ final class ReviewPopoverTests: XCTestCase {
             try SnapshotRenderer.render(dashboard: dashboard, configuration: configuration, to: outputURL)
             let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: outputURL)))
             XCTAssertEqual(bitmap.pixelsWide, Int(MenuBarTemplateMetrics.width))
-            XCTAssertEqual(bitmap.pixelsHigh, Int(MenuBarTemplateMetrics.height))
+            XCTAssertEqual(bitmap.pixelsHigh, Int(MenuBarTemplateMetrics.preferredHeight))
         }
     }
 
@@ -814,7 +814,7 @@ final class ReviewPopoverTests: XCTestCase {
             let snapshot = try Data(contentsOf: outputURL)
             let bitmap = try XCTUnwrap(NSBitmapImageRep(data: snapshot))
             XCTAssertEqual(bitmap.pixelsWide, Int(MenuBarTemplateMetrics.width))
-            XCTAssertEqual(bitmap.pixelsHigh, Int(MenuBarTemplateMetrics.height))
+            XCTAssertEqual(bitmap.pixelsHigh, Int(MenuBarTemplateMetrics.preferredHeight))
             renderedSnapshots.append(snapshot)
         }
 

@@ -57,12 +57,25 @@ try {
       await page.locator(".proof-command .copy-status:not(:empty)").waitFor();
       assert.equal(await page.locator(".proof-command .copy-status").textContent(), "Command copied.");
 
+      await page.evaluate(() => {
+        navigator.clipboard.writeText = async () => { throw new Error("Clipboard denied for smoke test"); };
+      });
+      await page.locator(".proof-command button").click();
+      assert.match(await page.locator(".proof-command .copy-status").textContent(), /Copy unavailable/);
+      const proofCommand = page.locator(".proof-command textarea");
+      await proofCommand.focus();
+      assert.equal(
+        await proofCommand.evaluate((field) => field.selectionStart === 0 && field.selectionEnd === field.value.length),
+        true,
+        "keyboard fallback did not select the full command",
+      );
+
       const tabs = page.locator(".beat-tabs button");
       await page.locator(".walkthrough-shell").focus();
       await page.keyboard.press("ArrowRight");
       assert.equal(await tabs.nth(1).getAttribute("aria-pressed"), "true");
 
-      await page.locator(".command-bar code").focus();
+      await page.locator(".command-bar textarea").focus();
       for (const key of ["ArrowRight", "Space", "r"]) {
         await page.keyboard.press(key);
         assert.equal(await tabs.nth(1).getAttribute("aria-pressed"), "true", `command focus changed beat on ${key}`);
