@@ -127,6 +127,34 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
             validate_body(body),
         )
 
+    def test_indented_multiline_field_is_populated(self) -> None:
+        body = VALID_BODY.replace(
+            "- Verification steps: python3 script/validate_pr_template.py --template .github/PULL_REQUEST_TEMPLATE.md.",
+            "- Verification steps:\n  1. Run the local validator.\n  2. Inspect the result.",
+        )
+        self.assertEqual(validate_body(body), [])
+
+    def test_required_not_applicable_field_needs_reason(self) -> None:
+        body = VALID_BODY.replace(
+            "- Risk and rollback: Revert the template and script together.",
+            "- Risk and rollback: n.a.",
+        )
+        self.assertTrue(any("needs a reason for n.a." in error for error in validate_body(body)))
+
+    def test_empty_blocked_command_reason_fails(self) -> None:
+        command = "- Command: `python3 script/validate_pr_template.py --template .github/PULL_REQUEST_TEMPLATE.md` -> pass"
+        for reason in ["", "   "]:
+            with self.subTest(reason=reason):
+                body = VALID_BODY.replace(command, command.replace("-> pass", f"-> blocked ({reason})"))
+                self.assertTrue(any("Command evidence must use" in error for error in validate_body(body)))
+
+    def test_template_requires_fixed_checklist_items(self) -> None:
+        template = Path(".github/PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
+        removed = template.replace(
+            "- [ ] Merge is blocked until all required checks pass.\n", ""
+        )
+        self.assertTrue(any("checklist" in error.lower() for error in validate_template(removed)))
+
     def test_release_mode_must_be_concrete(self) -> None:
         body = VALID_BODY.replace(
             "- Release mode: Harness",

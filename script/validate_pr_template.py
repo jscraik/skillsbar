@@ -137,6 +137,18 @@ LOCAL_ABSOLUTE_PATH_RE = re.compile(
 CHECKBOX_RE = re.compile(r"^- \[[ xX]\]")
 UNRESOLVED_CHECKBOX_RE = re.compile(r"^- \[ \]")
 STATUS_MARKER_RE = re.compile(r"\*\*\((?:pending|n/a|not applicable)\)\*\*", re.I)
+NOT_APPLICABLE_RE = re.compile(r"^(?:n\.a\.|n/a|not applicable)(?=$|\s)", re.I)
+REQUIRED_CHECKLIST_ITEMS = (
+    "I did not push directly to `main`; this PR is from a dedicated branch.",
+    "Branch name follows policy (`codex/*` for agent-created branches).",
+    "I ran the required validation for the changed surfaces and recorded every outcome below.",
+    "CodeRabbit review completed and findings handled or explicitly waived.",
+    "An independent reviewer performed the review outside the coding agent.",
+    "Codex review completed and findings handled or explicitly waived.",
+    "Any CodeRabbit Semgrep findings were fixed or explicitly justified.",
+    "Merge is blocked until all required checks pass.",
+    "I will delete the branch and worktree after merge.",
+)
 
 
 def strip_comments(value: str) -> str:
@@ -173,7 +185,7 @@ def extract_field(section_body: str, label: str) -> str | None:
 
     escaped = re.escape(label)
     match = re.search(
-        rf"^-\s*{escaped}:[ \t]*([\s\S]*?)(?=\r?\n-\s*[A-Za-z][^\n:]{{0,80}}:|\r?\n##\s|$)",
+        rf"^-\s*{escaped}:[ \t]*([\s\S]*?)(?=\r?\n-\s*[A-Za-z][^\n:]{{0,80}}:|\r?\n##\s|\Z)",
         section_body,
         re.I | re.M,
     )
@@ -206,6 +218,8 @@ def field_errors(body: str) -> list[str]:
                 errors.append(f"Missing required {section[3:].lower()} field: {label}")
             elif not value:
                 errors.append(f"Replace {section[3:].lower()} field placeholder: {label}")
+            elif NOT_APPLICABLE_RE.match(value) and not NA_WITH_REASON_RE.fullmatch(value):
+                errors.append(f"Required {section[3:].lower()} field needs a reason for n.a.: {label}")
     return errors
 
 
@@ -234,7 +248,9 @@ def checklist_errors(body: str) -> list[str]:
     def item_text(item: str) -> str:
         return STATUS_MARKER_RE.sub("", CHECKBOX_RE.sub("", item)).strip()
 
-    if [item_text(item) for item in items] != [item_text(item) for item in expected]:
+    if [item_text(item) for item in expected] != list(REQUIRED_CHECKLIST_ITEMS):
+        return ["Checked-in template does not preserve the required checklist contract."]
+    if [item_text(item) for item in items] != list(REQUIRED_CHECKLIST_ITEMS):
         return ["Checklist must preserve every template item in its original order."]
     unchecked = [line for line in items if UNRESOLVED_CHECKBOX_RE.match(line)]
     unresolved = [line for line in unchecked if not STATUS_MARKER_RE.search(line)]
@@ -258,7 +274,7 @@ def command_evidence_errors(body: str) -> list[str]:
     if not command_lines:
         return ["Validation section must include at least one Command evidence line."]
 
-    outcome = r"(?:pass|fail|`(?:pass|fail)`)(?:\s*\([^)]*\)\.?)?|(?:n\.a\.|n/a|`(?:n\.a\.|n/a)`)(?:\s*\([^)]*\))?|(?:blocked|`blocked`)\s*\([^)]*\)"
+    outcome = r"(?:pass|fail|`(?:pass|fail)`)(?:\s*\([^)]*\)\.?)?|(?:n\.a\.|n/a|`(?:n\.a\.|n/a)`)(?:\s*\([^)]*\))?|(?:blocked|`blocked`)\s*\([^)]*\S[^)]*\)"
     pattern = re.compile(rf"^-\s*Command:\s*(?:`[^\n`]+`|\S.*?\S)\s*->\s*{outcome}$", re.I)
     errors = []
     for line in command_lines:
@@ -361,6 +377,13 @@ def validate_template(template: str) -> list[str]:
     """Validate the shape of the checked-in template without filling it in."""
 
     errors = missing_sections(template)
+    checklist = extract_section(template, "## Checklist") or ""
+    checklist_items = [
+        STATUS_MARKER_RE.sub("", CHECKBOX_RE.sub("", line.strip())).strip()
+        for line in checklist.splitlines() if CHECKBOX_RE.match(line.strip())
+    ]
+    if checklist_items != list(REQUIRED_CHECKLIST_ITEMS):
+        errors.append("Template checklist must preserve every required item in its original order.")
     for section, labels in TEMPLATE_FIELDS.items():
         section_body = extract_section(template, section)
         if section_body is None:
