@@ -76,4 +76,4 @@ Report validation as `Command: <exact command> -> pass|fail|blocked (<reason>)`.
 
 ## Harness Context
 
-The `.harness` directory contains project context and design artifacts. The approved pipeline-posture spec is the current documentation contract; its mockup remains supporting evidence, not runtime proof. The earlier review-popover spec is historical reference only. Before implementing or closing UI changes, refresh against the live app and report screenshot, clipboard, focus, reduced-motion, and height evidence when applicable.
+The `.harness` directory contains project context and design artifacts. The approved pipeline-posture spec is the current documentation contract; its mockup remains supporting evidence, not runtime proof. The earlier review-popover spec is historical reference only. For UI changes that require visual verification, refresh against the live app and report screenshot, clipboard, focus, reduced-motion, and height evidence when applicable.
