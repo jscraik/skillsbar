@@ -1,33 +1,34 @@
 # SkillsBar evidence walkthrough
 
-A landing page and four-view visual explainer for the SkillsBar evidence cockpit. The explainer supports judge Q&A; the native menu-bar app remains the product demo.
-The page presents one deterministic candidate-identity scenario: the local Skill
-has no canonical package digest at Gate 1, so every downstream receipt remains
-held while the published registry baseline stays visible as separate context.
+A landing page and interactive nine-stage inspector matching the compact 04B native app.
+The native menu-bar app remains the product demo.
 
 ## Interaction model
 
-- Select the four visible walkthrough beats. With the walkthrough region focused,
-  use Space/Right Arrow and Left Arrow, or press `R` to return to the overview.
-  Shortcuts do not override normal page scrolling outside that region.
-- The evidence scenario remains fixed while the desktop camera moves across
-  Build, Prove, and Ship. Mobile stacks all three groups in the overview and
-  shows the selected group in chapter views. Keyboard changes are immediate;
-  pointer changes use a short transform transition. Reduced Motion removes
-  movement while keeping color feedback on controls.
-- Both command presentations have a copy button. Copy success resets after
-  1.8 seconds. If clipboard access fails, the full command remains selectable
-  on keyboard focus with a manual-copy instruction.
-- Marketing sections render without scroll-triggered reveals. The walkthrough
-  alone changes its camera in response to the visitor's controls.
-- The candidate-identity command is a copy-only demonstration. The page does not execute
-  Skills SDK commands, publish packages, access credentials, or call production
-  endpoints.
+- Select one of nine stages to inspect details. Arrow keys work while a stage
+  button is focused; normal page scrolling and text selection remain available.
+- Choose “Security review required” or “Identity missing” using the labelled demo
+  scenario controls inside the inspector. Changing scenario resets selection to its next required gate.
+- Selected details reveal over 160ms without moving the grid or registry. Reduced
+  Motion disables the animation. Navigation collapses to an Explore menu at 900px.
+- The product-proof section crops the native capture to its evidence, action, and
+  Tessl summary, with three accompanying annotations.
+- Stage selection never changes evidence. Security uses the native visual-comparison
+  fixture with an unavailable registry; identity uses the supported demo baseline
+  (version 0.2.0, score 66, lift 1.28x). Downstream identity explanations summarise
+  the evidence model rather than claiming to be raw receipts.
+- The security fixture's illustrative command is not presented as an executable
+  command. Identity exposes its real copy-only SDK start command.
+- Copy confirmation resets after 1.8 seconds; denied clipboard access reveals the
+  selectable command with a manual-copy instruction.
+- Marketing content is visible without JavaScript. No camera animation or automatic
+  scenario advancement is used.
+- This site executes no SDK commands or production operations.
 
 ## Proof boundary
 
 - `CONCEPT MOCKUP · NOT RUNTIME EVIDENCE` identifies the system diagram.
-- `SUPPORTED DEMO FIXTURE · APP-RENDERED SNAPSHOT` identifies a render from the packaged app with `SKILLSBAR_DEMO_MODE=1`, `--snapshot-dark`, and `--snapshot`. It does not prove live menu-bar interaction.
+- `Native app · Fixture capture` identifies a render from the packaged app with `SKILLSBAR_DEMO_MODE=1`, `--snapshot-dark`, and `--snapshot`. It does not prove live menu-bar interaction.
 - The expanded nine-gate SVG is a concept evidence atlas, not live product proof.
 - The Tessl baseline remains visually separate from current local proof.
 - SkillsBar exposes evidence and the next command; the release decision remains
@@ -36,7 +37,7 @@ held while the published registry baseline stays visible as separate context.
 To regenerate the app snapshot, run these commands from the repository root.
 The first step packages the app without launching or stopping a running copy;
 the executable then renders the deterministic fixture to the site asset
-without opening the menu bar. Snapshot export uses the fixed 1180-point canvas
+without opening the menu bar. Snapshot export uses the fixed 460 × 586-point canvas
 even when the live menu bar adapts to a shorter display:
 
 ```bash
@@ -82,7 +83,7 @@ npm run start -- --port 3008
 npm run test:browser -- http://localhost:3008/
 ```
 
-The browser check uses a locally installed Chrome. It covers layout at four
+The browser check uses a locally installed Chrome. It covers layout at six
 widths, keyboard focus and shortcuts, clipboard feedback, reduced motion,
 image loading, and the no-JavaScript hero. It does not prove native menu-bar
 interaction, hosted deployment, or other browser engines.

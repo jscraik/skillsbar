@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SkillsBar — Direction A</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f3f1eb;
+      --muted: #9b9da3;
+      --quiet: #73777f;
+      --canvas: #0a0b0d;
+      --surface: #111318;
+      --surface-2: #171a20;
+      --rule: #2a2e36;
+      --rule-strong: #3a3f49;
+      --blue: #5b9cff;
+      --blue-soft: #20334f;
+      --orange: #f09a4a;
+      --orange-soft: #3a281c;
+      --green: #66c995;
+      --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      --sans: "Geist", -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+      --serif: "Newsreader", "Iowan Old Style", "Baskerville", "Times New Roman", serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      min-width: 1180px;
+      height: 100%;
+      min-height: 720px;
+      margin: 0;
+      overflow: hidden;
+      background: var(--canvas);
+    }
+
+    body {
+      color: var(--ink);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button { font: inherit; }
+
+    .frame {
+      width: 100vw;
+      height: 100vh;
+      min-width: 1180px;
+      min-height: 720px;
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      grid-template-rows: minmax(0, 1fr) 76px;
+      column-gap: 20px;
+      padding: 44px 64px 28px;
+      background:
+        radial-gradient(circle at 76% 8%, rgba(91, 156, 255, 0.055), transparent 29%),
+        linear-gradient(180deg, #0b0c0f 0%, #090a0c 100%);
+    }
+
+    .editorial {
+      grid-column: 1 / span 5;
+      min-width: 0;
+      padding: 4px 26px 16px 0;
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid var(--rule-strong);
+    }
+
+    .masthead {
+      min-height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .wordmark {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      font-size: 19px;
+    }
+
+    .wordmark::before {
+      content: "";
+      width: 12px;
+      height: 12px;
+      border: 1px solid var(--blue);
+      border-radius: 3px;
+      box-shadow: inset 3px 0 0 var(--blue);
+    }
+
+    .endorsement {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .04em;
+    }
+
+    .story {
+      margin: auto 0;
+      max-width: 590px;
+      padding: 42px 0 34px;
+    }
+
+    .eyebrow {
+      margin: 0 0 22px;
+      color: var(--orange);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 560px;
+      margin: 0;
+      font-family: var(--serif);
+      font-size: clamp(60px, 5.35vw, 86px);
+      font-weight: 500;
+      line-height: .92;
+      letter-spacing: -.052em;
+    }
+
+    h1 em {
+      color: var(--blue);
+      font-style: normal;
+    }
+
+    .lede {
+      max-width: 525px;
+      margin: 32px 0 0;
+      color: #c4c4c0;
+      font-size: 19px;
+      line-height: 1.48;
+      letter-spacing: -.012em;
+    }
+
+    .presenter {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 62px;
+      padding-top: 14px;
+      border-top: 1px solid var(--rule);
+    }
+
+    .presenter button {
+      height: 44px;
+      min-width: 44px;
+      padding: 0 16px;
+      border: 1px solid var(--rule-strong);
+      border-radius: 5px;
+      background: #101217;
+      color: #d5d7dc;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .presenter button.primary {
+      border-color: #3874c9;
+      background: #1d5aa7;
+      color: white;
+    }
+
+    .presenter .progress {
+      margin-left: auto;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .08em;
+    }
+
+    .disclosure {
+      margin-top: 12px;
+      color: var(--quiet);
+      font-family: var(--mono);
+      font-size: 9px;
+      line-height: 1.4;
+      letter-spacing: .08em;
+    }
+
+    .technical {
+      grid-column: 6 / span 7;
+      min-width: 0;
+      padding-left: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .cockpit {
+      width: 100%;
+      height: min(710px, calc(100vh - 152px));
+      min-height: 550px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid #383d46;
+      border-radius: 12px;
+      background: rgba(17, 19, 24, .96);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, .42), inset 0 1px 0 rgba(255,255,255,.035);
+    }
+
+    .cockpit-head {
+      flex: 0 0 88px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 18px;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--rule);
+      background: #14171c;
+    }
+
+    .cockpit-title {
+      margin: 0 0 5px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+
+    .skill-path {
+      color: #888d96;
+      font-family: var(--mono);
+      font-size: 10px;
+    }
+
+    .candidate-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid #664326;
+      border-radius: 5px;
+      background: var(--orange-soft);
+      color: #ffc080;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    .candidate-chip::before {
+      content: "!";
+      display: grid;
+      width: 16px;
+      height: 16px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--orange);
+      color: #1c1208;
+      font-family: var(--sans);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .pipeline-label {
+      flex: 0 0 33px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 22px;
+      border-bottom: 1px solid var(--rule);
+      color: #818690;
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .pipeline-label strong { color: #aab0bb; font-weight: 600; }
+
+    .gates {
+      flex: 1 1 auto;
+      min-height: 0;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: gates;
+    }
+
+    .gate {
+      counter-increment: gates;
+      min-height: 47px;
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 20px 8px 18px;
+      border-bottom: 1px solid #252932;
+      background: #111318;
+    }
+
+    .gate::before {
+      content: counter(gates, decimal-leading-zero);
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border: 1px solid #3b404a;
+      border-radius: 50%;
+      color: #7d828b;
+      font-family: var(--mono);
+      font-size: 9px;
+    }
+
+    .gate.active {
+      min-height: 62px;
+      background: linear-gradient(90deg, rgba(240, 154, 74, .09), transparent 50%);
+      box-shadow: inset 3px 0 0 var(--orange);
+    }
+
+    .gate.active::before {
+      border-color: var(--orange);
+      color: #ffc080;
+      background: var(--orange-soft);
+    }
+
+    .gate-name {
+      overflow: hidden;
+      color: #e3e4e7;
+      font-size: 13px;
+      font-weight: 650;
+      letter-spacing: -.006em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .gate-reason {
+      margin-top: 3px;
+      overflow: hidden;
+      color: #7f848d;
+      font-family: var(--mono);
+      font-size: 9px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .gate.active .gate-reason { color: #ba9470; }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: #7c818a;
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .status::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #626872;
+    }
+
+    .status.required { color: var(--orange); }
+    .status.required::before { background: var(--orange); box-shadow: 0 0 0 3px rgba(240,154,74,.12); }
+
+    .baseline {
+      flex: 0 0 44px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 0 20px;
+      border-top: 1px solid #343841;
+      background: #15181d;
+    }
+
+    .baseline strong {
+      color: #b7bac0;
+      font-size: 11px;
+    }
+
+    .baseline span {
+      color: #777c85;
+      font-family: var(--mono);
+      font-size: 9px;
+    }
+
+    .baseline .score { color: var(--blue); font-weight: 700; }
+
+    .proof {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 36px;
+      border-top: 1px solid var(--rule-strong);
+    }
+
+    .proof-steps {
+      height: 60px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .proof-step {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #646972;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .04em;
+    }
+
+    .proof-step::before {
+      content: "";
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #555a63;
+    }
+
+    .proof-step:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      right: 14px;
+      width: calc(100% - 145px);
+      height: 1px;
+      background: #292d34;
+    }
+
+    .proof-step.active { color: #cfdae9; }
+    .proof-step.active::before { background: var(--blue); box-shadow: 0 0 0 4px rgba(91,156,255,.13); }
+
+    .maker {
+      height: 60px;
+      display: flex;
+      align-items: center;
+      color: #757a83;
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .16em;
+      white-space: nowrap;
+    }
+
+    @media (max-height: 790px) {
+      .frame { padding-top: 28px; padding-bottom: 18px; grid-template-rows: minmax(0, 1fr) 64px; }
+      .cockpit { height: calc(100vh - 112px); min-height: 560px; }
+      .cockpit-head { flex-basis: 72px; padding-top: 12px; padding-bottom: 12px; }
+      .pipeline-label { flex-basis: 27px; }
+      .gate { min-height: 41px; padding-top: 5px; padding-bottom: 5px; }
+      .gate.active { min-height: 52px; }
+      .gate-reason { display: none; }
+      .baseline { flex-basis: 38px; }
+      .story { padding-top: 22px; padding-bottom: 20px; }
+      h1 { font-size: clamp(54px, 5vw, 72px); }
+      .lede { margin-top: 22px; font-size: 17px; }
+      .proof-steps, .maker { height: 52px; }
+    }
+
+    @media (prefers-contrast: more) {
+      .cockpit, .presenter button { border-color: #727984; }
+      .gate { border-bottom-color: #484e58; }
+      .gate.active { background: #2a1d14; }
+      .status { color: #b9bdc5; }
+    }
+  </style>
+</head>
+<body>
+  <main class="frame" aria-label="SkillsBar guided demo, beat 1 of 6">
+    <section class="editorial" aria-labelledby="page-title">
+      <header class="masthead">
+        <div class="wordmark">SkillsBar</div>
+        <div class="endorsement">by brAInwav</div>
+      </header>
+
+      <div class="story">
+        <p class="eyebrow">01 / Hook · Candidate changed</p>
+        <h1 id="page-title">When evidence goes <em>stale.</em></h1>
+        <p class="lede">A changed Skill candidate should not inherit proof that no longer belongs to it.</p>
+      </div>
+
+      <nav class="presenter" aria-label="Presenter controls">
+        <button type="button" aria-label="Previous beat">←</button>
+        <button class="primary" type="button" aria-label="Next beat">Next&nbsp;&nbsp;→</button>
+        <button type="button" aria-label="Reset walkthrough">Reset</button>
+        <span class="progress">1 / 6</span>
+      </nav>
+      <div class="disclosure">GUIDED DEMO · DETERMINISTIC STATES · NOT LIVE RUNTIME EVIDENCE</div>
+    </section>
+
+    <section class="technical" aria-label="SkillsBar nine-gate evidence cockpit">
+      <article class="cockpit">
+        <header class="cockpit-head">
+          <div>
+            <h2 class="cockpit-title">improve-agent-native</h2>
+            <div class="skill-path">AI Skill candidate · package digest pending</div>
+          </div>
+          <div class="candidate-chip">Candidate changed</div>
+        </header>
+
+        <div class="pipeline-label"><strong>Release evidence</strong><span>Gate 1 of 9 · downstream held</span></div>
+
+        <ol class="gates">
+          <li class="gate active">
+            <div><div class="gate-name">Candidate identity</div><div class="gate-reason">Canonical package identity is required before downstream proof.</div></div>
+            <span class="status required">Required</span>
+          </li>
+          <li class="gate">
+            <div><div class="gate-name">Mechanical validation</div><div class="gate-reason">Waiting for current package identity.</div></div>
+            <span class="status">Held</span>
+          </li>
+          <li class="gate">
+            <div><div class="gate-name">Security &amp; guardrails</div><div class="gate-reason">Current governed risk-mode evidence required.</div></div>
+            <span class="status">Held</span>
+          </li>
+          <li class="gate">
+            <div><div class="gate-name">Eval preparation</div><div class="gate-reason">Scenario and scorer preparation are candidate-bound.</div></div>
+            <span class="status">Held</span>
+          </li>
+          <li class="gate">
+            <div><div class="gate-name">Eval local proof</div><div class="gate-reason">Local proof must match the candidate digest.</div></div>
+            <span class="status">Held</span>
+          </li>
+          <li class="gate">
+            <div><div class="gate-name">Eval cloud proof</div><div class="gate-reason">Cloud proof must use the same scenario identities.</div></div>
+            <span class="status">Held</span>
+          </li>
+          <li class="gate">
+            <div><div class="gate-name">Tessl staging</div><div class="gate-reason">Local proof, dry run, and handoff readiness required.</div></div>
+            <span class="status">Held</span>
+          </li>
+          <li class="gate">
+            <div><div class="gate-name">Tessl publication &amp; registry</div><div class="gate-reason">Publication and registry observation stay separate.</div></div>
+            <span class="status">Held</span>
+          </li>
+          <li class="gate">
+            <div><div class="gate-name">Runtime truth</div><div class="gate-reason">Installed digest, doctor, and behavior must agree.</div></div>
+            <span class="status">Held</span>
+          </li>
+        </ol>
+
+        <aside class="baseline" aria-label="Observed Tessl baseline">
+          <strong>Tessl baseline</strong>
+          <span>Historical external observation · not proof for this candidate</span>
+          <span class="score">66 / 100</span>
+        </aside>
+      </article>
+    </section>
+
+    <footer class="proof" aria-label="Proof sequence">
+      <div class="proof-steps">
+        <div class="proof-step active">Scoped change</div>
+        <div class="proof-step">Repository checks</div>
+        <div class="proof-step">Structured evidence</div>
+        <div class="proof-step">Human decision</div>
+      </div>
+      <div class="maker">BUILT WITH CODEX</div>
+    </footer>
+  </main>
+</body>
+</html>

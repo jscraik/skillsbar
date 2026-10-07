@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SkillsBar — Direction B</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f4f6f8;
+      --ink-soft: #c5cbd3;
+      --muted: #818a97;
+      --canvas: #07090c;
+      --graphite: #0d1117;
+      --panel: rgba(18, 23, 31, .74);
+      --panel-solid: #12171f;
+      --line: rgba(226, 234, 244, .12);
+      --line-strong: rgba(226, 234, 244, .20);
+      --blue: #61a9ff;
+      --blue-soft: rgba(71, 148, 255, .13);
+      --orange: #f2a45f;
+      --orange-soft: rgba(242, 164, 95, .12);
+      --shadow: rgba(0, 0, 0, .48);
+      --sans: "Geist", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --serif: "Newsreader Display", "Iowan Old Style", "Baskerville", Georgia, serif;
+      --mono: "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { width: 100%; height: 100%; margin: 0; }
+
+    body {
+      min-width: 1180px;
+      overflow: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse at 82% 40%, rgba(49, 112, 190, .15) 0%, transparent 36%),
+        radial-gradient(ellipse at 16% 4%, rgba(88, 106, 132, .10) 0%, transparent 32%),
+        linear-gradient(145deg, #0b0e13 0%, var(--canvas) 52%, #05070a 100%);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .12;
+      background-image:
+        linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, black, transparent 85%);
+    }
+
+    .stage {
+      width: min(100vw, 1600px);
+      height: min(100vh, 900px);
+      margin: 0 auto;
+      padding: 40px 64px 30px;
+      display: grid;
+      grid-template-rows: 1fr 74px;
+      gap: 22px;
+      position: relative;
+      isolation: isolate;
+    }
+
+    .stage::after {
+      content: "01 / 06";
+      position: absolute;
+      top: 46px;
+      right: 66px;
+      z-index: 7;
+      color: #aeb7c3;
+      font: 600 11px/1 var(--mono);
+      letter-spacing: .12em;
+    }
+
+    .composition {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 20px;
+      align-items: center;
+    }
+
+    .editorial {
+      grid-column: 1 / span 5;
+      align-self: stretch;
+      padding: 32px 28px 18px 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 15px;
+      font-weight: 650;
+      letter-spacing: -.01em;
+    }
+
+    .mark {
+      width: 30px;
+      height: 30px;
+      border: 1px solid rgba(129, 185, 255, .55);
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(145deg, rgba(102, 172, 255, .23), rgba(34, 86, 150, .08));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 10px 24px rgba(0, 49, 112, .22);
+      color: #91c5ff;
+      font: 700 13px/1 var(--mono);
+    }
+
+    .byline { color: var(--muted); font-size: 11px; font-weight: 500; margin-left: -6px; }
+
+    .hero-copy { margin-top: auto; margin-bottom: auto; max-width: 530px; padding: 42px 0 24px; }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--blue);
+      font: 600 11px/1.4 var(--mono);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      margin-bottom: 26px;
+    }
+
+    .eyebrow::before { content: ""; width: 26px; height: 1px; background: var(--blue); }
+
+    h1 {
+      margin: 0;
+      max-width: 520px;
+      font-family: var(--serif);
+      font-size: clamp(62px, 5vw, 82px);
+      line-height: .94;
+      letter-spacing: -.052em;
+      font-weight: 500;
+      text-wrap: balance;
+    }
+
+    .lede {
+      max-width: 460px;
+      margin: 30px 0 0;
+      color: var(--ink-soft);
+      font-size: 18px;
+      line-height: 1.48;
+      letter-spacing: -.012em;
+    }
+
+    .presenter {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .control {
+      min-width: 46px;
+      height: 46px;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: var(--ink-soft);
+      background: rgba(20, 25, 33, .56);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font: 600 12px/1 var(--sans);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    .control.next { color: #f8fbff; border-color: rgba(104, 172, 255, .34); background: rgba(47, 115, 198, .20); }
+    .control.muted { color: #69727e; }
+    .key { font-family: var(--mono); font-size: 13px; }
+
+    .technical {
+      grid-column: 6 / -1;
+      align-self: stretch;
+      min-height: 0;
+      position: relative;
+      display: grid;
+      place-items: center;
+      perspective: 1300px;
+      padding: 26px 0 10px 8px;
+    }
+
+    .frame-line {
+      position: absolute;
+      inset: 2% -1% 2% 5%;
+      border: 1px solid rgba(115, 174, 244, .10);
+      border-radius: 36px;
+      transform: rotate(-1.2deg);
+      z-index: -2;
+    }
+
+    .frame-line::before, .frame-line::after {
+      content: "";
+      position: absolute;
+      border: 1px solid rgba(226,234,244,.07);
+      border-radius: inherit;
+    }
+    .frame-line::before { inset: 18px -12px -14px 20px; }
+    .frame-line::after { inset: 45px 24px -30px -18px; }
+
+    .ambient-card {
+      position: absolute;
+      width: 72%;
+      height: 77%;
+      border: 1px solid rgba(255,255,255,.05);
+      border-radius: 28px;
+      background: rgba(24, 31, 41, .20);
+      box-shadow: 0 44px 90px rgba(0,0,0,.32);
+      transform: translate(64px, 16px) rotate(2.2deg) translateZ(-50px);
+      backdrop-filter: blur(24px);
+      z-index: -1;
+    }
+
+    .cockpit {
+      width: min(100%, 798px);
+      max-height: 716px;
+      border: 1px solid rgba(196, 213, 233, .18);
+      border-radius: 24px;
+      overflow: hidden;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.045), transparent 24%),
+        rgba(14, 18, 25, .84);
+      box-shadow:
+        0 48px 100px rgba(0,0,0,.50),
+        0 10px 34px rgba(0,0,0,.34),
+        inset 0 1px 0 rgba(255,255,255,.09);
+      backdrop-filter: blur(34px) saturate(115%);
+      transform: rotateY(-2.2deg) rotateX(.5deg) translateZ(0);
+      transform-origin: center right;
+    }
+
+    .cockpit-head {
+      height: 62px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.018);
+    }
+
+    .cockpit-brand { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 650; }
+    .mini-mark { width: 22px; height: 22px; border-radius: 7px; background: #1c4f89; border: 1px solid #3e79b9; display: grid; place-items: center; font: 700 10px/1 var(--mono); color: #b9dbff; }
+    .head-meta { display: flex; align-items: center; gap: 18px; color: var(--muted); font: 500 10px/1 var(--mono); letter-spacing: .05em; }
+    .head-meta .signal { color: var(--orange); }
+
+    .candidate {
+      margin: 14px 16px 12px;
+      padding: 13px 15px;
+      border: 1px solid rgba(242,164,95,.34);
+      border-radius: 13px;
+      background: linear-gradient(90deg, var(--orange-soft), rgba(242,164,95,.025));
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 0 32px rgba(242,164,95,.045), inset 3px 0 0 rgba(242,164,95,.7);
+    }
+
+    .warning-icon {
+      width: 25px; height: 25px; border: 1px solid rgba(242,164,95,.48); border-radius: 8px;
+      display: grid; place-items: center; color: var(--orange); font: 700 12px/1 var(--mono);
+    }
+    .candidate strong { display: block; font-size: 13px; line-height: 1.2; }
+    .candidate small { display: block; margin-top: 4px; color: #a98e75; font: 500 10px/1.2 var(--mono); }
+    .required { color: var(--orange); font: 600 10px/1 var(--mono); letter-spacing: .06em; }
+
+    .gates { list-style: none; padding: 0 16px 14px; margin: 0; display: grid; gap: 4px; }
+
+    .gate {
+      min-height: 44px;
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 11px;
+      padding: 7px 10px;
+      border: 1px solid rgba(255,255,255,.065);
+      border-radius: 10px;
+      background: rgba(255,255,255,.018);
+    }
+
+    .gate:first-child { border-color: rgba(242,164,95,.18); background: rgba(242,164,95,.022); }
+    .gate-num { color: #656f7c; font: 600 10px/1 var(--mono); }
+    .gate-name { min-width: 0; color: #d2d7de; font-size: 12px; line-height: 1.2; font-weight: 590; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .gate-reason { color: #7f8996; font: 500 9.5px/1.2 var(--mono); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .gate-state { display: flex; align-items: center; gap: 7px; color: #858f9b; font: 600 9.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .04em; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #606975; box-shadow: 0 0 0 3px rgba(96,105,117,.11); }
+    .gate:first-child .gate-state { color: #bf8959; }
+    .gate:first-child .dot { background: var(--orange); box-shadow: 0 0 0 3px rgba(242,164,95,.12); }
+
+    .baseline {
+      margin: 0 16px 16px;
+      min-height: 35px;
+      border: 1px solid rgba(112, 156, 209, .15);
+      border-radius: 10px;
+      background: rgba(50, 88, 130, .055);
+      padding: 0 11px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #8e9ba9;
+      font: 500 9.5px/1 var(--mono);
+    }
+    .baseline b { color: #9ebbdc; font-weight: 600; }
+
+    .cockpit-foot {
+      min-height: 42px;
+      padding: 0 18px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #75808c;
+      font: 500 9px/1.25 var(--mono);
+      letter-spacing: .035em;
+    }
+    .cockpit-foot .disclosure { color: #a7b1bd; }
+
+    .proof {
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 28px;
+      align-items: end;
+      padding-top: 18px;
+    }
+
+    .proof-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
+    .proof-step { position: relative; padding-top: 12px; color: #646d79; font: 580 11px/1 var(--sans); letter-spacing: .01em; }
+    .proof-step::before { content: ""; position: absolute; top: 0; left: 0; right: 14px; height: 2px; background: #252b33; }
+    .proof-step.active { color: #dcecff; }
+    .proof-step.active::before { background: linear-gradient(90deg, var(--blue), rgba(97,169,255,.15)); box-shadow: 0 0 14px rgba(97,169,255,.30); }
+    .proof-step span { margin-right: 8px; color: #4b5561; font: 600 9px/1 var(--mono); }
+    .proof-step.active span { color: var(--blue); }
+
+    .maker { color: #707987; font: 600 9px/1.4 var(--mono); letter-spacing: .15em; text-align: right; }
+    .maker b { color: #9ba5b2; font-weight: 600; }
+
+    @media (max-height: 760px) {
+      .stage { padding-top: 24px; padding-bottom: 20px; grid-template-rows: 1fr 62px; gap: 12px; }
+      .editorial { padding-top: 18px; }
+      .hero-copy { padding: 20px 0 12px; }
+      h1 { font-size: 58px; }
+      .lede { margin-top: 20px; font-size: 16px; }
+      .cockpit { transform: scale(.91) rotateY(-2deg); }
+      .technical { padding-top: 4px; }
+      .proof { padding-top: 12px; }
+    }
+
+    @media (prefers-reduced-transparency: reduce) {
+      .cockpit, .ambient-card, .control { background: var(--panel-solid); backdrop-filter: none; }
+    }
+
+    @media (prefers-contrast: more) {
+      body { background: #000; }
+      .cockpit, .gate, .candidate, .control { background: #10151c; border-color: #7f8996; }
+      .gate-name, .gate-reason, .gate-state, .cockpit-foot { color: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage" aria-label="SkillsBar guided demo — Beat 1 of 6">
+    <section class="composition">
+      <article class="editorial" aria-labelledby="page-title">
+        <header class="brand">
+          <span class="mark" aria-hidden="true">SB</span>
+          <span>SkillsBar</span>
+          <span class="byline">by brAInwav</span>
+        </header>
+
+        <div class="hero-copy">
+          <div class="eyebrow">The trust boundary</div>
+          <h1 id="page-title">When evidence goes stale.</h1>
+          <p class="lede">A changed Skill candidate should not inherit proof that no longer belongs to it.</p>
+        </div>
+
+        <nav class="presenter" aria-label="Presenter controls">
+          <button class="control muted" type="button" aria-label="Previous beat"><span class="key">←</span></button>
+          <button class="control next" type="button">Next <span class="key">→</span></button>
+          <button class="control" type="button">Reset <span class="key">R</span></button>
+        </nav>
+      </article>
+
+      <section class="technical" aria-label="SkillsBar nine-gate evidence cockpit">
+        <div class="frame-line" aria-hidden="true"></div>
+        <div class="ambient-card" aria-hidden="true"></div>
+        <article class="cockpit">
+          <header class="cockpit-head">
+            <div class="cockpit-brand"><span class="mini-mark" aria-hidden="true">SB</span> SkillsBar <span class="byline">by brAInwav</span></div>
+            <div class="head-meta"><span>GUIDED DEMO</span><span class="signal">1 REQUIRED</span></div>
+          </header>
+
+          <div class="candidate">
+            <span class="warning-icon" aria-hidden="true">!</span>
+            <div><strong>Candidate identity</strong><small>No canonical package digest for this change</small></div>
+            <span class="required">REQUIRED</span>
+          </div>
+
+          <ol class="gates">
+            <li class="gate"><span class="gate-num">01</span><div><div class="gate-name">Candidate identity</div><div class="gate-reason">Canonical package identity required</div></div><span class="gate-state"><i class="dot"></i> Required</span></li>
+            <li class="gate"><span class="gate-num">02</span><div><div class="gate-name">Mechanical validation</div><div class="gate-reason">Waiting for candidate identity</div></div><span class="gate-state"><i class="dot"></i> Held</span></li>
+            <li class="gate"><span class="gate-num">03</span><div><div class="gate-name">Security &amp; guardrails</div><div class="gate-reason">Current evidence must bind to candidate</div></div><span class="gate-state"><i class="dot"></i> Held</span></li>
+            <li class="gate"><span class="gate-num">04</span><div><div class="gate-name">Eval preparation</div><div class="gate-reason">Scenario inputs not yet admitted</div></div><span class="gate-state"><i class="dot"></i> Held</span></li>
+            <li class="gate"><span class="gate-num">05</span><div><div class="gate-name">Eval local proof</div><div class="gate-reason">No receipt for current digest</div></div><span class="gate-state"><i class="dot"></i> Held</span></li>
+            <li class="gate"><span class="gate-num">06</span><div><div class="gate-name">Eval cloud proof</div><div class="gate-reason">Scenario identities must match</div></div><span class="gate-state"><i class="dot"></i> Held</span></li>
+            <li class="gate"><span class="gate-num">07</span><div><div class="gate-name">Tessl staging</div><div class="gate-reason">Local proof and dry run required</div></div><span class="gate-state"><i class="dot"></i> Held</span></li>
+            <li class="gate"><span class="gate-num">08</span><div><div class="gate-name">Tessl publication &amp; registry</div><div class="gate-reason">Publication and observation stay separate</div></div><span class="gate-state"><i class="dot"></i> Held</span></li>
+            <li class="gate"><span class="gate-num">09</span><div><div class="gate-name">Runtime truth</div><div class="gate-reason">Installed digest and behavior must agree</div></div><span class="gate-state"><i class="dot"></i> Held</span></li>
+          </ol>
+
+          <div class="baseline"><span><b>TESSL OBSERVED BASELINE</b> · historical context</span><span>NOT CURRENT PROOF&nbsp; ↗</span></div>
+          <footer class="cockpit-foot"><span class="disclosure">GUIDED DEMO · DETERMINISTIC STATES · NOT LIVE RUNTIME EVIDENCE</span><span>candidate-bound receipts</span></footer>
+        </article>
+      </section>
+    </section>
+
+    <footer class="proof">
+      <div class="proof-steps" aria-label="Evidence path">
+        <div class="proof-step active"><span>01</span>Scoped change</div>
+        <div class="proof-step"><span>02</span>Repository checks</div>
+        <div class="proof-step"><span>03</span>Structured evidence</div>
+        <div class="proof-step"><span>04</span>Human decision</div>
+      </div>
+      <div class="maker">BUILT WITH <b>CODEX</b><br>STORY · STATE CONTRACT · VERIFIED QR</div>
+    </footer>
+  </main>
+</body>
+</html>

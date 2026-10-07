@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SkillsBar — Precision Grid</title>
+  <style>
+    :root {
+      --canvas: #0b0d10;
+      --surface: #111418;
+      --surface-raised: #15191e;
+      --rule: #2a3038;
+      --rule-strong: #3a424d;
+      --ink: #f2f4f7;
+      --muted: #9aa4b1;
+      --quiet: #65707d;
+      --blue: #5aa7ff;
+      --blue-soft: #17304e;
+      --orange: #f29b52;
+      --orange-soft: #382619;
+      --green: #70c89b;
+      --sans: "Geist", "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      --mono: "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { margin: 0; min-width: 320px; min-height: 100%; background: var(--canvas); color: var(--ink); }
+
+    body {
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+      background-image:
+        linear-gradient(to right, transparent calc(100% - 1px), rgba(255,255,255,.024) 1px),
+        linear-gradient(to bottom, transparent calc(100% - 1px), rgba(255,255,255,.018) 1px);
+      background-size: 96px 96px;
+    }
+
+    button { font: inherit; color: inherit; }
+
+    .page {
+      width: min(100%, 1600px);
+      min-height: 900px;
+      margin: 0 auto;
+      padding: 42px 64px 28px;
+      display: grid;
+      grid-template-rows: 1fr 84px;
+      gap: 24px;
+    }
+
+    .stage {
+      display: grid;
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      gap: 40px;
+      min-height: 0;
+    }
+
+    .editorial {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding-right: 18px;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding-bottom: 17px;
+      border-bottom: 1px solid var(--rule-strong);
+    }
+
+    .brand {
+      font-size: 17px;
+      font-weight: 650;
+      letter-spacing: -.02em;
+    }
+
+    .byline {
+      color: var(--quiet);
+      font-size: 12px;
+      letter-spacing: .02em;
+    }
+
+    .story {
+      align-self: center;
+      max-width: 560px;
+      padding: 10px 0 18px;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 24px;
+      color: var(--orange);
+      font: 600 11px/1 var(--mono);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 24px;
+      height: 1px;
+      background: currentColor;
+    }
+
+    h1 {
+      max-width: 520px;
+      margin: 0;
+      font-family: var(--serif);
+      font-size: clamp(64px, 5.2vw, 83px);
+      font-weight: 500;
+      line-height: .94;
+      letter-spacing: -.052em;
+    }
+
+    .lede {
+      max-width: 485px;
+      margin: 31px 0 0;
+      color: #c2c8d0;
+      font-size: 19px;
+      line-height: 1.48;
+      letter-spacing: -.012em;
+    }
+
+    .presenter {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 18px;
+      align-items: end;
+      padding-top: 17px;
+      border-top: 1px solid var(--rule-strong);
+    }
+
+    .controls { display: flex; gap: 8px; }
+
+    .control {
+      min-width: 44px;
+      height: 44px;
+      padding: 0 14px;
+      border: 1px solid var(--rule-strong);
+      border-radius: 2px;
+      background: transparent;
+      font-size: 13px;
+    }
+
+    .control.primary {
+      border-color: var(--blue);
+      background: var(--blue);
+      color: #07111c;
+      font-weight: 700;
+    }
+
+    .progress { text-align: right; }
+    .progress strong { display: block; font: 600 13px/1 var(--mono); }
+    .progress span { display: block; margin-top: 8px; color: var(--quiet); font: 10px/1.2 var(--mono); letter-spacing: .06em; }
+
+    .cockpit-wrap {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+    }
+
+    .cockpit {
+      width: 100%;
+      border: 1px solid var(--rule-strong);
+      border-radius: 4px;
+      background: var(--surface);
+      box-shadow: 0 24px 70px rgba(0,0,0,.34);
+      overflow: hidden;
+    }
+
+    .cockpit-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 20px;
+      min-height: 76px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--rule-strong);
+      background: #0e1115;
+    }
+
+    .skill-title { display: flex; gap: 13px; align-items: center; min-width: 0; }
+    .mark {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--blue);
+      color: var(--blue);
+      font: 700 13px/1 var(--mono);
+    }
+    .skill-title strong { display: block; font-size: 16px; letter-spacing: -.01em; }
+    .skill-title small { display: block; margin-top: 5px; color: var(--muted); font: 11px/1.2 var(--mono); }
+
+    .state-summary { text-align: right; }
+    .state-summary b { display: block; color: var(--orange); font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .state-summary small { display: block; margin-top: 7px; color: var(--quiet); font: 10px/1 var(--mono); }
+
+    .gate-table-head,
+    .gate {
+      display: grid;
+      grid-template-columns: 42px minmax(190px, 1fr) 104px minmax(184px, .95fr);
+      align-items: center;
+      column-gap: 12px;
+    }
+
+    .gate-table-head {
+      height: 34px;
+      padding: 0 18px;
+      color: var(--quiet);
+      border-bottom: 1px solid var(--rule);
+      font: 600 9px/1 var(--mono);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .gates { margin: 0; padding: 0; list-style: none; }
+
+    .gate {
+      min-height: 49px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--rule);
+      background: var(--surface);
+    }
+
+    .gate.active {
+      position: relative;
+      background: linear-gradient(90deg, var(--orange-soft), rgba(56,38,25,.18) 54%, transparent);
+    }
+
+    .gate.active::before {
+      content: "";
+      position: absolute;
+      inset: -1px auto -1px 0;
+      width: 3px;
+      background: var(--orange);
+    }
+
+    .index { color: var(--quiet); font: 11px/1 var(--mono); }
+    .gate.active .index { color: var(--orange); }
+    .gate-name { font-size: 13px; font-weight: 620; letter-spacing: -.008em; }
+    .gate-reason { overflow: hidden; color: var(--muted); font: 10px/1.35 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+
+    .status {
+      justify-self: start;
+      padding: 5px 7px 4px;
+      border: 1px solid var(--rule-strong);
+      color: var(--quiet);
+      font: 650 9px/1 var(--mono);
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+
+    .status.required { border-color: #8b5936; background: var(--orange-soft); color: var(--orange); }
+
+    .baseline {
+      display: grid;
+      grid-template-columns: 42px 1fr auto;
+      align-items: center;
+      column-gap: 12px;
+      min-height: 56px;
+      padding: 0 18px;
+      background: #0e1115;
+    }
+
+    .baseline-icon { color: var(--quiet); font: 12px/1 var(--mono); }
+    .baseline strong { display: block; color: #b5bdc7; font-size: 11px; font-weight: 600; }
+    .baseline small { display: block; margin-top: 5px; color: var(--quiet); font: 9px/1 var(--mono); }
+    .baseline-score { color: var(--quiet); font: 600 10px/1 var(--mono); }
+
+    .proof-footer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 28px;
+      border-top: 1px solid var(--rule-strong);
+    }
+
+    .proof-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      min-width: 0;
+    }
+
+    .proof-step {
+      position: relative;
+      padding: 18px 16px 0 28px;
+      border-top: 2px solid var(--rule);
+      color: var(--quiet);
+      font: 600 11px/1.2 var(--mono);
+      letter-spacing: .01em;
+    }
+
+    .proof-step::before {
+      content: attr(data-index);
+      position: absolute;
+      left: 0;
+      color: #515b67;
+      font-size: 9px;
+    }
+
+    .proof-step.active { border-top-color: var(--blue); color: var(--ink); }
+    .proof-step.active::before { color: var(--blue); }
+
+    .maker {
+      padding-top: 18px;
+      color: var(--muted);
+      font: 650 10px/1 var(--mono);
+      letter-spacing: .12em;
+      white-space: nowrap;
+    }
+
+    .provenance {
+      position: absolute;
+      right: 64px;
+      top: 22px;
+      color: #707a87;
+      font: 600 9px/1 var(--mono);
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 1100px) {
+      .page { padding-inline: 36px; }
+      .stage { grid-template-columns: 1fr; }
+      .editorial { min-height: 520px; }
+      .provenance { right: 36px; }
+      .page { min-height: 1200px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <p class="provenance">Guided demo · deterministic states · not live runtime evidence</p>
+    <section class="stage" aria-label="SkillsBar guided demo, beat one">
+      <div class="editorial">
+        <header class="brand-row">
+          <div class="brand">SkillsBar</div>
+          <div class="byline">by brAInwav</div>
+        </header>
+
+        <div class="story">
+          <p class="eyebrow">The trust boundary</p>
+          <h1>When evidence<br>goes stale.</h1>
+          <p class="lede">A changed Skill candidate should not inherit proof that no longer belongs to it.</p>
+        </div>
+
+        <div class="presenter">
+          <div class="controls" aria-label="Presenter controls">
+            <button class="control" type="button" aria-label="Previous beat">←</button>
+            <button class="control primary" type="button" aria-label="Next beat">Next&nbsp;&nbsp;→</button>
+            <button class="control" type="button" aria-label="Reset walkthrough">R</button>
+          </div>
+          <div class="progress"><strong>1 / 6</strong><span>HOOK · OVERVIEW</span></div>
+        </div>
+      </div>
+
+      <div class="cockpit-wrap">
+        <article class="cockpit" aria-label="Nine-gate SkillsBar cockpit">
+          <header class="cockpit-head">
+            <div class="skill-title">
+              <div class="mark">SB</div>
+              <div><strong>improve-agent-native</strong><small>candidate · digest unavailable</small></div>
+            </div>
+            <div class="state-summary"><b>Action required</b><small>1 boundary · 8 gates held</small></div>
+          </header>
+
+          <div class="gate-table-head" aria-hidden="true"><span>Gate</span><span>Evidence lane</span><span>Status</span><span>Candidate binding</span></div>
+          <ol class="gates">
+            <li class="gate active"><span class="index">01</span><span class="gate-name">Candidate identity</span><span class="status required">Required</span><span class="gate-reason">Create canonical package digest</span></li>
+            <li class="gate"><span class="index">02</span><span class="gate-name">Mechanical validation</span><span class="status">Held</span><span class="gate-reason">Awaiting candidate identity</span></li>
+            <li class="gate"><span class="index">03</span><span class="gate-name">Security &amp; guardrails</span><span class="status">Held</span><span class="gate-reason">No current governed receipt</span></li>
+            <li class="gate"><span class="index">04</span><span class="gate-name">Eval preparation</span><span class="status">Held</span><span class="gate-reason">Scenario binding unavailable</span></li>
+            <li class="gate"><span class="index">05</span><span class="gate-name">Eval local proof</span><span class="status">Held</span><span class="gate-reason">Candidate digest required</span></li>
+            <li class="gate"><span class="index">06</span><span class="gate-name">Eval cloud proof</span><span class="status">Held</span><span class="gate-reason">Scenario identities required</span></li>
+            <li class="gate"><span class="index">07</span><span class="gate-name">Tessl staging</span><span class="status">Held</span><span class="gate-reason">Local proof and dry run required</span></li>
+            <li class="gate"><span class="index">08</span><span class="gate-name">Tessl publication &amp; registry</span><span class="status">Held</span><span class="gate-reason">Publication receipt unavailable</span></li>
+            <li class="gate"><span class="index">09</span><span class="gate-name">Runtime truth</span><span class="status">Held</span><span class="gate-reason">Installed digest not observed</span></li>
+          </ol>
+
+          <div class="baseline">
+            <span class="baseline-icon">↳</span>
+            <div><strong>Observed Tessl baseline</strong><small>Historical external context · not proof for this candidate</small></div>
+            <span class="baseline-score">SCORE 66 · COLLAPSED</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <footer class="proof-footer">
+      <div class="proof-strip" aria-label="Proof sequence">
+        <div class="proof-step active" data-index="01">Scoped change</div>
+        <div class="proof-step" data-index="02">Repository checks</div>
+        <div class="proof-step" data-index="03">Structured evidence</div>
+        <div class="proof-step" data-index="04">Human decision</div>
+      </div>
+      <div class="maker">BUILT WITH CODEX</div>
+    </footer>
+  </main>
+</body>
+</html>

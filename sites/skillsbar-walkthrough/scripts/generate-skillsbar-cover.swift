@@ -114,67 +114,20 @@ fill(CGRect(x: 0, y: 0, width: 720, height: canvas.height), warm)
 
 icon.draw(in: CGRect(x: 62, y: 790, width: 52, height: 52))
 draw("SkillsBar", in: CGRect(x: 132, y: 800, width: 220, height: 34), font: font(size: 25, weight: .semibold), color: paperInk)
-draw("by brAInwav", in: CGRect(x: 134, y: 780, width: 160, height: 20), font: font(size: 12, weight: .medium), color: color(0x6d6b66), tracking: 0.25)
+draw("by jscraik", in: CGRect(x: 134, y: 780, width: 160, height: 20), font: font(size: 12, weight: .medium), color: color(0x6d6b66), tracking: 0.25)
 
 draw("OPENAI HACKATHON · BUILT WITH CODEX", in: CGRect(x: 62, y: 691, width: 510, height: 22), font: font(name: "SFMono-Semibold", size: 12, weight: .semibold), color: color(0x55575b), tracking: 1.3)
-draw("A score is not\na candidate.", in: CGRect(x: 58, y: 350, width: 600, height: 310), font: font(name: "SF Pro Display", size: 92, weight: .bold), color: paperInk, lineHeight: 91, tracking: -4.2)
-draw("A published score cannot prove a local skill whose package digest is missing.", in: CGRect(x: 62, y: 236, width: 548, height: 90), font: font(size: 23, weight: .regular), color: color(0x4f5155), lineHeight: 33)
-draw("CONCEPT MOCKUP · NOT RUNTIME EVIDENCE", in: CGRect(x: 62, y: 64, width: 470, height: 22), font: font(name: "SFMono-Regular", size: 11), color: color(0x6f6c67), tracking: 1.25)
+draw("Know what your\nskill needs next.", in: CGRect(x: 58, y: 350, width: 600, height: 310), font: font(name: "SF Pro Display", size: 92, weight: .bold), color: paperInk, lineHeight: 91, tracking: -4.2)
+draw("Inspect nine evidence gates, see what needs attention, and copy the next command.", in: CGRect(x: 62, y: 236, width: 548, height: 90), font: font(size: 23, weight: .regular), color: color(0x4f5155), lineHeight: 33)
+draw("APP-RENDERED FIXTURE · NOT LIVE EVIDENCE", in: CGRect(x: 62, y: 64, width: 470, height: 22), font: font(name: "SFMono-Regular", size: 11), color: color(0x6f6c67), tracking: 1.25)
 
-let technicalX: CGFloat = 720
-draw("SKILLS SDK · LOCAL · v0.2.0", in: CGRect(x: technicalX + 62, y: 815, width: 380, height: 20), font: font(name: "SFMono-Semibold", size: 12, weight: .semibold), color: muted, tracking: 1.1)
-draw("jscraik/improve-agent-native", in: CGRect(x: technicalX + 62, y: 779, width: 520, height: 30), font: font(size: 22, weight: .semibold), color: ink)
-draw("LOCAL CANDIDATE CHANGED", in: CGRect(x: technicalX + 62, y: 718, width: 320, height: 22), font: font(name: "SFMono-Semibold", size: 12, weight: .semibold), color: orange, tracking: 1.2)
-draw("canonical digest missing", in: CGRect(x: 1440, y: 718, width: 220, height: 22), font: font(name: "SFMono-Regular", size: 12), color: muted, alignment: .right)
+let captureURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    .appendingPathComponent("public/skillsbar-demo-render.png")
+guard let capture = NSImage(contentsOf: captureURL) else { throw CoverError.missingIcon }
+capture.draw(in: CGRect(x: 934, y: 84, width: 552, height: 703.2))
+draw("NATIVE MACOS APP · NINE EVIDENCE GATES", in: CGRect(x: 840, y: 815, width: 760, height: 24), font: font(name: "SFMono-Semibold", size: 15), color: secondary, alignment: .center)
+draw("SUPPORTED DEMO FIXTURE · APP-RENDERED SNAPSHOT", in: CGRect(x: 820, y: 36, width: 800, height: 22), font: font(name: "SFMono-Regular", size: 12), color: muted, alignment: .center)
 
-let trackY: CGFloat = 648
-let trackStart: CGFloat = technicalX + 72
-let trackEnd: CGFloat = 1660
-line(from: CGPoint(x: trackStart, y: trackY), to: CGPoint(x: trackEnd, y: trackY), color: rule, width: 2)
-line(from: CGPoint(x: trackStart, y: trackY), to: CGPoint(x: trackStart + 72, y: trackY), color: orange, width: 5)
-fill(CGRect(x: trackStart + 64, y: trackY - 8, width: 16, height: 16), orange, radius: 8)
-draw("CANDIDATE", in: CGRect(x: trackStart, y: trackY + 16, width: 140, height: 18), font: font(name: "SFMono-Regular", size: 10), color: muted, tracking: 1)
-draw("REQUIRED", in: CGRect(x: trackStart + 35, y: trackY - 35, width: 100, height: 18), font: font(name: "SFMono-Semibold", size: 10), color: orange, alignment: .center, tracking: 1)
-draw("HUMAN DECISION", in: CGRect(x: 1510, y: trackY + 16, width: 150, height: 18), font: font(name: "SFMono-Regular", size: 10), color: muted, alignment: .right, tracking: 1)
-
-let cards: [(String, String, CGFloat, CGFloat)] = [
-    ("01", "Build", 782, 248),
-    ("02", "Prove", 1048, 318),
-    ("03", "Ship", 1384, 276),
-]
-for (number, title, x, width) in cards {
-    let rect = CGRect(x: x, y: 322, width: width, height: 245)
-    fill(rect, surface, radius: 18)
-    stroke(rect, rule, radius: 18, width: 2)
-    fill(CGRect(x: x + 20, y: 504, width: 38, height: 38), color(0x1d2127), radius: 19)
-    stroke(CGRect(x: x + 20, y: 504, width: 38, height: 38), color(0x4a515c), radius: 19)
-    draw(number, in: CGRect(x: x + 20, y: 516, width: 38, height: 16), font: font(name: "SFMono-Semibold", size: 10), color: blue, alignment: .center)
-    draw(title, in: CGRect(x: x + 72, y: 503, width: width - 94, height: 38), font: font(size: 27, weight: .semibold), color: ink)
-}
-
-draw("1  Candidate identity", in: CGRect(x: 806, y: 437, width: 200, height: 26), font: font(size: 16, weight: .semibold), color: color(0xffc15a))
-draw("digest missing", in: CGRect(x: 806, y: 405, width: 190, height: 24), font: font(name: "SFMono-Semibold", size: 12), color: orange)
-draw("2  Mechanical validation", in: CGRect(x: 806, y: 362, width: 210, height: 24), font: font(size: 14, weight: .medium), color: muted)
-
-let proveRows = ["3  Security & guardrails", "4  Eval preparation", "5  Eval local proof", "6  Eval cloud proof"]
-for (index, row) in proveRows.enumerated() {
-    draw(row, in: CGRect(x: 1072, y: 443 - CGFloat(index * 35), width: 250, height: 24), font: font(size: 14, weight: .medium), color: muted)
-}
-let shipRows = ["7  Tessl staging", "8  Publication & registry", "9  Runtime truth"]
-for (index, row) in shipRows.enumerated() {
-    draw(row, in: CGRect(x: 1408, y: 433 - CGFloat(index * 43), width: 225, height: 26), font: font(size: 14, weight: .medium), color: muted)
-}
-
-let verdict = CGRect(x: technicalX + 62, y: 154, width: 885, height: 112)
-fill(verdict, color(0x18130c), radius: 15)
-stroke(verdict, color(0x74501c), radius: 15, width: 2)
-draw("CANDIDATE IDENTITY REQUIRED", in: CGRect(x: verdict.minX + 22, y: verdict.maxY - 43, width: 360, height: 22), font: font(name: "SFMono-Semibold", size: 12), color: orange, tracking: 1)
-draw("Downstream proof held", in: CGRect(x: verdict.minX + 22, y: verdict.minY + 25, width: 360, height: 35), font: font(size: 24, weight: .semibold), color: ink)
-draw("registry baseline remains separate", in: CGRect(x: verdict.maxX - 350, y: verdict.minY + 34, width: 326, height: 22), font: font(name: "SFMono-Regular", size: 11), color: muted, alignment: .right)
-
-draw("current candidate · observed baseline separate · release decision human", in: CGRect(x: technicalX + 62, y: 70, width: 885, height: 22), font: font(name: "SFMono-Regular", size: 10), color: muted, alignment: .right, tracking: 0.8)
-
-context?.flushGraphics()
 NSGraphicsContext.restoreGraphicsState()
 
 guard let png = bitmap.representation(using: .png, properties: [:]) else {

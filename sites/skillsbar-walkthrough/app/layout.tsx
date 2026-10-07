@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
-const title = "A score is not a candidate · SkillsBar";
-const description = "See why a published skill score cannot prove a local candidate with a missing digest, and find the next check to run.";
+const title = "Know what your skill needs next · SkillsBar";
+const description = "Inspect nine evidence gates, see what needs attention, and copy the next command from your macOS menu bar.";
 
 export const viewport: Viewport = {
   width: "device-width",
