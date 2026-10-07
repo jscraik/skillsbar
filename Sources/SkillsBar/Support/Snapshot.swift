@@ -57,11 +57,45 @@ extension EnvironmentValues {
 }
 
 enum SnapshotRenderer {
+    /// Visual comparison only; never used by the live evidence loader.
+    static var focusReferenceDashboard: SkillDashboard {
+        var dashboard = SkillDashboard.reviewNoCLIFixture
+        let observed = Date().addingTimeInterval(-180)
+        let fingerprint = "focus-reference-only"
+        dashboard.pipeline = PipelineCandidate(
+            fingerprint: fingerprint,
+            governedInputPaths: [],
+            observedAt: observed,
+            stageReceipts: PipelineStage.allCases.map { stage in
+                PipelineStageReceipt(
+                    stage: stage,
+                    candidateFingerprint: fingerprint,
+                    evidenceStatus: stage.number < 3 ? .passed : (stage.number == 3 ? .reviewRequired : (stage.number == 4 ? .held : .unproven)),
+                    stageScore: stage.number < 3 ? 100 : nil,
+                    command: "skills security risk-modes",
+                    receiptPath: nil,
+                    modelProfile: nil,
+                    observedAt: observed,
+                    nextAction: "Review findings · full governed security receipt is missing or malformed"
+                )
+            }
+        )
+        dashboard.tessl.registryScore = nil
+        dashboard.tessl.registryVersion = nil
+        dashboard.tessl.registryQualityScore = nil
+        dashboard.tessl.registryImpactScore = nil
+        dashboard.tessl.registrySecurityLabel = nil
+        dashboard.tessl.dataOrigin = .unavailable
+        dashboard.refreshedAt = observed
+        return dashboard
+    }
+
     @MainActor
     static func render(to outputURL: URL, configuration: SnapshotConfiguration = .default) {
         do {
             _ = NSApplication.shared
-            let dashboard = try DashboardDataSource().loadSync()
+            let dashboard = CommandLine.arguments.contains("--snapshot-focus-reference")
+                ? focusReferenceDashboard : try DashboardDataSource().loadSync()
             try render(dashboard: dashboard, configuration: configuration, to: outputURL)
             print("Wrote snapshot \(outputURL.path)")
         } catch {
@@ -114,9 +148,23 @@ enum SnapshotRenderer {
         hostingView.layoutSubtreeIfNeeded()
         hostingView.needsDisplay = true
         hostingView.displayIfNeeded()
-        guard let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds) else {
+        // Keep the regression canvas in points, independent of the attached
+        // display's Retina scale, so local and headless renders agree.
+        guard let bitmap = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: Int(hostingView.bounds.width),
+            pixelsHigh: Int(hostingView.bounds.height),
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ) else {
             throw SnapshotError.bitmapUnavailable
         }
+        bitmap.size = hostingView.bounds.size
         hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
         guard let data = bitmap.representation(using: .png, properties: [:]) else {
             throw SnapshotError.pngUnavailable

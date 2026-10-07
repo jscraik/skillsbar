@@ -30,9 +30,9 @@ struct DashboardView: View {
                     onSelectSkill: { model.selectSkill(path: $0) },
                     onRefresh: { Task { await model.refresh() } }
                 )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 32)
-                    .padding(.bottom, 18)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
             } else {
                 EvidenceLoadingView()
                     .padding(24)
@@ -43,24 +43,13 @@ struct DashboardView: View {
             height: snapshotMode ? MenuBarTemplateMetrics.preferredHeight : MenuBarTemplateMetrics.height
         )
         .foregroundStyle(.primaryText)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(alignment: .topTrailing) {
-            PopoverCloseButton()
-                .padding(13)
-        }
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onExitCommand { NSApp.keyWindow?.orderOut(nil) }
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: [Color.primary.opacity(0.32), Color.primary.opacity(0.08)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
-            )
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
             .allowsHitTesting(false)
         )
-        .shadow(color: Color.black.opacity(0.18), radius: 22, y: 12)
         .accessibilityElement(children: .contain)
     }
 }
@@ -83,47 +72,6 @@ private struct EvidenceLoadingView: View {
     }
 }
 
-private struct PopoverCloseButton: View {
-    @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var hover = PopoverCloseHoverModel()
-
-    var body: some View {
-        Button { closePopover() } label: {
-            ZStack {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
-                    .frame(width: 30, height: 30)
-                    .background(Color.primary.opacity(hover.isHovering ? 0.075 : 0.025))
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.primary.opacity(hover.isHovering ? 0.16 : 0.06), lineWidth: 1))
-            }
-            .frame(
-                width: MenuBarTemplateMetrics.minimumInteractiveTarget,
-                height: MenuBarTemplateMetrics.minimumInteractiveTarget
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(ImmediateFeedbackButtonStyle())
-        .keyboardShortcut(.cancelAction)
-        .foregroundStyle(.bodyText)
-        .contentShape(Rectangle())
-        .onHover { hover.isHovering = $0 }
-        .help("Close SkillsBar")
-        .accessibilityLabel("Close SkillsBar")
-    }
-
-    private func closePopover() {
-        let popoverWindow = NSApp.keyWindow
-        dismiss()
-        popoverWindow?.orderOut(nil)
-    }
-}
-
-@MainActor
-private final class PopoverCloseHoverModel: ObservableObject {
-    @Published var isHovering = false
-}
-
 private struct PopoverInteriorBackdrop: View {
     let colorScheme: ColorScheme
     let reduceTransparency: Bool
@@ -131,51 +79,36 @@ private struct PopoverInteriorBackdrop: View {
     let snapshotMode: Bool
 
     var body: some View {
-        ZStack {
-            Color(nsColor: colorScheme == .dark ? .underPageBackgroundColor : .windowBackgroundColor)
-            if !reduceTransparency && !increasedContrast && !snapshotMode {
-                Rectangle()
-                    .fill(.regularMaterial)
-                    .opacity(0.78)
+        if reduceTransparency || increasedContrast || snapshotMode {
+            if colorScheme == .dark {
+                Color.focusDarkSurface
+            } else {
+                Color(nsColor: .windowBackgroundColor)
             }
-        }
-        .overlay(
-            LinearGradient(
-                colors: reduceTransparency || increasedContrast
-                    ? [
-                        Color(nsColor: colorScheme == .dark ? .underPageBackgroundColor : .windowBackgroundColor),
-                        Color(nsColor: .controlBackgroundColor)
-                    ]
-                    : [
-                        Color.primary.opacity(0.025),
-                        .clear
-                    ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .overlay(alignment: .top) {
-            LinearGradient(
-                colors: [Color.primary.opacity(0.055), .clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 110)
-            .allowsHitTesting(false)
+        } else {
+            PopoverMaterial()
         }
     }
 }
 
-private struct ImmediateFeedbackButtonStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+private struct PopoverMaterial: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = TransparentPopoverEffect()
+        view.material = .popover
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(Color.primary.opacity(configuration.isPressed ? 0.10 : 0))
-            .opacity(configuration.isPressed ? 0.78 : 1)
-            .contentShape(Rectangle())
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
-            .animation(.easeOut(duration: reduceMotion ? 0 : 0.10), value: configuration.isPressed)
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+}
+
+private final class TransparentPopoverEffect: NSVisualEffectView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // Behind-window material requires the hosting window to expose its backdrop.
+        window?.isOpaque = false
+        window?.backgroundColor = .clear
     }
 }
 
@@ -207,10 +140,14 @@ private func resourceImage(named name: String) -> NSImage? {
 extension ShapeStyle where Self == Color {
     static var primaryText: Color { .primary }
     static var secondaryText: Color { .secondary }
-    static var bodyText: Color { .secondary.opacity(0.88) }
+    static var bodyText: Color { Color(nsColor: .secondaryLabelColor) }
 }
 
 extension Color {
+    static var focusDarkSurface: Color { Color(red: 0.105, green: 0.12, blue: 0.13) }
+    static var focusActionBlue: Color { Color(red: 0, green: 0.435, blue: 0.94) }
+    static var focusWarningInk: Color { Color(red: 0.55, green: 0.32, blue: 0.02) }
+    static var focusInfoInk: Color { Color(red: 0.04, green: 0.40, blue: 0.48) }
     static var releaseSurface: Color { Color.primary.opacity(0.04) }
     static var releaseSurfacePressed: Color { Color.primary.opacity(0.10) }
     static var releaseBorderSubtle: Color { Color.primary.opacity(0.12) }

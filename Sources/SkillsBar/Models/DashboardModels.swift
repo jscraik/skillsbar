@@ -110,6 +110,20 @@ enum PipelineStage: String, CaseIterable, Identifiable {
         }
     }
 
+    var compactTitle: String {
+        switch self {
+        case .candidateBaseline: return "Identity"
+        case .mechanicalValidation: return "Validation"
+        case .securityReview: return "Security"
+        case .evalPreparation: return "Eval prep"
+        case .ossLocal: return "Local eval"
+        case .ossCloud: return "Cloud eval"
+        case .tesslStaging: return "Staging"
+        case .tesslLiveRegistry: return "Publication"
+        case .liveScoreAndRuntime: return "Runtime"
+        }
+    }
+
     var number: Int {
         Self.allCases.firstIndex(of: self).map { $0 + 1 } ?? 0
     }

@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 private enum SkillsBarMotion {
+    static let feedback = Animation.easeOut(duration: 0.12)
     static let candidateRefresh = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.16)
     static let tesslRefresh = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.18)
 }
@@ -44,18 +45,6 @@ private struct EvidenceValueTransition<Content: View>: View {
         } else {
             content()
         }
-    }
-}
-
-private extension PipelineCandidate {
-    var refreshMotionKey: String {
-        let active = activeReceipt
-        return [
-            fingerprint,
-            active?.stage.rawValue ?? "complete",
-            active?.evidenceStatus.label ?? "passed",
-            active?.nextAction ?? ""
-        ].joined(separator: "|")
     }
 }
 
@@ -103,37 +92,26 @@ struct ReleaseEvidenceView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            EvidenceValueTransition(key: dashboard.pipeline.refreshMotionKey) {
-                ReleaseHeader(
+            ReleaseHeader(
+                dashboard: dashboard,
+                isRefreshing: isRefreshing,
+                isFixture: isFixture
+            ) {
+                SkillSelectionMenu(
                     dashboard: dashboard,
-                    isRefreshing: isRefreshing,
-                    isFixture: isFixture,
-                    availableSkillPaths: availableSkillPaths,
                     selectedSkillPath: selectedSkillPath,
-                    isSkillSelectionPinned: isSkillSelectionPinned,
-                    onSelectSkill: onSelectSkill
+                    availableSkillPaths: availableSkillPaths,
+                    isPinned: isSkillSelectionPinned,
+                    onSelect: onSelectSkill
                 )
             }
-            ReleaseDivider().padding(.vertical, 14)
-            if let active = dashboard.pipeline.activeReceipt {
-                VStack(alignment: .leading, spacing: 9) {
-                    Text("NEXT REQUIRED")
-                        .releaseFont(11, weight: .medium, relativeTo: .caption)
-                        .foregroundStyle(.secondaryText)
-                        .padding(.horizontal, 12)
-                    EvidenceValueTransition(key: dashboard.pipeline.refreshMotionKey) {
-                        NextRequiredCard(receipt: active)
-                    }
-                }
-                .padding(.bottom, 16)
-            }
+            ReleaseDivider().padding(.top, 8).padding(.bottom, 4)
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    ReleaseGateList(dashboard: dashboard)
-                        .id(dashboard.pipeline.fingerprint)
+                VStack(alignment: .leading, spacing: 8) {
+                    FocusNavigator(candidate: dashboard.pipeline, securityBadge: dashboard.security.severityLine)
                     TesslEvidenceCard(dashboard: dashboard)
-                    ReleaseFooter(dashboard: dashboard, isRefreshing: isRefreshing, onRefresh: onRefresh)
-                    Color.clear.frame(height: 14)
+                    .padding(.vertical, 8)
+                    .overlay(alignment: .top) { ReleaseDivider() }
                 }
                 .padding(.trailing, 2)
             }
@@ -141,124 +119,380 @@ struct ReleaseEvidenceView: View {
             .scrollBounceBehavior(.basedOnSize)
             .frame(maxHeight: .infinity)
             .layoutPriority(1)
+            ReleaseDivider().padding(.top, 2)
+            ReleaseFooter(dashboard: dashboard, isRefreshing: isRefreshing, onRefresh: onRefresh)
         }
     }
 }
 
-private struct ReleaseHeader: View {
+private struct FocusNavigator: View {
+    let candidate: PipelineCandidate
+    let securityBadge: String
+    @StateObject private var selection: FocusNavigatorModel
+
+    init(candidate: PipelineCandidate, securityBadge: String) {
+        self.candidate = candidate
+        self.securityBadge = securityBadge
+        _selection = StateObject(wrappedValue: FocusNavigatorModel(candidate: candidate))
+    }
+
+    private var summary: String {
+        let receipts = candidate.orderedReceipts
+        let counts: [(PipelineEvidenceStatus, String)] = [
+            (.passed, "passed"), (.reviewRequired, "needs review"),
+            (.blocked, "blocked"), (.stale, "stale")
+        ]
+        var parts = counts.compactMap { status, label -> String? in
+            let count = receipts.filter { $0.evidenceStatus == status }.count
+            return count > 0 ? "\(count) \(label)" : nil
+        }
+        let awaiting = receipts.filter { $0.evidenceStatus == .held || $0.evidenceStatus == .unproven }.count
+        if awaiting > 0 { parts.append("\(awaiting) awaiting proof") }
+        return parts.joined(separator: " · ")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            PipelineStageGrid(candidate: candidate, selection: selection)
+            Text(summary)
+                .releaseFont(13, weight: .regular, relativeTo: .caption)
+                .foregroundStyle(.bodyText).monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
+            ReleaseDivider().padding(.vertical, 4)
+            if let receipt = selection.receipt(in: candidate) {
+                SelectedStageDetail(
+                    receipt: receipt,
+                    activeStage: candidate.activeReceipt?.stage,
+                    stageCount: candidate.orderedReceipts.count,
+                    securityBadge: securityBadge
+                )
+                .id(receipt.stage)
+                .id(candidate.fingerprint)
+            }
+        }
+        .onChange(of: candidate) { _, updated in selection.reconcile(updated) }
+    }
+}
+
+private struct PipelineStageGrid: View {
+    let candidate: PipelineCandidate
+    @ObservedObject var selection: FocusNavigatorModel
+    @FocusState private var focusedStage: PipelineStage?
+
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 5), count: 3), spacing: 5) {
+            ForEach(candidate.orderedReceipts, id: \.stage) { receipt in
+                PipelineStageCell(
+                    receipt: receipt,
+                    isSelected: selection.selectedStage == receipt.stage,
+                    isCurrent: candidate.activeReceipt?.stage == receipt.stage,
+                    isFocused: focusedStage == receipt.stage
+                ) {
+                    selection.select(receipt.stage)
+                }
+                .focused($focusedStage, equals: receipt.stage)
+            }
+        }
+        .onMoveCommand { direction in
+            guard let stage = focusedStage,
+                  let next = selection.moveFocus(from: stage, direction: direction)
+            else { return }
+            focusedStage = next
+        }
+    }
+}
+
+private struct PipelineStageCell: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let receipt: PipelineStageReceipt
+    let isSelected: Bool
+    let isCurrent: Bool
+    let isFocused: Bool
+    let action: () -> Void
+
+    private var tint: Color {
+        isCurrent ? (colorScheme == .dark ? .warningAccent : .focusWarningInk) : .focusActionBlue
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                ZStack {
+                    HStack {
+                    Text(String(format: "%02d", receipt.stage.number))
+                        .releaseFont(14, weight: .regular, relativeTo: .caption)
+                        .monospacedDigit()
+                    Spacer()
+                    }
+                    Image(systemName: receipt.evidenceStatus.symbol)
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(receipt.evidenceStatus.iconColor(in: colorScheme))
+                }
+                Text(receipt.stage.compactTitle)
+                    .releaseFont(13, weight: .regular, relativeTo: .caption)
+                    .foregroundStyle(isSelected && isCurrent ? tint : Color.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(.primary)
+            .frame(maxWidth: .infinity, minHeight: 36)
+            .padding(.horizontal, 12).padding(.vertical, 5)
+            .background(isSelected ? tint.opacity(0.08) : Color.primary.opacity(0.012), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(isSelected ? tint.opacity(0.85) : Color.releaseBorderSubtle, lineWidth: isSelected ? 1.5 : 1))
+            .overlay(RoundedRectangle(cornerRadius: 6).inset(by: 3).stroke(isFocused ? Color.primary : .clear, lineWidth: 2).allowsHitTesting(false))
+        }
+        .buttonStyle(FocusStageButtonStyle())
+        .accessibilityLabel("Stage \(receipt.stage.number), \(receipt.stage.title), \(receipt.evidenceStatus.label)\(isCurrent ? ", next required" : "")")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .help("\(receipt.stage.title) · \(receipt.evidenceStatus.label)")
+    }
+}
+
+struct SelectedStageDetail: View {
+    @ScaledMetric(relativeTo: .caption) private var statusHeight = 26.0
+    @ScaledMetric(relativeTo: .body) private var explanationHeight = 38.0
+    let receipt: PipelineStageReceipt
+    let activeStage: PipelineStage?
+    let stageCount: Int
+    let securityBadge: String
+
+    private var detailText: String {
+        if receipt.stage == .securityReview,
+           receipt.evidenceStatus == .reviewRequired,
+           receipt.nextAction.contains("full governed security receipt is missing or malformed") {
+            return "Full security receipt missing or malformed.\nInspect findings before continuing."
+        }
+        return receipt.nextAction
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Gate \(String(format: "%02d", receipt.stage.number)) / \(String(format: "%02d", stageCount))")
+                    .monospacedDigit()
+                Spacer(minLength: 8)
+                if let activeStage {
+                    Text(activeStage == receipt.stage ? "Next required" : "Next required: Gate \(String(format: "%02d", activeStage.number))")
+                } else {
+                    Text("All stages passed")
+                }
+            }
+            .releaseFont(12, weight: .regular, relativeTo: .caption)
+            .foregroundStyle(.bodyText)
+            Text(receipt.stage.title)
+                .releaseFont(19, weight: .medium, relativeTo: .headline)
+                .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if receipt.stage == .securityReview, !securityBadge.isEmpty {
+                    SeverityBadges(labels: securityBadge)
+                } else {
+                    Label(receipt.evidenceStatus.label, systemImage: receipt.evidenceStatus.symbol)
+                        .releaseFont(13, weight: .medium, relativeTo: .subheadline)
+                }
+            }
+            .frame(minHeight: statusHeight, alignment: .leading)
+            Text(detailText)
+                .releaseFont(13, weight: .regular, relativeTo: .body)
+                .foregroundStyle(.primary)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: explanationHeight, alignment: .topLeading)
+                .accessibilityLabel(receipt.nextAction)
+            if !receipt.command.isEmpty {
+                CommandAction(receipt: receipt)
+            } else {
+                Text("No command available for this stage")
+                    .releaseFont(12, weight: .regular, relativeTo: .caption)
+                    .foregroundStyle(.bodyText)
+                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct SeverityBadges: View {
+    let labels: String
+
+    private var values: [String] {
+        labels.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { badges }
+            VStack(alignment: .leading, spacing: 6) { badges }
+        }
+    }
+
+    @ViewBuilder private var badges: some View {
+        ForEach(values, id: \.self) { label in
+            StatusBadge(text: label, tone: .warning, prominence: .strong)
+        }
+    }
+}
+
+@MainActor
+private final class CommandDisclosureModel: ObservableObject {
+    @Published var isExpanded = false
+}
+
+private struct CommandAction: View {
+    let receipt: PipelineStageReceipt
+    @StateObject private var disclosure = CommandDisclosureModel()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 12) {
+                Button {
+                    disclosure.isExpanded.toggle()
+                } label: {
+                    Label(disclosure.isExpanded ? "Hide command" : "Show command", systemImage: disclosure.isExpanded ? "chevron.down" : "chevron.right")
+                        .releaseFont(13, weight: .regular, relativeTo: .subheadline)
+                        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(FocusStageButtonStyle())
+                .accessibilityValue(disclosure.isExpanded ? "Expanded" : "Collapsed")
+                Spacer(minLength: 0)
+                GateCopyButton(receipt: receipt)
+            }
+            if disclosure.isExpanded {
+                Text(receipt.command)
+                    .releaseFont(12, weight: .regular, design: .monospaced, relativeTo: .caption)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.releaseSurface, in: RoundedRectangle(cornerRadius: 6))
+            }
+        }
+    }
+}
+
+private extension PipelineEvidenceStatus {
+    var symbol: String {
+        switch self {
+        case .passed: return "checkmark.circle.fill"
+        case .reviewRequired: return "exclamationmark.triangle.fill"
+        case .blocked: return "xmark.octagon.fill"
+        case .held: return "pause.circle.fill"
+        case .unproven: return "minus.circle.fill"
+        case .stale: return "clock.badge.exclamationmark"
+        }
+    }
+
+    func iconColor(in colorScheme: ColorScheme) -> Color {
+        guard colorScheme == .light else { return tone.color }
+        switch self {
+        case .passed: return Color(red: 0.08, green: 0.46, blue: 0.20)
+        case .reviewRequired: return .focusWarningInk
+        case .blocked: return Color(red: 0.72, green: 0.12, blue: 0.10)
+        case .held, .unproven, .stale: return .secondary
+        }
+    }
+}
+
+private struct FocusStageButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @StateObject private var interaction = SurfaceInteraction()
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.primary)
+                    .opacity(configuration.isPressed ? 0.10 : (interaction.isHovered && isEnabled ? 0.04 : 0))
+                    .animation(reduceMotion ? nil : SkillsBarMotion.feedback, value: interaction.isHovered)
+                    .allowsHitTesting(false)
+            }
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .onHover { interaction.isHovered = $0 }
+    }
+}
+
+@MainActor
+private final class SurfaceInteraction: ObservableObject {
+    @Published var isHovered = false
+}
+
+private struct ReleaseHeader<Actions: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
     let dashboard: SkillDashboard
     let isRefreshing: Bool
     let isFixture: Bool
-    let availableSkillPaths: [String]
-    let selectedSkillPath: String
-    let isSkillSelectionPinned: Bool
-    let onSelectSkill: ((String) -> Void)?
+    let actions: Actions
 
-    private var candidate: PipelineCandidate { dashboard.pipeline }
-    private var active: PipelineStageReceipt? { candidate.activeReceipt }
-    private var statusLabel: String {
-        if isRefreshing { return "Refreshing" }
-        if active != nil { return "Needs attention" }
-        return "Up to date"
+    init(
+        dashboard: SkillDashboard,
+        isRefreshing: Bool,
+        isFixture: Bool,
+        @ViewBuilder actions: () -> Actions
+    ) {
+        self.dashboard = dashboard
+        self.isRefreshing = isRefreshing
+        self.isFixture = isFixture
+        self.actions = actions()
     }
+
+    private var statusLabel: String {
+        switch status {
+        case .current: return "Up to date"
+        case .attention: return "Needs attention"
+        case .blocked: return "Blocked"
+        case .refreshing: return "Refreshing"
+        case .unavailable: return "Unavailable"
+        }
+    }
+    private var status: MenuBarStatus { .resolve(dashboard: dashboard, isRefreshing: isRefreshing) }
     private var statusColor: Color {
-        if isRefreshing { return .advisoryAccent }
-        if active != nil { return .warningAccent }
-        return .successAccent
+        if colorScheme == .light {
+            if status == .refreshing { return .focusInfoInk }
+            if status == .attention { return .focusWarningInk }
+        }
+        return status.color
     }
 
     private var statusAccessibilityLabel: String {
-        if isRefreshing { return "Refreshing evidence" }
-        if active != nil { return "Local source up to date; evidence needs attention" }
-        return "Local source up to date"
+        status.label
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            ReleaseSkillLogo(size: 50)
-
-            VStack(alignment: .leading, spacing: 5) {
+            ReleaseSkillLogo(size: 48)
+            VStack(alignment: .leading, spacing: 4) {
                 Text("SKILLS SDK")
-                    .releaseFont(12, weight: .medium, relativeTo: .caption)
-                    .foregroundStyle(.secondaryText)
+                    .releaseFont(12, weight: .regular, relativeTo: .caption)
+                    .foregroundStyle(.bodyText)
                 Text(dashboard.displayName)
-                    .releaseFont(18, weight: .medium, relativeTo: .headline)
-                    .foregroundStyle(.primaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                HStack(spacing: 6) {
-                    ReleasePill(text: isFixture ? "DEMO FIXTURE" : "LOCAL", tone: isFixture ? .pending : .advisory)
+                    .releaseFont(16, weight: .medium, relativeTo: .headline)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                    .help(dashboard.displayName)
+                HStack(spacing: 8) {
+                    StatusBadge(text: isFixture ? "Demo" : "Local", tone: .advisory)
                     Text("v\(dashboard.version.trimmingCharacters(in: CharacterSet(charactersIn: "vV")))")
-                        .releaseFont(12, weight: .regular, relativeTo: .caption)
-                        .foregroundStyle(.bodyText)
-                        .monospacedDigit()
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 8, height: 8)
-                    Text(statusLabel)
-                        .releaseFont(12, weight: .regular, relativeTo: .caption)
-                        .foregroundStyle(statusColor)
-                        .lineLimit(1)
-                        .frame(width: 76, alignment: .leading)
-                        .help(statusAccessibilityLabel)
-                        .accessibilityLabel(statusAccessibilityLabel)
+                        .releaseFont(13, weight: .regular, relativeTo: .caption)
+                        .foregroundStyle(.bodyText).monospacedDigit().fixedSize()
+                    HStack(spacing: 5) {
+                        Circle().fill(statusColor).frame(width: 8, height: 8)
+                        Text(statusLabel)
+                            .releaseFont(13, weight: .medium, relativeTo: .caption)
+                            .foregroundStyle(statusColor)
+                    }
+                    .accessibilityLabel(statusAccessibilityLabel)
+                    .fixedSize()
                 }
             }
-
-            Spacer(minLength: 6)
-
-            VStack(alignment: .center, spacing: 2) {
-                Text("CURRENT GATE")
-                    .releaseFont(9.5, weight: .medium, relativeTo: .caption2)
-                    .foregroundStyle(.secondaryText)
-                CurrentGateRing(active: active, total: PipelineStage.allCases.count)
-            }
-            SkillSelectionMenu(
-                selectedSkillPath: selectedSkillPath,
-                availableSkillPaths: availableSkillPaths,
-                isPinned: isSkillSelectionPinned,
-                onSelect: onSelectSkill
-            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
+            actions
         }
-        .padding(.trailing, 34)
         .accessibilityElement(children: .contain)
     }
 }
 
-private struct CurrentGateRing: View {
-    let active: PipelineStageReceipt?
-    let total: Int
-
-    private var number: Int { active?.stage.number ?? total }
-    private var progress: CGFloat {
-        guard total > 0 else { return 1 }
-        return CGFloat(number) / CGFloat(total)
-    }
-    private var tone: Color {
-        guard let active else { return .successAccent }
-        return active.evidenceStatus == .blocked ? .warningAccent : active.evidenceStatus.tone.color
-    }
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.primary.opacity(0.15), lineWidth: 4)
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(tone, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Text(String(format: "%02d", number))
-                .releaseFont(18, weight: .medium, design: .rounded, relativeTo: .headline)
-                .monospacedDigit()
-                .foregroundStyle(.primaryText)
-        }
-        .frame(width: 54, height: 54)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(active.map { "Current gate \($0.stage.number), \($0.stage.title)" } ?? "All gates current")
-    }
-}
-
 private struct SkillSelectionMenu: View {
+    let dashboard: SkillDashboard
     let selectedSkillPath: String
     let availableSkillPaths: [String]
     let isPinned: Bool
@@ -270,6 +504,7 @@ private struct SkillSelectionMenu: View {
 
     var body: some View {
             Menu {
+            Menu("Select skill") {
             if availableSkillPaths.isEmpty {
                 Text("No local skills discovered")
                     .foregroundStyle(.secondary)
@@ -292,22 +527,23 @@ private struct SkillSelectionMenu: View {
                 Text("Selection pinned by environment")
                     .foregroundStyle(.secondary)
             }
-        } label: {
-            ZStack {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 36, height: 36)
-                    .background(Color.primary.opacity(0.055))
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.primary.opacity(0.16), lineWidth: 1))
             }
-            .frame(width: 48, height: 48)
-            .contentShape(Rectangle())
+            Divider()
+            ReleaseUtilityActions(dashboard: dashboard)
+            Button("Close popover") { NSApp.keyWindow?.orderOut(nil) }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
-        .help(isPinned ? "Skill selection is pinned by the environment" : "Choose a local skill")
-        .accessibilityLabel("Choose skill, currently \(selectedName)")
+        .frame(width: 44, height: 44)
+        .background { Circle().fill(Color.primary.opacity(0.035)).frame(width: 34, height: 34) }
+        .overlay { Circle().strokeBorder(Color.primary.opacity(0.13), lineWidth: 1).frame(width: 34, height: 34).allowsHitTesting(false) }
+        .help("More actions and skill selection")
+        .accessibilityLabel("More SkillsBar actions; selected skill \(selectedName)")
     }
 
     private static func skillName(for path: String) -> String {
@@ -318,600 +554,132 @@ private struct SkillSelectionMenu: View {
     }
 }
 
-@MainActor
-private final class PipelineDisclosureModel: ObservableObject {
-    @Published var expandedReceiptIDs: Set<String>
-    @Published var expandedGroupIDs: Set<String> = []
-
-    init(activeStage: PipelineStage?) {
-        expandedReceiptIDs = activeStage.map { [$0.rawValue] } ?? []
-    }
-}
-
-private struct ReleaseGateList: View {
-    let dashboard: SkillDashboard
-    @StateObject private var disclosure: PipelineDisclosureModel
-
-    init(dashboard: SkillDashboard) {
-        self.dashboard = dashboard
-        _disclosure = StateObject(
-            wrappedValue: PipelineDisclosureModel(activeStage: dashboard.pipeline.activeReceipt?.stage)
-        )
-    }
-
-    private var candidate: PipelineCandidate { dashboard.pipeline }
-
-    private func isReceiptExpanded(_ receipt: PipelineStageReceipt) -> Bool {
-        disclosure.expandedReceiptIDs.contains(receipt.stage.rawValue)
-    }
-
-    private func toggleReceipt(_ receipt: PipelineStageReceipt) {
-        let id = receipt.stage.rawValue
-        if disclosure.expandedReceiptIDs.contains(id) {
-            disclosure.expandedReceiptIDs.remove(id)
-        } else {
-            disclosure.expandedReceiptIDs.insert(id)
-        }
-    }
-
-    private func toggleGroup(_ id: String) {
-        if disclosure.expandedGroupIDs.contains(id) {
-            disclosure.expandedGroupIDs.remove(id)
-        } else {
-            disclosure.expandedGroupIDs.insert(id)
-        }
-    }
-
-    @ViewBuilder
-    private func gateRow(_ receipt: PipelineStageReceipt) -> some View {
-        ReleaseGateRow(
-            receipt: receipt,
-            isActive: receipt.stage == candidate.activeReceipt?.stage,
-            isExpanded: isReceiptExpanded(receipt),
-            securityBadge: receipt.stage == .securityReview ? dashboard.security.severityLine : nil,
-            onToggle: { toggleReceipt(receipt) }
-        )
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("EVIDENCE PIPELINE")
-                    .releaseFont(13, weight: .medium, relativeTo: .caption)
-                    .foregroundStyle(.secondaryText)
-                Spacer()
-                Text("\(candidate.evidencedStageCount) current · \(candidate.activeReceipt == nil ? "ready" : "proof held")")
-                    .releaseFont(10.5, weight: .regular, relativeTo: .caption2)
-                    .foregroundStyle(.bodyText)
-                    .monospacedDigit()
-            }
-            .padding(.horizontal, 3)
-
-            PipelineSurface {
-                ForEach(candidate.orderedReceipts) { receipt in
-                    gateRow(receipt)
-                    if receipt.id != candidate.orderedReceipts.last?.id {
-                        ReleaseDivider()
-                    }
-                }
-            }
-
-        }
-        .accessibilityElement(children: .contain)
-        .onChange(of: candidate.activeReceipt?.stage.rawValue) { _, activeStageID in
-            if let activeStageID {
-                disclosure.expandedReceiptIDs = [activeStageID]
-            } else {
-                disclosure.expandedReceiptIDs.removeAll()
-            }
-        }
-    }
-
-    private func groupDetail(_ receipts: [PipelineStageReceipt]) -> String {
-        if receipts.allSatisfy({ $0.evidenceStatus == .passed }) { return "Passed" }
-        if let first = receipts.first(where: { $0.evidenceStatus != .passed }) {
-            return first.evidenceStatus.label
-        }
-        return "Unproven"
-    }
-
-    @ViewBuilder
-    private func compactSection(
-        _ receipts: [PipelineStageReceipt],
-        id: String,
-        title: String,
-        detail: String
-    ) -> some View {
-        if !receipts.isEmpty {
-            GateGroupRow(
-                title: title,
-                detail: detail,
-                isExpanded: disclosure.expandedGroupIDs.contains(id),
-                onToggle: { toggleGroup(id) }
-            )
-            if disclosure.expandedGroupIDs.contains(id) {
-                ReleaseDivider()
-                ForEach(receipts) { receipt in
-                    gateRow(receipt)
-                    if receipt.id != receipts.last?.id { ReleaseDivider() }
-                }
-            }
-        }
-    }
-
-    private func stageRangeTitle(_ receipts: [PipelineStageReceipt]) -> String {
-        guard let first = receipts.first?.stage.number,
-              let last = receipts.last?.stage.number else { return "" }
-        return first == last ? String(format: "%02d", first) : String(format: "%02d–%02d", first, last)
-    }
-
-    private func stageRangeDetail(_ receipts: [PipelineStageReceipt]) -> String {
-        guard let first = receipts.first?.stage.number,
-              let last = receipts.last?.stage.number else { return "" }
-        let prefix = first == last ? "Gate \(first)" : "Gates \(first)–\(last)"
-        return "\(prefix) \(groupDetail(receipts).lowercased())"
-    }
-}
-
-private struct PipelineSurface<Content: View>: View {
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        VStack(spacing: 0, content: content)
-            .background(Color.releaseSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.releaseBorderSubtle, lineWidth: 1)
-            )
-    }
-}
-
-private struct GateGroupRow: View {
-    let title: String
-    let detail: String
-    let isExpanded: Bool
-    let onToggle: () -> Void
-
-    private var isDownstream: Bool { title.localizedCaseInsensitiveContains("downstream") }
-    private var isPassed: Bool { detail.localizedCaseInsensitiveContains("passed") }
-
-    var body: some View {
-        Button(action: onToggle) {
-            HStack(spacing: 10) {
-                Image(systemName: isDownstream ? "chevron.right" : (isPassed ? "checkmark.circle.fill" : "circle.dotted"))
-                    .font(.system(size: 21, weight: .medium))
-                    .foregroundStyle(isPassed ? Color.successAccent : Color.pendingAccent)
-                    .frame(width: 32)
-                if isDownstream {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(title)
-                            .releaseFont(15, weight: .medium, relativeTo: .subheadline)
-                            .foregroundStyle(.primaryText)
-                        Text(detail)
-                            .releaseFont(12, weight: .regular, relativeTo: .caption)
-                            .foregroundStyle(.bodyText)
-                    }
-                } else {
-                    HStack(spacing: 10) {
-                        Text(title)
-                            .releaseFont(14, weight: .medium, design: .rounded, relativeTo: .subheadline)
-                            .foregroundStyle(.primaryText)
-                            .monospacedDigit()
-                        Text(detail)
-                            .releaseFont(14, weight: .regular, relativeTo: .subheadline)
-                            .foregroundStyle(.bodyText)
-                    }
-                }
-                Spacer(minLength: 4)
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.bodyText)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
-        }
-        .buttonStyle(PipelineDisclosureButtonStyle())
-        .accessibilityLabel("\(title), \(detail)")
-        .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-        .accessibilityHint(isExpanded ? "Hides these gate details" : "Shows these gate details")
-    }
-}
-
-private struct NextRequiredCard: View {
+private struct GateCopyButton: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let receipt: PipelineStageReceipt
     @ObservedObject private var feedback = CopyFeedbackModel.shared
+    private var copyError: String? { feedback.error(for: receipt.command) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 14) {
-            ActionGateIcon(receipt: receipt)
-                .frame(width: 54)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(receipt.stage.title)
-                    .releaseFont(20, weight: .medium, relativeTo: .headline)
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(presentationTone)
-                        .frame(width: 9, height: 9)
-                    Text(receipt.evidenceStatus.label.uppercased())
-                        .releaseFont(12.5, weight: .medium, relativeTo: .caption)
-                        .foregroundStyle(presentationTone)
-                    Text("•")
-                        .foregroundStyle(.secondaryText)
-                    Text(receipt.compactActionLabel)
-                        .releaseFont(12.5, weight: .regular, relativeTo: .caption)
-                        .foregroundStyle(.bodyText)
-                        .help(receipt.nextAction)
-                }
-                Text(actionInstruction)
-                    .releaseFont(14, weight: .regular, relativeTo: .caption)
-                    .foregroundStyle(.bodyText)
-                    .fixedSize(horizontal: false, vertical: true)
+        Button {
+            feedback.copy(receipt.command)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: copyError != nil ? "exclamationmark.circle" : (feedback.copiedCommand == receipt.command ? "checkmark" : "doc.on.clipboard"))
+                    .frame(width: 18)
+                    .contentTransition(.opacity)
+                    .animation(reduceMotion ? nil : SkillsBarMotion.feedback, value: feedback.copiedCommand)
+                Text(copyError != nil ? "Retry copy" : (feedback.copiedCommand == receipt.command ? "Copied" : "Copy command"))
+                    .frame(minWidth: 104, alignment: .leading)
             }
-            Spacer(minLength: 4)
-            }
-            if receipt.command.isEmpty {
-                ReleaseDivider()
-                HStack(alignment: .center, spacing: 8) {
-                    Image(systemName: "doc.badge.ellipsis")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(Color.warningAccent)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Next step: receipt required")
-                            .releaseFont(15, weight: .medium, relativeTo: .subheadline)
-                        Text("Complete the governed \(receipt.stage.title.lowercased()) step, then refresh to bind its receipt.")
-                            .releaseFont(12.5, weight: .regular, relativeTo: .caption)
-                            .foregroundStyle(.bodyText)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            } else {
-                ReleaseDivider()
-                HStack(alignment: .center, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Next step: copy command")
-                            .releaseFont(15, weight: .medium, relativeTo: .subheadline)
-                        Text("Paste into Terminal to run local proof.")
-                            .releaseFont(12.5, weight: .regular, relativeTo: .caption)
-                            .foregroundStyle(.bodyText)
-                    }
-                    .layoutPriority(1)
-                    Text(receipt.command)
-                        .font(.system(size: 11, weight: .regular, design: .monospaced))
-                        .foregroundStyle(.secondaryText)
-                        .lineLimit(2)
-                        .truncationMode(.middle)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: 170, alignment: .leading)
-                    Spacer(minLength: 4)
-                    Button {
-                        feedback.copy(receipt.command)
-                    } label: {
-                        Text(feedback.copiedCommand == receipt.command ? "Copied" : "Copy command")
-                            .releaseFont(14, weight: .medium, relativeTo: .subheadline)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-                            .padding(.horizontal, 15)
-                            .frame(height: 42)
-                    }
-                    .buttonStyle(ReleasePressButtonStyle(tint: .advisoryAccent))
-                    .frame(width: 132, height: 46)
-                    .foregroundStyle(.primaryText)
-                    .help("Copy the full \(receipt.stage.title.lowercased()) command")
-                    .accessibilityLabel("Copy the full \(receipt.stage.title.lowercased()) command")
-                }
-            }
+            .releaseFont(14, weight: .regular, relativeTo: .caption)
+            .frame(minWidth: 132)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 32)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 16)
-        .background(Color.releaseSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(presentationTone.opacity(0.68), lineWidth: 1))
-    }
-
-    private var presentationTone: Color {
-        receipt.evidenceStatus == .blocked ? .warningAccent : receipt.evidenceStatus.tone.color
-    }
-
-    private var actionInstruction: String {
-        if receipt.stage == .ossLocal {
-            return "Run local eval to produce the receipt."
-        }
-        return receipt.stage.supportingText
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.roundedRectangle(radius: 8))
+        .tint(.focusActionBlue)
+        .help(copyError ?? "Copy the full \(receipt.stage.title.lowercased()) command")
+        .accessibilityLabel("Copy the full \(receipt.stage.title.lowercased()) command")
+        .accessibilityValue(copyError ?? (feedback.copiedCommand == receipt.command ? "Copied" : "Copies without executing"))
     }
 }
 
-private struct ActionGateIcon: View {
-    let receipt: PipelineStageReceipt
+private struct TesslRegistryPresentation {
+    let isLive: Bool
+    let hasRegistrySnapshot: Bool
+    let isHistorical: Bool
+    let hasCurrentCandidateDigest: Bool
+    let statusLabel: String
+    let statusTone: StatusTone
+    let compactCaption: String
+    let versionText: String
+    let observedText: String
 
-    private var tone: Color {
-        receipt.evidenceStatus == .blocked ? .warningAccent : receipt.evidenceStatus.tone.color
-    }
-
-    var body: some View {
-        Group {
-            switch receipt.stage {
-            case .ossLocal:
-                Image(systemName: "key.fill")
-                    .font(.system(size: 27, weight: .semibold))
-            case .ossCloud:
-                Image(systemName: "cloud.fill")
-                    .font(.system(size: 25, weight: .semibold))
-            default:
-                Text(String(format: "%02d", receipt.stage.number))
-                    .releaseFont(20, weight: .medium, design: .rounded, relativeTo: .headline)
-                    .monospacedDigit()
-            }
-        }
-        .foregroundStyle(tone)
-        .frame(width: 54, height: 54)
-        .background(tone.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .stroke(tone.opacity(0.64), lineWidth: 1)
-        )
-        .accessibilityHidden(true)
-    }
-}
-
-private struct GateConnector: View {
-    var body: some View {
-        GeometryReader { geometry in
-            Path { path in
-                path.move(to: CGPoint(x: 0.5, y: 0))
-                path.addLine(to: CGPoint(x: 0.5, y: geometry.size.height))
-            }
-            .stroke(
-                Color.secondaryText.opacity(0.5),
-                style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [4, 4])
-            )
-        }
-        .frame(width: 1)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct ReleaseGateRow: View {
-    let receipt: PipelineStageReceipt
-    let isActive: Bool
-    let isExpanded: Bool
-    let securityBadge: String?
-    let onToggle: () -> Void
-
-    private var rowOpacity: Double {
-        switch receipt.evidenceStatus {
-        case .held: return 0.78
-        case .unproven: return 0.88
-        default: return 1
-        }
-    }
-
-    private var presentationTone: Color {
-        receipt.evidenceStatus == .blocked ? .warningAccent : receipt.evidenceStatus.tone.color
-    }
-    private var actionLabel: String {
-        if let completedChecks = receipt.completedChecks,
-           let requiredChecks = receipt.requiredChecks,
-           requiredChecks > 0,
-           completedChecks < requiredChecks {
-            return "\(completedChecks) / \(requiredChecks) checks"
-        }
-        if receipt.evidenceStatus == .unproven { return "Binding required" }
-        if receipt.evidenceStatus == .held { return "Held observation" }
-        return receipt.compactActionLabel
-    }
-
-    private var stateTone: Color {
-        if receipt.evidenceStatus == .passed { return .successAccent }
-        return isActive ? presentationTone : .bodyText
-    }
-
-    var body: some View {
-        Button(action: onToggle) {
-            VStack(alignment: .leading, spacing: isExpanded ? 12 : 6) {
-                HStack(alignment: .top, spacing: 13) {
-                    GateSymbol(receipt: receipt, isActive: isActive)
-                        .frame(width: 54)
-
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(receipt.stage.title)
-                            .releaseFont(16, weight: isActive ? .medium : .regular, relativeTo: .subheadline)
-                            .foregroundStyle(.primaryText)
-                            .lineLimit(1)
-                        HStack(spacing: 5) {
-                            Circle()
-                                .fill(stateTone)
-                                .frame(width: 8, height: 8)
-                            Text(receipt.evidenceStatus.label.uppercased())
-                                .releaseFont(12, weight: isActive ? .medium : .regular, relativeTo: .caption)
-                                .foregroundStyle(stateTone)
-                            Text("•")
-                                .foregroundStyle(.secondaryText)
-                            Text(actionLabel)
-                                .releaseFont(12, weight: .regular, relativeTo: .caption)
-                                .foregroundStyle(.bodyText)
-                                .lineLimit(1)
-                                .help(receipt.nextAction)
-                        }
-                    }
-
-                    Spacer(minLength: 5)
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.bodyText)
-                        .padding(.top, 4)
-                }
-
-                if isExpanded {
-                    Text(receipt.stage.supportingText)
-                        .releaseFont(14, weight: .regular, relativeTo: .caption)
-                        .foregroundStyle(.bodyText)
-                        .frame(maxWidth: 292, alignment: .leading)
-                        .padding(.leading, 68)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if let securityBadge, !securityBadge.isEmpty {
-                    Text(securityBadge)
-                        .releaseFont(11, weight: .medium, relativeTo: .caption2)
-                        .foregroundStyle(Color.warningAccent)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .stroke(Color.warningAccent.opacity(0.62), lineWidth: 1)
-                        )
-                        .padding(.top, 2)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, isExpanded ? 14 : 12)
-            .padding(.vertical, isExpanded ? 15 : 11)
-            .background {
-                if isActive {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.releaseSurface)
-                }
-            }
-            .overlay {
-                if isActive {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(presentationTone.opacity(0.72), lineWidth: 1)
-                }
-            }
-            .overlay(alignment: .leading) {
-                if isActive {
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: 12,
-                        bottomLeadingRadius: 12,
-                        bottomTrailingRadius: 0,
-                        topTrailingRadius: 0
-                    )
-                    .fill(presentationTone)
-                    .frame(width: 4)
-                }
-            }
-        }
-        .buttonStyle(PipelineDisclosureButtonStyle())
-        .opacity(rowOpacity)
-        .accessibilityLabel(
-            "Gate \(receipt.stage.number), \(receipt.stage.title). \(receipt.evidenceStatus.label). \(receipt.nextAction)."
-        )
-        .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-        .accessibilityHint(isExpanded ? "Hides gate details" : "Shows gate details")
-    }
-}
-
-private struct GateSymbol: View {
-    let receipt: PipelineStageReceipt
-    let isActive: Bool
-
-    private var presentationTone: Color {
-        receipt.evidenceStatus == .blocked ? .warningAccent : receipt.evidenceStatus.tone.color
-    }
-
-    private var symbolTone: Color {
-        if receipt.evidenceStatus == .passed { return .successAccent }
-        return isActive ? presentationTone : .bodyText
-    }
-
-    var body: some View {
-        Group {
-            if receipt.evidenceStatus == .unproven {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 15, weight: .medium))
-                    .frame(width: 34, height: 34)
-                    .background(Color.primary.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Color.secondaryText.opacity(0.6), lineWidth: 1.5)
-                    )
-            } else {
-                ZStack {
-                    Circle()
-                        .fill(Color.primary.opacity(0.08))
-                    Circle()
-                        .stroke(
-                            symbolTone.opacity(isActive || receipt.evidenceStatus == .passed ? 0.72 : 0.65),
-                            lineWidth: 1.5
-                    )
-                    Text(String(format: "%02d", receipt.stage.number))
-                        .releaseFont(15, weight: .medium, design: .rounded, relativeTo: .caption)
-                        .monospacedDigit()
-                }
-                .frame(width: isActive ? 44 : 34, height: isActive ? 44 : 34)
-            }
-        }
-        .foregroundStyle(symbolTone)
-        .padding(.top, isActive ? 0 : 1)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct TesslEvidenceCard: View {
-    let dashboard: SkillDashboard
-
-    private var isLive: Bool { dashboard.tessl.dataOrigin == .liveCLI }
-    private var hasRegistrySnapshot: Bool {
-        dashboard.tessl.registryScore != nil
+    init(dashboard: SkillDashboard, now: Date = Date()) {
+        isLive = dashboard.tessl.dataOrigin == .liveCLI
+        hasRegistrySnapshot = dashboard.tessl.registryScore != nil
             || dashboard.tessl.registryVersion != nil
             || dashboard.tessl.registryQualityScore != nil
             || dashboard.tessl.registryImpactScore != nil
             || dashboard.tessl.registrySecurityLabel != nil
-    }
-    private var isHistorical: Bool {
-        dashboard.tessl.dataOrigin == .cached
+        isHistorical = dashboard.tessl.dataOrigin == .cached
             || dashboard.tessl.dataOrigin == .fixture
             || (dashboard.tessl.dataOrigin == .unavailable && hasRegistrySnapshot)
-    }
-    private var hasCurrentCandidateDigest: Bool {
-        dashboard.pipeline.orderedReceipts.first(where: { $0.stage == .candidateBaseline })?.evidenceStatus == .passed
-    }
-    private var statusLabel: String {
-        if isLive { return "LIVE" }
-        if !dashboard.tessl.cliAvailable { return "CLI UNAVAILABLE" }
-        if isHistorical { return "LAST KNOWN" }
-        return "UNAVAILABLE"
-    }
-    private var statusTone: StatusTone {
-        if isLive { return .advisory }
-        if isHistorical { return .pending }
-        return .warning
-    }
-    private var versionText: String {
-        guard let version = dashboard.tessl.registryVersion, !version.isEmpty else { return "version unavailable" }
-        return "v" + version.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
-    }
-    private var observedText: String {
-        guard let observation = dashboard.tessl.observedAt ?? (isLive ? dashboard.refreshedAt : nil) else {
-            return "last observation unavailable"
+        hasCurrentCandidateDigest = dashboard.pipeline.orderedReceipts
+            .first(where: { $0.stage == .candidateBaseline })?.evidenceStatus == .passed
+
+        if isLive {
+            statusLabel = "LIVE"
+            statusTone = .advisory
+        } else if !dashboard.tessl.cliAvailable {
+            statusLabel = "CLI UNAVAILABLE"
+            statusTone = hasRegistrySnapshot ? .pending : .warning
+        } else if isHistorical {
+            statusLabel = "LAST KNOWN"
+            statusTone = .pending
+        } else {
+            statusLabel = "UNAVAILABLE"
+            statusTone = .warning
         }
-        let elapsed = Date().timeIntervalSince(observation)
-        guard observation.timeIntervalSince1970 > 0, elapsed >= 0 else { return "last observation unavailable" }
-        if elapsed < 60 { return "observed \(max(1, Int(elapsed.rounded())))s ago" }
-        if elapsed < 3_600 { return "observed \(Int(elapsed / 60))m ago" }
-        return "observed \(Int(elapsed / 3_600))h ago"
+
+        compactCaption = !dashboard.tessl.cliAvailable && !hasRegistrySnapshot
+            ? "No cached evidence · separate from local proof."
+            : dashboard.registryEvidenceCaption
+
+        if let version = dashboard.tessl.registryVersion, !version.isEmpty {
+            versionText = "v" + version.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
+        } else {
+            versionText = "version unavailable"
+        }
+
+        if let observation = dashboard.tessl.observedAt ?? (isLive ? dashboard.refreshedAt : nil),
+           observation.timeIntervalSince1970 > 0,
+           now.timeIntervalSince(observation) >= 0 {
+            let elapsed = now.timeIntervalSince(observation)
+            if elapsed < 60 {
+                observedText = "observed \(max(1, Int(elapsed.rounded())))s ago"
+            } else if elapsed < 3_600 {
+                observedText = "observed \(Int(elapsed / 60))m ago"
+            } else {
+                observedText = "observed \(Int(elapsed / 3_600))h ago"
+            }
+        } else {
+            observedText = "last observation unavailable"
+        }
     }
+}
+
+private struct TesslRegistrySummary: View {
+    enum Style { case compact, expanded }
+
+    let dashboard: SkillDashboard
+    let presentation: TesslRegistryPresentation
+    let style: Style
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack(alignment: .top, spacing: 13) {
-                ReleaseTesslLogo(size: 50)
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 7) {
-                        Text("Tessl Registry")
-                            .releaseFont(17, weight: .medium, relativeTo: .subheadline)
-                        ReleasePill(text: statusLabel, tone: statusTone)
-                    }
-                    Text("\(versionText) · \(observedText)")
-                        .releaseFont(12.5, weight: .regular, relativeTo: .caption)
+        HStack(alignment: .top, spacing: style == .compact ? 10 : 13) {
+            ReleaseTesslLogo(size: 36)
+                .accessibilityHidden(style == .compact)
+            VStack(alignment: .leading, spacing: style == .compact ? 4 : 5) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { heading }
+                    VStack(alignment: .leading, spacing: 5) { heading }
+                }
+                if style == .compact {
+                    Text(presentation.compactCaption)
+                        .releaseFont(12, weight: .regular, relativeTo: .caption)
                         .foregroundStyle(.bodyText)
-                        .lineLimit(1)
-                        .monospacedDigit()
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    if presentation.hasRegistrySnapshot {
+                        Text("\(presentation.versionText) · \(presentation.observedText)")
+                            .releaseFont(12.5, weight: .regular, relativeTo: .caption)
+                            .foregroundStyle(.bodyText)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .monospacedDigit()
+                    }
                     Text(dashboard.registryPath)
                         .releaseFont(11.5, weight: .regular, relativeTo: .caption2)
                         .foregroundStyle(.secondaryText)
@@ -919,112 +687,122 @@ private struct TesslEvidenceCard: View {
                         .truncationMode(.middle)
                         .help("Tessl package identity: \(dashboard.registryPath)")
                 }
+            }
+            if style == .expanded {
                 Spacer(minLength: 4)
                 VStack(alignment: .trailing, spacing: 5) {
                     if let score = dashboard.tessl.registryScore {
-                        RegistryScoreHex(score: "\(score)", muted: !isLive)
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("\(score)")
+                                .releaseFont(22, weight: .semibold, relativeTo: .title3)
+                                .monospacedDigit()
+                            Text("Registry score")
+                                .releaseFont(11, weight: .regular, relativeTo: .caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
                     }
                     if let multiplier = dashboard.tessl.registryImprovementMultiplier {
-                        ReleasePill(
+                        StatusBadge(
                             text: String(format: "%.2fx lift", multiplier),
                             tone: dashboard.tessl.registryImpactTone
                         )
                     }
                 }
             }
+        }
+    }
 
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "info.circle")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(Color.advisoryAccent)
-                Text("Registry data is not proof for the current local candidate.")
-                    .releaseFont(14, weight: .regular, relativeTo: .caption)
-                    .foregroundStyle(.primaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
-            .background(Color.advisoryAccent.opacity(0.045))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.advisoryAccent.opacity(0.28), lineWidth: 1)
-            )
+    @ViewBuilder private var heading: some View {
+                    Text("Tessl Registry")
+                        .releaseFont(style == .compact ? 14 : 17, weight: .medium, relativeTo: .subheadline)
+                    StatusBadge(text: presentation.statusLabel == "CLI UNAVAILABLE" ? "CLI unavailable" : presentation.statusLabel.capitalized, tone: presentation.statusTone)
+    }
+}
 
-            EvidenceValueTransition(
-                key: dashboard.tessl.motionKey,
-                isEnabled: isLive,
-                animation: SkillsBarMotion.tesslRefresh
-            ) {
-                HStack(spacing: 12) {
-                    RegistryMetric(
-                        label: "Quality",
-                        value: dashboard.tessl.registryQualityScore.map { "\($0)%" } ?? "—",
-                        progress: dashboard.tessl.registryQualityScore.map { Double($0) / 100 },
-                        tone: RegistryMetricPresentation.percentTone(dashboard.tessl.registryQualityScore),
-                        muted: !isLive,
-                        animateChanges: isLive
-                    )
-                    RegistryVerticalDivider()
-                    RegistryMetric(
-                        label: "Impact",
-                        value: dashboard.tessl.registryImpactScore.map { "\($0)%" } ?? "—",
-                        progress: dashboard.tessl.registryImpactScore.map { Double($0) / 100 },
-                        tone: RegistryMetricPresentation.percentTone(dashboard.tessl.registryImpactScore),
-                        muted: !isLive,
-                        animateChanges: isLive
-                    )
-                    RegistryVerticalDivider()
-                    RegistryMetric(
-                        label: "Security",
-                        value: dashboard.tessl.registrySecurityDisplay,
-                        progress: dashboard.tessl.registrySecurityTone == .positive ? 1 : nil,
-                        tone: dashboard.tessl.registrySecurityTone,
-                        muted: !isLive,
-                        animateChanges: isLive
-                    )
+private struct TesslEvidenceCard: View {
+    let dashboard: SkillDashboard
+
+    var body: some View {
+        let presentation = TesslRegistryPresentation(dashboard: dashboard)
+        VStack(alignment: .leading, spacing: 10) {
+            TesslRegistrySummary(dashboard: dashboard, presentation: presentation,
+                                 style: presentation.hasRegistrySnapshot ? .expanded : .compact)
+
+            if presentation.hasRegistrySnapshot {
+                EvidenceValueTransition(
+                    key: dashboard.tessl.motionKey,
+                    isEnabled: presentation.isLive,
+                    animation: SkillsBarMotion.tesslRefresh
+                ) {
+                    HStack(spacing: 12) {
+                        RegistryMetric(
+                            label: "Quality",
+                            value: dashboard.tessl.registryQualityScore.map { "\($0)%" } ?? "—",
+                            progress: dashboard.tessl.registryQualityScore.map { Double($0) / 100 },
+                            tone: RegistryMetricPresentation.percentTone(dashboard.tessl.registryQualityScore),
+                            muted: !presentation.isLive,
+                            animateChanges: presentation.isLive
+                        )
+                        RegistryVerticalDivider()
+                        RegistryMetric(
+                            label: "Impact",
+                            value: dashboard.tessl.registryImpactScore.map { "\($0)%" } ?? "—",
+                            progress: dashboard.tessl.registryImpactScore.map { Double($0) / 100 },
+                            tone: RegistryMetricPresentation.percentTone(dashboard.tessl.registryImpactScore),
+                            muted: !presentation.isLive,
+                            animateChanges: presentation.isLive
+                        )
+                        RegistryVerticalDivider()
+                        RegistryMetric(
+                            label: "Security",
+                            value: dashboard.tessl.registrySecurityDisplay,
+                            progress: dashboard.tessl.registrySecurityTone == .positive ? 1 : nil,
+                            tone: dashboard.tessl.registrySecurityTone,
+                            muted: !presentation.isLive,
+                            animateChanges: presentation.isLive
+                        )
+                    }
                 }
             }
 
-            if !dashboard.registryEvidenceCaption.isEmpty {
+            if presentation.hasRegistrySnapshot, !dashboard.registryEvidenceCaption.isEmpty {
                 Text(dashboard.registryEvidenceCaption)
                     .releaseFont(11, weight: .regular, relativeTo: .caption2)
-                    .foregroundStyle(Color.advisoryAccent.opacity(isLive ? 0.84 : 0.68))
+                    .foregroundStyle(.bodyText)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let url = dashboard.registryURL {
                 HStack {
-                    Spacer(minLength: 4)
+                    if presentation.hasRegistrySnapshot {
+                        Text("Registry evidence · separate from local proof")
+                            .releaseFont(11, weight: .regular, relativeTo: .caption)
+                            .foregroundStyle(.bodyText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
                     Button {
                         NSWorkspace.shared.open(url)
                     } label: {
-                        Text("View in Tessl.io  →")
-                            .releaseFont(14, weight: .medium, relativeTo: .caption)
+                        Text("Tessl.io ↗")
+                            .releaseFont(12, weight: .medium, relativeTo: .caption)
                             .foregroundStyle(Color.advisoryAccent)
+                            .frame(minHeight: 40)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .frame(minHeight: MenuBarTemplateMetrics.minimumInteractiveTarget)
-                    .contentShape(Rectangle())
                     .accessibilityLabel("View in Tessl.io")
-                    Spacer(minLength: 4)
                 }
             }
-            if !isLive, !hasCurrentCandidateDigest {
+            if !presentation.isLive, !presentation.hasCurrentCandidateDigest {
                 Text("Content comparison blocked until candidate digest exists.")
                     .releaseFont(10, weight: .regular, relativeTo: .caption2)
                     .foregroundStyle(.secondaryText)
             }
         }
-        .padding(15)
-        .background(Color.releaseSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.teal.opacity(isLive ? 0.42 : 0.28), lineWidth: 1)
-        )
         .accessibilityElement(children: .contain)
         .accessibilityLabel(
-            "Tessl Registry. \(isLive ? "Live registry data" : (isHistorical ? "CLI unavailable, last known registry data" : "Registry comparison unavailable")). "
+            "Tessl Registry. \(presentation.statusLabel). "
                 + dashboard.registryEvidenceCaption
         )
     }
@@ -1054,7 +832,6 @@ private struct RegistryMetric: View {
                     animateChanges && !reduceMotion ? SkillsBarMotion.tesslRefresh : nil,
                     value: value
                 )
-            GeometryReader { _ in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.releaseMetricTrack)
                     if let progress {
@@ -1072,7 +849,6 @@ private struct RegistryMetric: View {
                             )
                     }
                 }
-            }
             .frame(height: 7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1091,85 +867,50 @@ private struct ReleaseFooter: View {
     let dashboard: SkillDashboard
     let isRefreshing: Bool
     let onRefresh: (() -> Void)?
-    @ObservedObject private var feedback = CopyFeedbackModel.shared
 
     private var refreshedText: String {
-        guard dashboard.refreshedAt.timeIntervalSince1970 > 0 else { return "Last checked unavailable" }
+        guard dashboard.refreshedAt.timeIntervalSince1970 > 0 else { return "Checked time unavailable" }
         let elapsed = Date().timeIntervalSince(dashboard.refreshedAt)
-        if elapsed < 60 { return "Last checked \(max(1, Int(elapsed.rounded())))s ago" }
-        if elapsed < 3_600 { return "Last checked \(Int(elapsed / 60))m ago" }
-        return "Last checked \(Int(elapsed / 3_600))h ago"
+        if elapsed < 60 { return "Checked \(max(1, Int(elapsed.rounded())))s ago" }
+        if elapsed < 3_600 { return "Checked \(Int(elapsed / 60))m ago" }
+        return "Checked \(Int(elapsed / 3_600))h ago"
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 8) {
-                Button { onRefresh?() } label: {
-                    HStack(spacing: 7) {
-                        Image(systemName: isRefreshing ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
-                            .font(.system(size: 16, weight: .medium))
-                        Text(isRefreshing ? "Refreshing" : "Refresh")
-                            .releaseFont(13, weight: .regular, relativeTo: .caption)
-                    }
-                }
-                .buttonStyle(ReleasePressButtonStyle())
-                .frame(
-                    width: 88,
-                    height: MenuBarTemplateMetrics.minimumInteractiveTarget,
-                    alignment: .leading
-                )
-                .foregroundStyle(.bodyText)
-                .disabled(onRefresh == nil || isRefreshing)
-                .help("Refresh local evidence and registry metadata")
-                .accessibilityLabel("Refresh evidence")
-
-                Spacer(minLength: 4)
-                Text(refreshedText)
-                    .releaseFont(12, weight: .regular, relativeTo: .caption2)
-                    .foregroundStyle(.secondaryText)
+        Button { onRefresh?() } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 18, weight: .regular))
+                Text(isRefreshing ? "Refreshing…" : refreshedText)
+                    .releaseFont(12, weight: .regular, relativeTo: .caption)
                     .monospacedDigit()
-
-                Menu {
-                    Button("Copy summary") {
-                        feedback.copy(diagnosticSummary)
-                    }
-                    Button("Copy latest observation") {
-                        feedback.copy(historySummary)
-                    }
-                    Button("Copy selected skill path") {
-                        feedback.copy(dashboard.fleet.selectedSkillPath)
-                    }
-                    Button("Copy model profile") {
-                        feedback.copy(profileSummary)
-                    }
-                    Divider()
-                    Button("Quit SkillsBar") { NSApp.terminate(nil) }
-                } label: {
-                    Label("More…", systemImage: "ellipsis.circle")
-                        .labelStyle(.titleAndIcon)
-                        .releaseFont(12, weight: .regular, relativeTo: .caption)
-                        .foregroundStyle(.bodyText)
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .tint(.bodyText)
-                .frame(
-                    minWidth: 82,
-                    minHeight: MenuBarTemplateMetrics.minimumInteractiveTarget,
-                    alignment: .trailing
-                )
-                .help("More SkillsBar actions")
-                .accessibilityLabel("More SkillsBar actions")
+                Spacer()
             }
-            .frame(maxWidth: .infinity)
-
-            FooterUtilityPanel(
-                copyDiagnostics: { feedback.copy(diagnosticSummary) },
-                copyHistory: { feedback.copy(historySummary) },
-                copyProfile: { feedback.copy(profileSummary) }
-            )
+            .foregroundStyle(.bodyText)
+            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .padding(.bottom, 5)
+        .buttonStyle(FocusStageButtonStyle())
+        .disabled(onRefresh == nil || isRefreshing)
+        .help("Refresh local evidence and registry metadata")
+        .accessibilityLabel("Refresh evidence")
+        .accessibilityValue(isRefreshing ? "Refreshing" : refreshedText)
+    }
+}
+
+private struct ReleaseUtilityActions: View {
+    let dashboard: SkillDashboard
+    @ObservedObject private var feedback = CopyFeedbackModel.shared
+
+    var body: some View {
+        Group {
+            Button("Copy summary") { feedback.copy(diagnosticSummary, label: "Summary") }
+            Button("Copy latest observation") { feedback.copy(historySummary, label: "Latest observation") }
+            Button("Copy selected skill path") { feedback.copy(dashboard.fleet.selectedSkillPath, label: "Skill path") }
+            Button("Copy model profile") { feedback.copy(profileSummary, label: "Model profile") }
+            Divider()
+            Button("Quit SkillsBar") { NSApp.terminate(nil) }
+        }
     }
 
     private var diagnosticSummary: String {
@@ -1205,212 +946,52 @@ private struct ReleaseFooter: View {
     }
 }
 
-private struct FooterUtilityPanel: View {
-    let copyDiagnostics: () -> Void
-    let copyHistory: () -> Void
-    let copyProfile: () -> Void
+private struct StatusBadge: View {
+    @Environment(\.colorScheme) private var colorScheme
+    enum Prominence { case standard, strong }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            utilityButton("Diagnostics", icon: "waveform.path.ecg", action: copyDiagnostics)
-            utilityButton("History", icon: "clock", action: copyHistory)
-            utilityButton("Profile", icon: "person.crop.circle", action: copyProfile)
-        }
-        .padding(.vertical, 5)
-        .background(Color.releaseSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.releaseBorderSubtle, lineWidth: 1)
-        )
-    }
-
-    private func utilityButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: icon)
-                .releaseFont(14, weight: .regular, relativeTo: .subheadline)
-                .foregroundStyle(.primaryText)
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: MenuBarTemplateMetrics.minimumInteractiveTarget,
-                    alignment: .leading
-                )
-                .padding(.horizontal, 14)
-        }
-        .buttonStyle(PipelineDisclosureButtonStyle())
-        .accessibilityHint("Copies \(title.lowercased()) information to the clipboard")
-    }
-}
-
-private struct CanonicalIdentityAction: View {
-    let receipt: PipelineStageReceipt?
-    @ObservedObject private var feedback = CopyFeedbackModel.shared
-
-    private var command: String { receipt?.command ?? "" }
-    private var title: String {
-        receipt.map { "\($0.stage.title) command" } ?? "All gates current"
-    }
-    private var subtitle: String {
-        receipt?.nextAction ?? "No held downstream gates"
-    }
-    private var commandLabel: String {
-        receipt.map { "Copy the \($0.stage.title.lowercased()) command" } ?? "Copy pipeline command"
-    }
-    private var commandPreview: String {
-        let executableCommand: String
-        if let separator = command.range(of: " && ") {
-            executableCommand = String(command[separator.upperBound...])
-        } else {
-            executableCommand = command
-        }
-
-        guard let pathStart = executableCommand.range(of: "'Skills/"),
-              let pathEnd = executableCommand[pathStart.upperBound...].firstIndex(of: "'") else {
-            return executableCommand
-        }
-        let path = executableCommand[pathStart.lowerBound..<pathEnd]
-        let finalComponent = path.split(separator: "/").last.map(String.init) ?? "skill"
-        return executableCommand.replacingCharacters(
-            in: pathStart.lowerBound...pathEnd,
-            with: "…/\(finalComponent)"
-        )
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "terminal")
-                .font(.system(size: 19, weight: .medium))
-                .frame(width: 38, height: 38)
-                .background(Color.primary.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.primary.opacity(0.17), lineWidth: 1)
-                )
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .releaseFont(14, weight: .medium, relativeTo: .subheadline)
-                Text(subtitle)
-                    .releaseFont(10.5, weight: .regular, relativeTo: .caption)
-                    .foregroundStyle(.bodyText)
-                if !command.isEmpty {
-                    Text(commandPreview)
-                        .releaseFont(10, weight: .regular, design: .monospaced, relativeTo: .caption2)
-                        .foregroundStyle(Color.primary.opacity(0.78))
-                        .lineLimit(2)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.primary.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-            }
-
-            Spacer(minLength: 4)
-            if !command.isEmpty {
-                Button { feedback.copy(command) } label: {
-                    Image(systemName: feedback.copiedCommand == command ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(
-                            width: MenuBarTemplateMetrics.minimumInteractiveTarget,
-                            height: MenuBarTemplateMetrics.minimumInteractiveTarget
-                        )
-                }
-                .buttonStyle(ReleasePressButtonStyle())
-                .foregroundStyle(feedback.copiedCommand == command ? Color.successAccent : Color.primaryText)
-                .help(commandLabel)
-                .accessibilityLabel(commandLabel)
-                .accessibilityValue(command)
-            }
-            Button { NSApp.terminate(nil) } label: {
-                Image(systemName: "power")
-                    .font(.system(size: 15, weight: .semibold))
-                .frame(
-                    width: MenuBarTemplateMetrics.minimumInteractiveTarget,
-                    height: MenuBarTemplateMetrics.minimumInteractiveTarget
-                )
-            }
-            .buttonStyle(ReleasePressButtonStyle())
-            .foregroundStyle(.primaryText)
-            .help("Quit SkillsBar")
-            .accessibilityLabel("Quit SkillsBar")
-        }
-        .padding(10)
-        .background(Color.releaseSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .stroke(Color.releaseBorderSubtle, lineWidth: 1)
-        )
-    }
-}
-
-private struct ReleasePill: View {
     let text: String
     let tone: StatusTone
+    var prominence: Prominence = .standard
+
+    private var ink: Color {
+        guard colorScheme == .light else { return tone.color }
+        switch tone {
+        case .warning: return .focusWarningInk
+        case .advisory: return .focusInfoInk
+        case .positive: return Color(red: 0.08, green: 0.46, blue: 0.20)
+        case .danger: return Color(red: 0.72, green: 0.12, blue: 0.10)
+        case .pending: return .secondary
+        }
+    }
 
     var body: some View {
         Text(text)
-            .releaseFont(8.5, weight: .medium, design: .rounded, relativeTo: .caption2)
-            .foregroundStyle(tone.color)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(tone.color.opacity(0.08))
-            .overlay(Capsule().stroke(tone.color.opacity(0.38), lineWidth: 1))
-            .clipShape(Capsule())
+            .releaseFont(
+                prominence == .strong ? 13 : 11,
+                weight: .medium,
+                design: .default,
+                relativeTo: prominence == .strong ? .caption : .caption2
+            )
+            .foregroundStyle(ink)
+            .monospacedDigit()
+            .padding(.horizontal, prominence == .strong ? 8 : 6)
+            .padding(.vertical, prominence == .strong ? 4 : 2)
+            .background(tone.color.opacity(prominence == .strong ? 0.12 : 0.08))
+            .clipShape(prominence == .strong ? AnyShape(RoundedRectangle(cornerRadius: 6)) : AnyShape(Capsule()))
+            .overlay {
+                if prominence == .strong {
+                    RoundedRectangle(cornerRadius: 6).stroke(tone.color.opacity(0.75), lineWidth: 1)
+                } else {
+                    Capsule().stroke(tone.color.opacity(0.46), lineWidth: 1)
+                }
+            }
             .fixedSize(horizontal: true, vertical: false)
     }
 }
 
-private struct RegistryScoreHex: View {
-    let score: String
-    let muted: Bool
-
-    var body: some View {
-        ZStack {
-            ReleaseHexagon()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.warningAccent.opacity(muted ? 0.025 : 0.075),
-                            Color.primary.opacity(0.08),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            ReleaseHexagon()
-                .stroke(Color.primary.opacity(muted ? 0.035 : 0.075), lineWidth: 0.75)
-                .padding(3)
-            ReleaseHexagon()
-                .stroke(Color.warningAccent.opacity(muted ? 0.4 : 0.92), lineWidth: 1.6)
-            Text(score)
-                .releaseFont(18, weight: .semibold, design: .rounded, relativeTo: .title3)
-                .foregroundStyle(Color.warningAccent.opacity(muted ? 0.56 : 1))
-                .monospacedDigit()
-        }
-        .frame(width: 40, height: 44)
-        .accessibilityLabel("Registry score \(score)")
-    }
-}
-
-private struct ReleaseHexagon: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.height * 0.25))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.height * 0.75))
-        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.height * 0.75))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.height * 0.25))
-        path.closeSubpath()
-        return path
-    }
-}
-
 private struct ReleaseSkillLogo: View {
+    @Environment(\.colorScheme) private var colorScheme
     let size: CGFloat
 
     var body: some View {
@@ -1427,12 +1008,13 @@ private struct ReleaseSkillLogo: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.primary.opacity(0.18), lineWidth: 1)
+                .strokeBorder((colorScheme == .dark ? Color.white : .black).opacity(0.10), lineWidth: 1)
         )
     }
 }
 
 private struct ReleaseTesslLogo: View {
+    @Environment(\.colorScheme) private var colorScheme
     let size: CGFloat
 
     var body: some View {
@@ -1449,49 +1031,19 @@ private struct ReleaseTesslLogo: View {
         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .stroke(Color.advisoryAccent.opacity(0.24), lineWidth: 1)
+                .strokeBorder((colorScheme == .dark ? Color.white : .black).opacity(0.10), lineWidth: 1)
         )
     }
 }
 
 private struct ReleaseDivider: View {
+    @Environment(\.displayScale) private var displayScale
+    @Environment(\.colorSchemeContrast) private var contrast
     var body: some View {
-        Rectangle().fill(Color.primary.opacity(0.11)).frame(height: 1)
+        Rectangle().fill(Color.primary.opacity(contrast == .increased ? 0.4 : 0.11))
+            .frame(height: contrast == .increased ? 1 : 1 / max(displayScale, 1))
             .allowsHitTesting(false)
             .accessibilityHidden(true)
-    }
-}
-
-private struct ReleasePressButtonStyle: ButtonStyle {
-    var tint: Color = .primary
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(Color.primary.opacity(configuration.isPressed ? 0.11 : 0.045))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(tint.opacity(configuration.isPressed ? 0.72 : 0.42), lineWidth: 1)
-            )
-            .opacity(configuration.isPressed ? 0.82 : 1)
-            .contentShape(Rectangle())
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
-            .animation(.easeOut(duration: reduceMotion ? 0 : 0.11), value: configuration.isPressed)
-    }
-}
-
-private struct PipelineDisclosureButtonStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(Color.releaseSurfacePressed.opacity(configuration.isPressed ? 1 : 0))
-            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .opacity(configuration.isPressed ? 0.84 : 1)
-            .contentShape(Rectangle())
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
-            .animation(.easeOut(duration: reduceMotion ? 0 : 0.10), value: configuration.isPressed)
     }
 }
 

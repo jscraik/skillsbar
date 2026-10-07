@@ -37,6 +37,23 @@ cd /Users/jamiecraik/dev/skillsbar
 
 You can also double-click `Launch.command` in Finder.
 
+The 04B focus navigator presents all nine evidence stages in a three-column grid.
+Select a stage to inspect its full status, next action, and command. Inspection
+does not change the next required stage or promote evidence. Refresh preserves
+manual selection for the same candidate and resets it for a new candidate.
+Expand **Show command** to inspect and select the command before copying;
+copying never executes it. Registry details live in a separate disclosure.
+Observation, path, and profile copy actions are available in **More…**.
+The 460 × 586-point popover adapts to the screen height and scrolls its content.
+For visual comparison with 04B, add `--snapshot-focus-reference` to a `--snapshot` command. This uses synthetic stage-three data only for the image; live evidence is unchanged.
+The compact grid uses amber for the selected next-required stage and blue for
+inspection of another stage. Keyboard focus has a separate neutral outline.
+The summary distinguishes passed, review, blocked, stale, and awaiting-proof
+states. Severity badges and the blue copy action follow the selected 04B mockup.
+Stage changes and arrow-key navigation are immediate. More actions and skill
+selection live in the header ellipsis menu; the footer's checked-time row
+refreshes evidence. Escape closes the popover.
+
 The launcher serializes concurrent builds, stops an existing instance, delegates bundle construction to `script/package_app.sh`, signs the development app ad hoc, opens it through LaunchServices, and verifies that the process remains running. If LaunchServices is unavailable in the caller's session, it falls back to launching the bundled executable directly and records which path was used. The default build root is:
 
 ```text

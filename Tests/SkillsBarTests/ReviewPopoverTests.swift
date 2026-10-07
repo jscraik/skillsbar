@@ -269,14 +269,14 @@ final class ReviewPopoverTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent(".harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png")
+            .appendingPathComponent(".harness/evidence/2026-09-29-skillsbar-focus-navigator.png")
         XCTAssertTrue(FileManager.default.fileExists(atPath: baselineURL.path))
 
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("skillsbar-review-baseline-\(UUID().uuidString).png")
         defer { try? FileManager.default.removeItem(at: outputURL) }
 
-        try SnapshotRenderer.render(dashboard: .reviewFixture, to: outputURL)
+        try SnapshotRenderer.render(dashboard: .reviewFixture, configuration: SnapshotConfiguration(colorScheme: .dark), to: outputURL)
         let baselineBitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: baselineURL)))
         let renderedBitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: outputURL)))
         XCTAssertEqual(renderedBitmap.pixelsWide, baselineBitmap.pixelsWide)
@@ -826,18 +826,39 @@ final class ReviewPopoverTests: XCTestCase {
     }
 
     @MainActor
-    func testTallCanvasKeepsTheActiveContextVisibleAndScrollsTheRemainingStack() {
+    func testStageDetailsKeepUniformHeightWithAndWithoutCommands() throws {
+        let candidate = SkillDashboard.reviewFixture.pipeline
+        var heights: [CGFloat] = []
+        for receipt in candidate.orderedReceipts {
+            let content = SelectedStageDetail(
+                receipt: receipt,
+                activeStage: candidate.activeReceipt?.stage,
+                stageCount: 9,
+                securityBadge: receipt.stage == .securityReview ? "1 critical, 2 high" : ""
+            ).frame(width: MenuBarTemplateMetrics.width - 24)
+            let hostingView = NSHostingView(rootView: content)
+            hostingView.layoutSubtreeIfNeeded()
+            heights.append(hostingView.fittingSize.height)
+        }
+        XCTAssertEqual(heights.count, 9)
+        XCTAssertTrue(candidate.orderedReceipts.contains { $0.command.isEmpty })
+        XCTAssertTrue(candidate.orderedReceipts.contains { !$0.command.isEmpty })
+        let shortest = try XCTUnwrap(heights.min())
+        XCTAssertGreaterThan(shortest, 0)
+        XCTAssertLessThanOrEqual(try XCTUnwrap(heights.max()) - shortest, 1,
+                                 "Stage navigation must not move the registry: \(heights)")
+    }
+
+    @MainActor
+    func testFocusCanvasRetainsNineStagesAndCommand() {
         let contentWidth = MenuBarTemplateMetrics.width - 32
         let content = ReleaseEvidenceView(dashboard: .reviewFixture, isRefreshing: false)
             .frame(width: contentWidth)
         let hostingView = NSHostingView(rootView: content)
         hostingView.layoutSubtreeIfNeeded()
 
-        XCTAssertGreaterThan(
-            hostingView.fittingSize.height,
-            MenuBarTemplateMetrics.height,
-            "The full evidence stack should retain its accessible target sizes and use the scroll region below the active context"
-        )
+        XCTAssertGreaterThan(hostingView.fittingSize.height, 0)
+        XCTAssertEqual(MenuBarTemplateMetrics.preferredHeight, 586)
         XCTAssertEqual(SkillDashboard.reviewFixture.pipeline.orderedReceipts.count, 9)
         XCTAssertFalse(SkillDashboard.reviewFixture.pipeline.activeReceipt?.command.isEmpty ?? true)
     }
@@ -940,7 +961,7 @@ final class ReviewPopoverTests: XCTestCase {
     }
 
     func testMenuBarTemplateUsesApprovedPointMetrics() {
-        XCTAssertEqual(MenuBarTemplateMetrics.width, 420)
+        XCTAssertEqual(MenuBarTemplateMetrics.width, 460)
         let expectedHeight = NSScreen.main.map {
             min(MenuBarTemplateMetrics.preferredHeight, max(1, $0.visibleFrame.height - 32))
         } ?? MenuBarTemplateMetrics.preferredHeight
@@ -1003,7 +1024,8 @@ final class ReviewPopoverTests: XCTestCase {
 
         XCTAssertFalse(model.copy(expectedCommand))
         XCTAssertNil(model.copiedCommand)
-        XCTAssertEqual(model.copyError, "Could not copy inspect command")
+        XCTAssertEqual(model.copyError, "Could not copy command")
+        XCTAssertEqual(model.error(for: "unrelated summary"), nil)
     }
 
     @MainActor

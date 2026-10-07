@@ -21,6 +21,7 @@ struct SkillsBarApp: App {
                 .frame(width: MenuBarTemplateMetrics.width, height: MenuBarTemplateMetrics.height)
         } label: {
             SkillsMenuBarIconView(status: model.menuBarStatus)
+                .equatable()
                 .accessibilityLabel("\(model.menuTitle), \(model.menuBarStatus.label)")
         }
         .menuBarExtraStyle(.window)

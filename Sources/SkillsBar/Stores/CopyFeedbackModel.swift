@@ -15,31 +15,39 @@ final class CopyFeedbackModel: ObservableObject {
     static let shared = CopyFeedbackModel()
     @Published var copiedCommand: String?
     @Published var copyError: String?
+    private(set) var failedValue: String?
+    private var resetTask: Task<Void, Never>?
     private let pasteboard: any PasteboardWriting
 
     init(pasteboard: any PasteboardWriting = NSPasteboard.general) {
         self.pasteboard = pasteboard
     }
 
-    deinit {}
-
     @discardableResult
-    func copy(_ command: String) -> Bool {
+    func copy(_ command: String, label: String = "Command") -> Bool {
+        resetTask?.cancel()
         _ = pasteboard.clearContents()
         guard pasteboard.setString(command, forType: .string) else {
             copiedCommand = nil
-            let message = "Could not copy inspect command"
+            failedValue = command
+            let message = "Could not copy \(label.lowercased())"
             copyError = message
             AccessibilityNotification.Announcement(message).post()
             return false
         }
         copyError = nil
+        failedValue = nil
         copiedCommand = command
-        AccessibilityNotification.Announcement("Inspect command copied").post()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-            guard self?.copiedCommand == command else { return }
+        AccessibilityNotification.Announcement("\(label) copied").post()
+        resetTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(1200)) }
+            catch { return }
             self?.copiedCommand = nil
         }
         return true
+    }
+
+    func error(for value: String) -> String? {
+        failedValue == value ? copyError : nil
     }
 }

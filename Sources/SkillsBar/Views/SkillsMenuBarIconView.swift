@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct SkillsMenuBarIconView: View {
+struct SkillsMenuBarIconView: View, Equatable {
     let status: MenuBarStatus
 
     init(status: MenuBarStatus = .current) {
@@ -29,10 +29,10 @@ struct SkillsMenuBarIconView: View {
                 .frame(width: 5, height: 5)
                 .overlay(Circle().stroke(Color.primary.opacity(0.85), lineWidth: 1))
         }
-        .frame(width: 18, height: 18)
         .frame(width: 18, height: 18, alignment: .center)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Skills SDK, \(status.label)")
+        .help("Skills SDK — \(status.label)")
     }
 }

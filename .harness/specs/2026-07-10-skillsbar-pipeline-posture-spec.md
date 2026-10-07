@@ -95,6 +95,58 @@ all downstream proof is held.
 
 ## Visual Requirements
 
+### September 29 layout revision
+
+The user's screenshot review and implementation request supersede the earlier
+placement and density prescriptions below. The selected 04B Focus navigator
+uses a three-column, nine-stage grid and one selected-stage detail panel.
+Inspection is distinct from the current blocking stage: selection never promotes
+evidence. Refresh retains manual selection for the same candidate; a new
+candidate resets inspection to its next required stage. Preserve native keyboard
+focus, status symbols and labels, and a single selected-stage Copy command action.
+Provide a selectable full-command disclosure and readable metadata.
+Keep registry context in a separate disclosure and utility copy actions in More.
+Use a 460 × 586-point preferred canvas, capped to the screen's available height,
+with scrollable details and a fixed refresh footer.
+When registry data is absent, omit empty metric bars while retaining the
+availability and local-candidate proof boundaries. The retained implementation
+snapshot is retained at
+`.harness/evidence/2026-09-29-skillsbar-focus-navigator.png`, generated from the
+production fixture at one pixel per point.
+These changes do not alter gate promotion or registry provenance rules.
+
+The fidelity correction uses compact centered tile labels, larger status
+symbols, a full status-count summary, a flat detail region, separate severity
+badges, and an inline blue Copy command action. Remove the earlier gate ring
+and extra pipeline heading. Selection of the next required stage is amber;
+inspection of another stage is blue. Keyboard focus uses a neutral inset
+outline and arrow navigation stops at grid edges. Stage changes have no
+animation. Move More actions and skill selection to the header ellipsis menu.
+The checked-time footer refreshes evidence; Escape and the menu close action
+dismiss the popover. Use a dark charcoal surface with a slight cyan hue,
+amber selected-stage labels and severity text, filled pending-state symbols,
+and a blue copy button independent of the system accent. Keep the screen-height cap, native scroll container, labelled
+controls, selectable command text, and separate registry provenance.
+
+Color declarations remain native SwiftUI sRGB tokens. The color pass measures
+their perceptual values in OKLCH and checks WCAG contrast rather than introducing
+a CSS color layer into the app.
+
+| File | Before | After | Reason |
+| --- | --- | --- | --- |
+| DashboardView | System dark background and prominent gradient overlays | `focusDarkSurface = RGB(0.09, 0.12, 0.135)`, OKLCH `0.232 0.013 229.7` | Match the prototype's charcoal hue; keep surface chroma low. |
+| DashboardView / ReleaseEvidenceView | System accent / system blue for copy | `focusActionBlue = RGB(0, 0.435, 0.94)`, OKLCH `0.568 0.212 258.1` | Stable prototype blue; white text contrast 4.64:1. |
+| DashboardView / ReleaseEvidenceView | Bright dark-theme amber used in light appearance | `focusWarningInk = RGB(0.55, 0.32, 0.02)`, OKLCH `0.495 0.110 63.7` | Darker light-theme ink; white-background contrast 6.33:1. |
+| DashboardView / ReleaseEvidenceView | Bright cyan used for light-theme metadata | `focusInfoInk = RGB(0.04, 0.40, 0.48)`, OKLCH `0.472 0.082 218.5` | Wider lightness gap; white-background contrast 6.57:1. |
+| ReleaseEvidenceView | Bright green status symbol in light appearance | `RGB(0.08, 0.46, 0.20)` | Preserve positive hue with a darker light-theme symbol. |
+| ReleaseEvidenceView | Bright red status symbol in light appearance | `RGB(0.72, 0.12, 0.10)` | Preserve danger hue with a darker light-theme symbol. |
+| DashboardView | Gradient outer border, opacity 0.32 to 0.08, plus custom shadow | Flat primary border, opacity 0.12 | Remove competing depth cues. |
+
+Dark amber remains `RGB(1, 0.69, 0.08)`, OKLCH `0.813 0.168 75.7`;
+its contrast against the selected amber fill is 7.24:1. These ratios measure
+the named solid color pairs; they do not establish full runtime accessibility
+or certify every pixel over desktop material.
+
 ### Header
 
 - Show the custom Skills SDK document icon from `SkillsSDKIcon.png` in the
