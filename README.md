@@ -201,12 +201,12 @@ swift test --build-system native --disable-sandbox --build-path /private/tmp/ski
 | `Sources/SkillsBar`                                                                      | SwiftUI app, models, services, stores, resources, and views.                                             |
 | `Sources/SkillsBarCore`                                                                  | Shared shell execution and JSON parsing helpers.                                                         |
 | `Tests/SkillsBarCoreTests`                                                               | Unit tests for core shell behavior.                                                                      |
-| `.harness/specs/2026-07-10-skillsbar-pipeline-posture-spec.md`                           | Approved current documentation contract for the nine-gate pipeline-posture UI.                            |
-| `.harness/media/2026-07-10-skillsbar-pipeline-posture-approved.png`                      | Approved pipeline-posture mockup; supporting visual evidence, not runtime proof.                          |
-| `.harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md`                    | Superseded review-popover spec retained as historical/reference-only evidence.                            |
+| `.harness/specs/2026-07-10-skillsbar-pipeline-posture-spec.md`                           | Approved current documentation contract for the nine-gate pipeline-posture UI.                           |
+| `.harness/media/2026-07-10-skillsbar-pipeline-posture-approved.png`                      | Approved pipeline-posture mockup; supporting visual evidence, not runtime proof.                         |
+| `.harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md`                    | Superseded review-popover spec retained as historical/reference-only evidence.                           |
 | `.harness/reviews/2026-07-09-review-popover-3lane-synthesis.md`                          | Three-lane implementation handoff for the final-polish review popover refactor.                          |
 | `.harness/reviews/2026-07-09-review-popover-pass3-synthesis.md`                          | Pass-three review closeout separating spec/doc handoff defects from remaining implementation blockers.   |
-| `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-implementation-handoff.png` | Historical full-height implementation-handoff mockup for the superseded review-popover spec.              |
+| `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-implementation-handoff.png` | Historical full-height implementation-handoff mockup for the superseded review-popover spec.             |
 | `.harness/evidence/2026-07-09-skills-sdk-review-popover-implementation.png`              | Deterministic `404 x 720` app-rendered implementation snapshot; not live MenuBarExtra interaction proof. |
 | `.harness/media/2026-07-09-skills-sdk-menubar-review-popover-final-polish.png`           | Earlier final-polish mockup retained as historical comparison evidence.                                  |
 | `.harness/media/2026-07-09-skills-sdk-menubar-final-mockup.png`                          | Earlier persisted mockup retained as historical comparison evidence.                                     |
