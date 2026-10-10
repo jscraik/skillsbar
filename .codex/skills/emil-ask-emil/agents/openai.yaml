@@ -1,3 +1,7 @@
 interface:
   display_name: "Ask Emil"
   short_description: "Ask which skill fits the problem in front of you, and in what order"
+  default_prompt: "Use $emil-ask-emil for this task."
+
+policy:
+  allow_implicit_invocation: false
