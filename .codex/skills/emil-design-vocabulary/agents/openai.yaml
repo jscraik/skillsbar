@@ -1,3 +1,4 @@
 interface:
   display_name: "Design Vocabulary"
   short_description: "Name a design or UI concept from a loose description"
+  default_prompt: "Use $emil-design-vocabulary for this task."

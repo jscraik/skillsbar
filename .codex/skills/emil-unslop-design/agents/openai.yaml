@@ -1,3 +1,4 @@
 interface:
   display_name: "Unslop Design"
   short_description: "Remove the visual tells that make a screen look AI-generated"
+  default_prompt: "Use $emil-unslop-design for this task."
