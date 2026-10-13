@@ -35,9 +35,21 @@ try {
     assert.deepEqual(errors, []);
     assert.equal(await page.locator(".compact-nav").isVisible(), width <= 900);
     if (width <= 900) {
+      // Open and verify links are visible
       await page.locator(".compact-nav summary").click();
       assert.equal(await page.locator(".compact-nav").getByRole("link", { name: "Interactive demo" }).isVisible(), true);
+
+      // Escape closes the nav and returns focus to the summary
+      await page.keyboard.press("Escape");
+      await page.waitForFunction(() => !document.querySelector(".compact-nav")?.hasAttribute("open"), { timeout: 2000 });
+      assert.equal(await page.locator(".compact-nav").evaluate(el => el.hasAttribute("open")), false, `${width}px: Escape should close compact-nav`);
+      assert.equal(await page.locator(".compact-nav summary").evaluate(el => el === document.activeElement), true, `${width}px: focus should return to summary after Escape`);
+
+      // Open again, select an internal link, nav should close and reach destination
       await page.locator(".compact-nav summary").click();
+      await page.locator(".compact-nav").getByRole("link", { name: "Interactive demo" }).click();
+      await page.waitForFunction(() => !document.querySelector(".compact-nav")?.hasAttribute("open"), { timeout: 2000 });
+      assert.equal(await page.locator(".compact-nav").evaluate(el => el.hasAttribute("open")), false, `${width}px: link click should close compact-nav`);
     }
     assert.equal(await page.locator(".scenario-picker").evaluate(element => Boolean(element.closest(".focus-inspector"))), true);
     assert.equal(await page.locator(".detail-reveal").evaluate(element => getComputedStyle(element).animationName), "none");
