@@ -1,0 +1,28 @@
+{
+  "name": "skills-sdk-lab/skillsbar",
+  "actions": {
+    "implement-github-issue": {
+      "skill": "tessl-labs/factory#implement-github-issue",
+      "environment": "skillsbar-factory"
+    }
+  },
+  "triggers": {
+    "github-issue-labelled": {
+      "on": [
+        "github:issues.labeled"
+      ],
+      "when": {
+        "event.label.name": "tessl"
+      },
+      "concurrency": {
+        "keys": [
+          {
+            "key": "implement:{{ event.repository.id }}#{{ event.issue.number }}",
+            "limit": 1
+          }
+        ]
+      },
+      "action": "implement-github-issue"
+    }
+  }
+}
