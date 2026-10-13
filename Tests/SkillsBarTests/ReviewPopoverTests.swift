@@ -123,6 +123,20 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(try source.loadSync().pipeline.activeReceipt?.stage, .tesslStaging)
     }
 
+    func testCommandDisclosureLabelNamesTheStageAndKeepsVisibleTextFirst() {
+        for stage in PipelineStage.allCases {
+            let collapsed = CommandDisclosureText(stageTitle: stage.title, isExpanded: false)
+            XCTAssertEqual(collapsed.title, "Show command")
+            XCTAssertEqual(collapsed.accessibilityLabel, "Show command, \(stage.title)")
+            XCTAssertEqual(collapsed.accessibilityValue, "Collapsed")
+
+            let expanded = CommandDisclosureText(stageTitle: stage.title, isExpanded: true)
+            XCTAssertEqual(expanded.title, "Hide command")
+            XCTAssertEqual(expanded.accessibilityLabel, "Hide command, \(stage.title)")
+            XCTAssertEqual(expanded.accessibilityValue, "Expanded")
+        }
+    }
+
     func testDensePipelineActionLabelsKeepTheFullReasonAvailableSeparately() {
         guard let active = SkillDashboard.reviewFixture.pipeline.activeReceipt else {
             return XCTFail("The review fixture must expose an active pipeline receipt")
