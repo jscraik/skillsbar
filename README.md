@@ -188,6 +188,78 @@ swift test --build-system native --disable-sandbox --build-path /private/tmp/ski
 
 `script/build_and_run.sh --verify` launches the app and checks for a running `SkillsBar` process. Use it only when a live macOS UI launch is appropriate for the current task.
 
+### Factory validation and Mac acceptance
+
+The existing Tessl factory implements GitHub issues only when Jamie explicitly
+adds the `tessl` label, then opens a PR. Keep each issue small, name its allowed
+files and deterministic checks, and record any cloud-toolchain blocker instead
+of claiming a test passed. Do not install Linux Swift expecting AppKit or
+SwiftUI macOS builds to work.
+
+`.github/workflows/validation.yml` provides the PR validation split:
+
+- **Native macOS tests:** GitHub-hosted `macos-15` with Xcode 26.3, verified
+  against the [runner-image inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md).
+  It builds, runs `ReviewPopoverTests` and the full deterministic suite, and
+  renders an app fixture. Rendering failures stay failures with logs retained.
+  The existing opt-in live integration test skips without a real agent-skills
+  checkout and Tessl credentials; the optional managed-Python shell probe also
+  skips when its workstation-only Python path is absent. Neither skip removes
+  SwiftUI/AppKit rendering coverage. CodeQL remains separate.
+- **Demo site tests:** GitHub-hosted `ubuntu-24.04` installs the npm lockfile,
+  provisions Playwright's `chrome` channel, lints, runs `npm test` (which already
+  builds), then browser-tests that build through the production server. Server
+  readiness has a 60-second limit; the test runner cleans up its owned process
+  groups. Logs and success/failure screenshots use portable `outputs/ci` paths.
+
+Both jobs record the PR head, actual tested Git revision, OS, architecture and
+tool versions. A PR run normally checks GitHub's synthetic merge revision;
+do not attribute that result to an untested head or a different checkout.
+Artifacts prove builds, tests and rendered fixtures. They do not prove live
+menu-bar interaction, final visual acceptance, registry publication or deployment.
+
+For web changes Tessl can run, from `sites/skillsbar-walkthrough`:
+
+```bash
+npm ci
+npm run lint
+npm test
+node scripts/test-browser-production.mjs
+```
+
+The last command runs `npm run start -- --port 3008` and the existing
+`npm run test:browser -- http://127.0.0.1:3008/`. `BROWSER_ARTIFACT_DIR` selects
+the screenshot/log directory (default `outputs/browser`). The Chrome channel
+must be installed; CI explicitly uses
+`npx --no-install playwright-core install --with-deps chrome`.
+Tessl's cloud may inspect native source and run available static checks, but
+must leave native compile/test proof to macOS when Apple's SDKs are absent.
+
+Final native acceptance remains supervised on Jamie's Mac: record the checkout,
+revision and bundle, open the affected popover state, and check pointer/keyboard
+behavior, tooltip/copy feedback, clipping and relevant accessibility settings.
+`script/build_and_run.sh --verify` proves a sustained LaunchServices launch;
+it does not substitute for those observations. Jamie's Mac is not an unattended
+PR runner. These validation jobs use no signing, publication or deployment secrets.
+
+The next bounded factory trial is a demo-site keyboard improvement:
+support Home and End on the nine-stage grid in
+`sites/skillsbar-walkthrough/app/focus-navigator.tsx`, with checks in the existing
+`tests/browser-smoke.mjs`. Acceptance requires Home to focus/select the first
+stage and End the last, while every evidence status remains unchanged. Arrow
+navigation and command-textarea editing must continue to work, with no overflow
+across existing viewports and passing lint, rendered-page and browser tests.
+Create and label that issue only with
+Jamie’s authorization after the validation workflow is published and proven.
+
+After Tessl opens a PR, inspect its head and checks with `gh pr checks` or the
+GitHub API, then reconcile them against the job's tested-revision artifact.
+The GitHub App's ability to read checks must be verified; it does not prove
+that the starter waits for CI or automatically repairs failures. The current
+manifest has no PR-shepherd automation. If a run ends after opening its PR,
+Jamie can supervise a focused follow-up with the failing log and unchanged
+scope, then require fresh checks and independent review before any merge.
+
 ## Project Layout
 
 | Path                                                                                     | Purpose                                                                                                  |
