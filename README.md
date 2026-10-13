@@ -191,8 +191,9 @@ swift test --build-system native --disable-sandbox --build-path /private/tmp/ski
 ### Factory validation and Mac acceptance
 
 The Tessl factory implements GitHub issues when Jamie explicitly adds the
-`tessl` label, then opens a PR. Its shepherd follows Tessl-labelled PRs on
-`tessl/` branches when reviews, human comments or check results arrive. Keep
+`tessl` label, then opens a PR. Its shepherd follows submitted reviews and
+review comments on Tessl-labelled `tessl/` branches, human comments on
+Tessl-labelled PRs, and check results on `tessl/` branches. Keep
 each issue small, name its allowed files and deterministic checks, and record
 any cloud-toolchain blocker instead of claiming a test passed. Do not install
 Linux Swift expecting AppKit or SwiftUI macOS builds to work.
