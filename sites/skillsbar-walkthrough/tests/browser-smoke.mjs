@@ -71,11 +71,16 @@ try {
 
     // Home/End assertions for both scenarios
     const scenarioDefaults = { "Security review required": 2, "Identity missing": 0 };
+    // span:last-child shows "Next required" when selected===active, else "Next required: Gate NN"
+    const gateContextText = (selectedIdx, activeIdx) => selectedIdx === activeIdx
+      ? "Next required"
+      : `Next required: Gate ${String(activeIdx + 1).padStart(2, "0")}`;
     for (const [scenarioLabel, defaultIndex] of Object.entries(scenarioDefaults)) {
       await page.getByRole("button", { name: scenarioLabel, exact: true }).click();
       const statuses = await page.locator(".stage-grid button").evaluateAll(buttons => buttons.map(button => button.dataset.status));
-      const nextRequired = await page.locator(".gate-context span:last-child").textContent();
       const registryText = await page.locator(".registry-summary").textContent();
+      // When the scenario loads, selected === active === defaultIndex
+      const activeGateIndex = defaultIndex;
 
       // Focus an interior stage (Gate 5, index 4)
       await page.locator(".stage-grid button").nth(4).focus();
@@ -90,7 +95,7 @@ try {
       assert.deepEqual(afterHome.selected, [0], `${scenarioLabel}: Home should select stage 1`);
       assert.equal(afterHome.focused, 0, `${scenarioLabel}: Home should focus stage 1`);
       assert.deepEqual(await page.locator(".stage-grid button").evaluateAll(buttons => buttons.map(button => button.dataset.status)), statuses, `${scenarioLabel}: Home must not change statuses`);
-      assert.equal(await page.locator(".gate-context span:last-child").textContent(), nextRequired, `${scenarioLabel}: Home must not change next-required`);
+      assert.equal(await page.locator(".gate-context span:last-child").textContent(), gateContextText(0, activeGateIndex), `${scenarioLabel}: Home must not change next-required`);
       assert.equal(await page.locator(".registry-summary").textContent(), registryText, `${scenarioLabel}: Home must not change registry evidence`);
 
       // Press End: expect stage 9 (index 8) selected and focused
@@ -103,7 +108,7 @@ try {
       assert.deepEqual(afterEnd.selected, [8], `${scenarioLabel}: End should select stage 9`);
       assert.equal(afterEnd.focused, 8, `${scenarioLabel}: End should focus stage 9`);
       assert.deepEqual(await page.locator(".stage-grid button").evaluateAll(buttons => buttons.map(button => button.dataset.status)), statuses, `${scenarioLabel}: End must not change statuses`);
-      assert.equal(await page.locator(".gate-context span:last-child").textContent(), nextRequired, `${scenarioLabel}: End must not change next-required`);
+      assert.equal(await page.locator(".gate-context span:last-child").textContent(), gateContextText(8, activeGateIndex), `${scenarioLabel}: End must not change next-required`);
       assert.equal(await page.locator(".registry-summary").textContent(), registryText, `${scenarioLabel}: End must not change registry evidence`);
 
       // Reset via scenario button and assert default selection
