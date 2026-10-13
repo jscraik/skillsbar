@@ -26,6 +26,8 @@ test("server-renders the SkillsBar evidence landing page", async () => {
   assert.match(html, /<title>Know what your skill needs next · SkillsBar<\/title>/i);
   assert.match(html, /Know what your skill needs next/);
   assert.match(html, /by jscraik/);
+  assert.match(html, /class="compact-nav"/, "compact-nav is server-rendered");
+  assert.match(html, /<details class="compact-nav"/, "compact-nav uses a native details element");
   assert.doesNotMatch(html, /brAInwav/);
   assert.match(html, /Security review required/);
   assert.match(html, /Identity missing/);

@@ -35,9 +35,29 @@ try {
     assert.deepEqual(errors, []);
     assert.equal(await page.locator(".compact-nav").isVisible(), width <= 900);
     if (width <= 900) {
+      // Open and verify links are visible
       await page.locator(".compact-nav summary").click();
       assert.equal(await page.locator(".compact-nav").getByRole("link", { name: "Interactive demo" }).isVisible(), true);
-      await page.locator(".compact-nav summary").click();
+
+      // Escape closes the nav and returns focus to the summary
+      await page.keyboard.press("Escape");
+      await page.waitForFunction(() => !document.querySelector(".compact-nav")?.hasAttribute("open"), { timeout: 2000 });
+      assert.equal(await page.locator(".compact-nav").evaluate(el => el.hasAttribute("open")), false, `${width}px: Escape should close compact-nav`);
+      assert.equal(await page.locator(".compact-nav summary").evaluate(el => el === document.activeElement), true, `${width}px: focus should return to summary after Escape`);
+
+      // Internal-link close: both #walkthrough and #product links close the menu, update the fragment, and land below the fixed header
+      for (const [linkName, fragment, sectionId] of [
+        ["Interactive demo", "#walkthrough", "walkthrough"],
+        ["Native app detail", "#product", "product"],
+      ]) {
+        await page.locator(".compact-nav summary").click();
+        await page.locator(".compact-nav").getByRole("link", { name: linkName }).click();
+        await page.waitForFunction(() => !document.querySelector(".compact-nav")?.hasAttribute("open"), { timeout: 2000 });
+        assert.equal(await page.locator(".compact-nav").evaluate(el => el.hasAttribute("open")), false, `${width}px: "${linkName}" click should close compact-nav`);
+        assert.equal(await page.evaluate(() => location.hash), fragment, `${width}px: "${linkName}" click should set URL fragment to ${fragment}`);
+        const sectionTop = await page.locator(`#${sectionId}`).evaluate(el => el.getBoundingClientRect().top);
+        assert.ok(sectionTop >= 0, `${width}px: "${linkName}" destination should land at or below viewport top (top=${sectionTop})`);
+      }
     }
     assert.equal(await page.locator(".scenario-picker").evaluate(element => Boolean(element.closest(".focus-inspector"))), true);
     assert.equal(await page.locator(".detail-reveal").evaluate(element => getComputedStyle(element).animationName), "none");
@@ -168,6 +188,26 @@ try {
   assert.equal(await page.locator(".hero h1").isVisible(), true);
   assert.equal(await page.locator(".hero-technical img").isVisible(), true);
   console.log("pass: no-JavaScript hero");
+
+  // No-JS compact-nav: native details disclosure opens without JavaScript, and both internal links navigate to their destinations
+  assert.equal(await page.locator(".compact-nav").isVisible(), true, "no-JS: compact-nav is visible at 375px");
+  assert.equal(await page.locator(".compact-nav").evaluate(el => el.hasAttribute("open")), false, "no-JS: compact-nav starts closed");
+  await page.locator(".compact-nav summary").click();
+  assert.equal(await page.locator(".compact-nav").evaluate(el => el.hasAttribute("open")), true, "no-JS: clicking summary opens the native disclosure");
+  for (const [linkName, fragment] of [
+    ["Interactive demo", "#walkthrough"],
+    ["Native app detail", "#product"],
+  ]) {
+    await page.locator(".compact-nav summary").click();
+    if (!await page.locator(".compact-nav").evaluate(el => el.hasAttribute("open"))) {
+      await page.locator(".compact-nav summary").click();
+    }
+    await page.locator(".compact-nav").getByRole("link", { name: linkName }).click();
+    await page.waitForURL(`**${fragment}`, { timeout: 3000 });
+    assert.equal(await page.evaluate(() => location.hash), fragment, `no-JS: "${linkName}" navigates to ${fragment}`);
+    await page.goto(baseURL, { waitUntil: "load" });
+  }
+  console.log("pass: no-JavaScript compact-nav disclosure and link navigation");
   await context.close();
 } catch (error) {
   if (activePage && !activePage.isClosed()) {

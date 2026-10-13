@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { CompactNavBehavior } from "./compact-nav";
 import { CopyCommand } from "./interactive-evidence";
 import { FocusNavigator } from "./focus-navigator";
 
@@ -10,7 +11,7 @@ export default function Home() {
       <nav className="site-nav" aria-label="Primary navigation">
         <a className="brand" href="#top" aria-label="SkillsBar home"><Image src="/skillsbar-icon-168.webp" alt="" width={28} height={28} unoptimized /><span>SkillsBar</span><small>by jscraik</small></a>
         <div className="nav-links"><a href="#product">Product proof</a><a href="#walkthrough">How it works</a><a className="nav-cta" href="https://github.com/jscraik/skillsbar">Repository ↗</a></div>
-        <details className="compact-nav"><summary>Explore</summary><div><a href="#walkthrough">Interactive demo</a><a href="#product">Native app detail</a><a href="https://github.com/jscraik/skillsbar">Repository ↗</a></div></details>
+        <details className="compact-nav"><summary>Explore</summary><div><a href="#walkthrough">Interactive demo</a><a href="#product">Native app detail</a><a href="https://github.com/jscraik/skillsbar">Repository ↗</a></div></details><CompactNavBehavior />
       </nav>
 
       <section className="hero" id="top" tabIndex={-1} aria-labelledby="hero-title">
