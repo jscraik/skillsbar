@@ -1,4 +1,3 @@
 interface:
   display_name: "Ask Lapse"
   short_description: "Answers anything about Lapse, and wires it into your project"
-  default_prompt: "Use $emil-ask-lapse for this task."

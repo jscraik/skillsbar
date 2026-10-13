@@ -1,4 +1,3 @@
 interface:
   display_name: "Design System Docs"
   short_description: "Write the docs that tell an agent when to use which component"
-  default_prompt: "Use $emil-design-system-docs for this task."
