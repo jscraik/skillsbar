@@ -1,5 +1,8 @@
 # SkillsBar
 
+The repository also distributes its existing AI for UI skill collection as a
+[Codex plugin](.codex/README.md), independently of the macOS application.
+
 SkillsBar is a native macOS menu-bar app for watching local Skills SDK evidence without flattening separate proof lanes. It renders the selected skill's canonical package identity, validation, security, eval preparation, durable downstream receipts, runtime proof, inventory, and Tessl registry state in a compact SwiftUI popover.
 
 The app is currently a local prototype with a release-capable packaging path. It builds and launches from this checkout, reads the agent-skills repository on disk, and keeps local SDK evidence separate from Tessl registry evidence. A public release still requires Jamie's Developer ID certificate and Apple notarization credentials.

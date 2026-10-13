@@ -1,3 +1,7 @@
 interface:
   display_name: "Build a Tool"
   short_description: "Build the small tool that produces the result your agent keeps missing"
+  default_prompt: "Use $emil-build-a-tool for this task."
+
+policy:
+  allow_implicit_invocation: false

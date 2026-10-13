@@ -1,3 +1,4 @@
 interface:
   display_name: "Performance"
   short_description: "Fast interfaces through virtualization, preloading, and perceived speed"
+  default_prompt: "Use $emil-performance for this task."

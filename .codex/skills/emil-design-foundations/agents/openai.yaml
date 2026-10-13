@@ -1,3 +1,4 @@
 interface:
   display_name: "Design Foundations"
   short_description: "Core design judgment for hierarchy, spacing, alignment, and restraint"
+  default_prompt: "Use $emil-design-foundations for this task."

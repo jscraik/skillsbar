@@ -1,3 +1,4 @@
 interface:
   display_name: "Animations"
   short_description: "Decides when to animate, and picks the easing, duration, and springs"
+  default_prompt: "Use $emil-animations for this task."

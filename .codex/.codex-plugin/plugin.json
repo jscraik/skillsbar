@@ -1,0 +1,46 @@
+{
+  "name": "emil-aiforui-course",
+  "version": "0.1.0",
+  "description": "The 28 AI for UI skills in this repository, packaged for Codex.",
+  "author": {
+    "name": "Jamie Craik"
+  },
+  "repository": "https://github.com/jscraik/skillsbar",
+  "skills": [
+    "./skills/emil-animations",
+    "./skills/emil-ask-emil",
+    "./skills/emil-ask-lapse",
+    "./skills/emil-borrow-a-brain",
+    "./skills/emil-build-a-tool",
+    "./skills/emil-color",
+    "./skills/emil-component-design",
+    "./skills/emil-design-foundations",
+    "./skills/emil-design-system-docs",
+    "./skills/emil-design-vocabulary",
+    "./skills/emil-engineering-vocabulary",
+    "./skills/emil-forms-and-inputs",
+    "./skills/emil-get-creative",
+    "./skills/emil-marketing-pages",
+    "./skills/emil-mobile-native",
+    "./skills/emil-performance",
+    "./skills/emil-prep-for-prod",
+    "./skills/emil-product-thinking",
+    "./skills/emil-prototype",
+    "./skills/emil-surfaces",
+    "./skills/emil-touch-and-accessibility",
+    "./skills/emil-typography",
+    "./skills/emil-ui-polish",
+    "./skills/emil-ui-review",
+    "./skills/emil-unslop-code",
+    "./skills/emil-unslop-design",
+    "./skills/emil-unslop-writing",
+    "./skills/emil-writing-skills"
+  ],
+  "interface": {
+    "displayName": "Emil Kowalski · AI for UI",
+    "shortDescription": "AI for UI course skills",
+    "developerName": "jscraik",
+    "category": "Developer Tools",
+    "websiteURL": "https://github.com/jscraik/skillsbar"
+  }
+}

@@ -1,3 +1,4 @@
 interface:
   display_name: "Surfaces & Depth"
   short_description: "Shadows, borders, gradients, depth, and dark-mode surfaces"
+  default_prompt: "Use $emil-surfaces for this task."
