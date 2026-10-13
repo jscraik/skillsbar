@@ -44,6 +44,17 @@ try {
     const crop = await page.locator(".native-detail-crop").boundingBox();
     assert.ok(crop && crop.height < crop.width, "native proof is a landscape detail crop");
     await page.locator(".atlas-disclosure summary").click();
+
+    /** Return selected stage indices and focused stage index (-1 if no stage button is active element). */
+    async function stageState() {
+      return page.evaluate(() => {
+        const buttons = [...document.querySelectorAll(".stage-grid button")];
+        const selected = buttons.reduce((acc, btn, i) => { if (btn.getAttribute("aria-pressed") === "true") acc.push(i); return acc; }, []);
+        const focused = buttons.indexOf(document.activeElement);
+        return { selected, focused };
+      });
+    }
+
     for (const scenario of ["Security review required", "Identity missing"]) {
       await page.getByRole("button", { name: scenario, exact: true }).click();
       const statuses = await page.locator(".stage-grid button").evaluateAll(buttons => buttons.map(button => button.dataset.status));
@@ -57,6 +68,49 @@ try {
       }
       if (width >= 1024) assert.ok(Math.max(...positions) - Math.min(...positions) <= 1, `${scenario} shifts registry: ${positions}`);
     }
+
+    // Home/End assertions for both scenarios
+    const scenarioDefaults = { "Security review required": 2, "Identity missing": 0 };
+    for (const [scenarioLabel, defaultIndex] of Object.entries(scenarioDefaults)) {
+      await page.getByRole("button", { name: scenarioLabel, exact: true }).click();
+      const statuses = await page.locator(".stage-grid button").evaluateAll(buttons => buttons.map(button => button.dataset.status));
+      const nextRequired = await page.locator(".gate-context").textContent();
+      const registryText = await page.locator(".registry-summary").textContent();
+
+      // Focus an interior stage (Gate 5, index 4)
+      await page.locator(".stage-grid button").nth(4).focus();
+
+      // Press Home: expect stage 1 (index 0) selected and focused
+      await page.keyboard.press("Home");
+      await page.waitForFunction(() => {
+        const buttons = [...document.querySelectorAll(".stage-grid button")];
+        return buttons[0].getAttribute("aria-pressed") === "true" && document.activeElement === buttons[0];
+      }, { timeout: 2000 });
+      const afterHome = await stageState();
+      assert.deepEqual(afterHome.selected, [0], `${scenarioLabel}: Home should select stage 1`);
+      assert.equal(afterHome.focused, 0, `${scenarioLabel}: Home should focus stage 1`);
+      assert.deepEqual(await page.locator(".stage-grid button").evaluateAll(buttons => buttons.map(button => button.dataset.status)), statuses, `${scenarioLabel}: Home must not change statuses`);
+      assert.equal(await page.locator(".gate-context").textContent(), nextRequired, `${scenarioLabel}: Home must not change next-required`);
+      assert.equal(await page.locator(".registry-summary").textContent(), registryText, `${scenarioLabel}: Home must not change registry evidence`);
+
+      // Press End: expect stage 9 (index 8) selected and focused
+      await page.keyboard.press("End");
+      await page.waitForFunction(() => {
+        const buttons = [...document.querySelectorAll(".stage-grid button")];
+        return buttons[8].getAttribute("aria-pressed") === "true" && document.activeElement === buttons[8];
+      }, { timeout: 2000 });
+      const afterEnd = await stageState();
+      assert.deepEqual(afterEnd.selected, [8], `${scenarioLabel}: End should select stage 9`);
+      assert.equal(afterEnd.focused, 8, `${scenarioLabel}: End should focus stage 9`);
+      assert.deepEqual(await page.locator(".stage-grid button").evaluateAll(buttons => buttons.map(button => button.dataset.status)), statuses, `${scenarioLabel}: End must not change statuses`);
+      assert.equal(await page.locator(".gate-context").textContent(), nextRequired, `${scenarioLabel}: End must not change next-required`);
+      assert.equal(await page.locator(".registry-summary").textContent(), registryText, `${scenarioLabel}: End must not change registry evidence`);
+
+      // Reset via scenario button and assert default selection
+      await page.getByRole("button", { name: scenarioLabel, exact: true }).click();
+      assert.equal(await page.locator(".stage-grid button").nth(defaultIndex).getAttribute("aria-pressed"), "true", `${scenarioLabel}: reset should select default stage ${defaultIndex + 1}`);
+    }
+
     await page.getByRole("button", { name: "Identity missing", exact: true }).click();
     assert.equal(await page.locator(".stage-grid button").nth(0).getAttribute("aria-pressed"), "true");
     assert.match(await page.locator(".registry-summary").textContent(), /66/);
@@ -64,6 +118,8 @@ try {
     await page.locator(".stage-grid button").nth(0).press("ArrowRight");
     assert.equal(await page.locator(".stage-grid button").nth(1).getAttribute("aria-pressed"), "true");
     await page.locator(".stage-grid button").nth(1).press("ArrowLeft");
+    // Assert ArrowLeft result: Identity Gate 2 -> Gate 1
+    assert.equal(await page.locator(".stage-grid button").nth(0).getAttribute("aria-pressed"), "true", "ArrowLeft from Gate 2 should select Gate 1");
     await page.locator(".inspector-command button").click();
     await page.locator(".inspector-command .copy-status").filter({ hasText: "Command copied." }).waitFor();
     assert.equal(await page.locator(".inspector-command .copy-status").textContent(), "Command copied.");
@@ -75,6 +131,12 @@ try {
     assert.equal(await page.locator(".inspector-command textarea").evaluate(field => field.selectionStart === 0 && field.selectionEnd === field.value.length), true);
     await page.locator(".inspector-command textarea").press("ArrowRight");
     assert.equal(await page.locator(".stage-grid button").nth(0).getAttribute("aria-pressed"), "true");
+    // Textarea Home/End must not change stage selection
+    const selectedBeforeTextareaNav = await page.locator(".stage-grid button").evaluateAll(buttons => buttons.findIndex(b => b.getAttribute("aria-pressed") === "true"));
+    await page.locator(".inspector-command textarea").press("Home");
+    assert.equal(await page.locator(".stage-grid button").evaluateAll(buttons => buttons.findIndex(b => b.getAttribute("aria-pressed") === "true")), selectedBeforeTextareaNav, "textarea Home must not change stage selection");
+    await page.locator(".inspector-command textarea").press("End");
+    assert.equal(await page.locator(".stage-grid button").evaluateAll(buttons => buttons.findIndex(b => b.getAttribute("aria-pressed") === "true")), selectedBeforeTextareaNav, "textarea End must not change stage selection");
     await page.getByRole("button", { name: "Security review required", exact: true }).click();
     assert.equal(await page.locator(".stage-grid button").nth(2).getAttribute("aria-pressed"), "true");
     if (width === 375 || width === 1440) {
