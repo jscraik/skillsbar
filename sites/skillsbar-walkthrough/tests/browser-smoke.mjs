@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
@@ -7,6 +7,7 @@ import { chromium } from "playwright-core";
 const baseURL = process.argv[2] ?? "http://localhost:3008/";
 const artifactDir = path.resolve(process.env.BROWSER_ARTIFACT_DIR ?? fileURLToPath(new URL("../outputs/browser", import.meta.url)));
 await mkdir(artifactDir, { recursive: true });
+await rm(path.join(artifactDir, "failure.png"), { force: true });
 const browser = await chromium.launch({ headless: true, channel: "chrome" });
 let activePage;
 try {
