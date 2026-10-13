@@ -16,7 +16,7 @@
     "assets:cover": "xcrun swift scripts/generate-skillsbar-cover.swift public/og.png"
   },
   "dependencies": {
-    "next": "16.3.6",
+    "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -29,7 +29,7 @@
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.3.8",
     "playwright-core": "1.62.1",
     "pngjs": "5.0.0",
     "qrcode": "1.5.4",
@@ -43,6 +43,9 @@
   "overrides": {
     "vinext": {
       "image-size": "2.0.4"
+    },
+    "miniflare": {
+      "sharp": "0.35.5"
     }
   },
   "type": "module"
