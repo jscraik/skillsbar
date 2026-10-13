@@ -353,6 +353,9 @@ private struct CommandAction: View {
                 }
                 .buttonStyle(FocusStageButtonStyle())
                 .accessibilityValue(disclosure.isExpanded ? "Expanded" : "Collapsed")
+                .help(disclosure.isExpanded
+                    ? "Hide the \(receipt.stage.title.lowercased()) command"
+                    : "Inspect the full \(receipt.stage.title.lowercased()) command")
                 Spacer(minLength: 0)
                 GateCopyButton(receipt: receipt)
             }
