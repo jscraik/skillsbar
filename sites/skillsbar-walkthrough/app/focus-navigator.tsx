@@ -36,11 +36,18 @@ export function FocusNavigator() {
         <div className="scenario-picker"><span>Demo scenario</span>{(Object.keys(scenarios) as Scenario[]).map(id => <button type="button" key={id} aria-pressed={scenario === id} onClick={() => { setScenario(id); select(scenarios[id].active); }}>{scenarios[id].label}</button>)}</div>
         <p className="scenario-disclosure">Interactive fixture · Selection changes the view, never the evidence. {scenario === "security" ? "The security command is illustrative." : "The identity command can be copied for local use."}</p>
         <div className="stage-grid" aria-label="Evidence stages">{names.map((name, index) => <button type="button" key={name} data-status={data.statuses[index]} aria-pressed={selected === index} aria-label={`Gate ${index + 1}: ${name}, ${data.statuses[index]}`} onClick={() => select(index)} onKeyDown={event => {
-          const offsets: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 3, ArrowUp: -3 };
-          const offset = offsets[event.key];
-          if (offset === undefined) return;
+          let next: number;
+          if (event.key === "Home") {
+            next = 0;
+          } else if (event.key === "End") {
+            next = 8;
+          } else {
+            const offsets: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 3, ArrowUp: -3 };
+            const offset = offsets[event.key];
+            if (offset === undefined) return;
+            next = Math.max(0, Math.min(8, index + offset));
+          }
           event.preventDefault();
-          const next = Math.max(0, Math.min(8, index + offset));
           select(next);
           event.currentTarget.parentElement?.querySelectorAll("button")[next]?.focus();
         }}><span>{String(index + 1).padStart(2, "0")}</span><i aria-hidden="true">{symbols[data.statuses[index]]}</i><b>{name}</b></button>)}</div>
