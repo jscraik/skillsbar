@@ -63,7 +63,10 @@ The app snapshot uses a lossless WebP; the original PNG remains its source asset
 
 The `vinext`-scoped `image-size` override pins 2.0.4 because Vinext 0.0.50
 pins vulnerable 2.0.2. Remove the override when a validated Vinext update
-includes a patched parser. Recheck with `npm audit --audit-level=low` after
+includes a patched parser. The `miniflare`-scoped `sharp` override pins 0.35.5
+because Miniflare 5.20260926.1-alpha pins vulnerable 0.35.4. Remove it when
+a validated Miniflare update includes the patched image library. Recheck with
+`npm audit --audit-level=low` after
 dependency updates; a clean audit covers known advisories, not application
 security or hosted release readiness.
 
