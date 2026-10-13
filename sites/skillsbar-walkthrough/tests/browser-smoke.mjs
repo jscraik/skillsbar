@@ -1,16 +1,24 @@
 import assert from "node:assert/strict";
+import { mkdir, rm } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 
 const baseURL = process.argv[2] ?? "http://localhost:3008/";
+const artifactDir = path.resolve(process.env.BROWSER_ARTIFACT_DIR ?? fileURLToPath(new URL("../outputs/browser", import.meta.url)));
+await mkdir(artifactDir, { recursive: true });
+await rm(path.join(artifactDir, "failure.png"), { force: true });
 const browser = await chromium.launch({ headless: true, channel: "chrome" });
+let activePage;
 try {
   for (const width of [375, 654, 837, 900, 1024, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce", permissions: ["clipboard-read", "clipboard-write"] });
     const page = await context.newPage();
+    activePage = page;
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
     await page.goto(baseURL, { waitUntil: "networkidle" });
-    if (width === 1440) await page.screenshot({ path: "/private/tmp/skillsbar-site-hero.png" });
+    if (width === 1440) await page.screenshot({ path: path.join(artifactDir, "skillsbar-site-hero.png") });
     await page.locator(".atlas-disclosure summary").click();
     for (const image of await page.locator("img").all()) {
       await image.scrollIntoViewIfNeeded();
@@ -72,14 +80,15 @@ try {
     if (width === 375 || width === 1440) {
       await page.locator(".focus-demo").scrollIntoViewIfNeeded();
       await page.locator(".focus-demo").evaluate(element => window.scrollTo({ top: element.getBoundingClientRect().top + scrollY - 110, behavior: "instant" }));
-      await page.screenshot({ path: `/private/tmp/skillsbar-site-${width}.png` });
+      await page.screenshot({ path: path.join(artifactDir, `skillsbar-site-${width}.png`) });
     }
-    if (width === 654) await page.locator(".demo-reading").screenshot({ path: "/private/tmp/skillsbar-demo-reading.png" });
+    if (width === 654) await page.locator(".demo-reading").screenshot({ path: path.join(artifactDir, "skillsbar-demo-reading.png") });
     console.log(`pass: ${width}px layout, assets, nine stages, evidence stability, scenario reset, keyboard and clipboard`);
     await context.close();
   }
   const motionContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "no-preference" });
   const motionPage = await motionContext.newPage();
+  activePage = motionPage;
   await motionPage.goto(baseURL, { waitUntil: "networkidle" });
   await motionPage.locator(".stage-grid button").nth(0).click();
   assert.equal(await motionPage.locator(".detail-reveal").evaluate(element => getComputedStyle(element).animationDuration), "0.16s");
@@ -87,9 +96,16 @@ try {
   console.log("pass: stage transition enabled when motion is allowed");
   const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 375, height: 900 } });
   const page = await context.newPage();
+  activePage = page;
   await page.goto(baseURL, { waitUntil: "load" });
   assert.equal(await page.locator(".hero h1").isVisible(), true);
   assert.equal(await page.locator(".hero-technical img").isVisible(), true);
   console.log("pass: no-JavaScript hero");
   await context.close();
+} catch (error) {
+  if (activePage && !activePage.isClosed()) {
+    await activePage.screenshot({ path: path.join(artifactDir, "failure.png"), fullPage: true })
+      .catch(screenshotError => console.error("Failure screenshot unavailable:", screenshotError.message));
+  }
+  throw error;
 } finally { await browser.close(); }
