@@ -190,11 +190,12 @@ swift test --build-system native --disable-sandbox --build-path /private/tmp/ski
 
 ### Factory validation and Mac acceptance
 
-The existing Tessl factory implements GitHub issues only when Jamie explicitly
-adds the `tessl` label, then opens a PR. Keep each issue small, name its allowed
-files and deterministic checks, and record any cloud-toolchain blocker instead
-of claiming a test passed. Do not install Linux Swift expecting AppKit or
-SwiftUI macOS builds to work.
+The Tessl factory implements GitHub issues when Jamie explicitly adds the
+`tessl` label, then opens a PR. Its shepherd follows Tessl-labelled PRs on
+`tessl/` branches when reviews, human comments or check results arrive. Keep
+each issue small, name its allowed files and deterministic checks, and record
+any cloud-toolchain blocker instead of claiming a test passed. Do not install
+Linux Swift expecting AppKit or SwiftUI macOS builds to work.
 
 `.github/workflows/validation.yml` provides the PR validation split:
 
@@ -242,23 +243,24 @@ behavior, tooltip/copy feedback, clipping and relevant accessibility settings.
 it does not substitute for those observations. Jamie's Mac is not an unattended
 PR runner. These validation jobs use no signing, publication or deployment secrets.
 
-The next bounded factory trial is a demo-site keyboard improvement:
-support Home and End on the nine-stage grid in
-`sites/skillsbar-walkthrough/app/focus-navigator.tsx`, with checks in the existing
-`tests/browser-smoke.mjs`. Acceptance requires Home to focus/select the first
-stage and End the last, while every evidence status remains unchanged. Arrow
-navigation and command-textarea editing must continue to work, with no overflow
-across existing viewports and passing lint, rendered-page and browser tests.
-Create and label that issue only with
-Jamie’s authorization after the validation workflow is published and proven.
+The first bounded factory trial, GitHub issue #19, covers Home and End on the
+nine-stage demo grid in `sites/skillsbar-walkthrough/app/focus-navigator.tsx`,
+with checks in `tests/browser-smoke.mjs`. Acceptance requires Home to
+focus/select the first stage and End the last, while every evidence status
+remains unchanged. Arrow navigation and command-textarea editing must continue
+to work, with no overflow across existing viewports and passing lint,
+rendered-page and browser tests.
 
 After Tessl opens a PR, inspect its head and checks with `gh pr checks` or the
 GitHub API, then reconcile them against the job's tested-revision artifact.
-The GitHub App's ability to read checks must be verified; it does not prove
-that the starter waits for CI or automatically repairs failures. The current
-manifest has no PR-shepherd automation. If a run ends after opening its PR,
-Jamie can supervise a focused follow-up with the failing log and unchanged
-scope, then require fresh checks and independent review before any merge.
+The GitHub App's ability to read checks does not prove that the issue-to-PR
+starter waits for CI. The shepherd is a separate action with 90-second
+debounced triggers for Tessl PR reviews, human comments and hosted check
+results; bot comments do not start a round. A check failure that predates
+shepherd activation will not replay: a human comment on the still-open,
+Tessl-labelled PR provides a new trigger. Supervise its reply and new commit,
+then require fresh checks and independent review before any merge. No shepherd
+run or successful repair is proven solely by this manifest.
 
 ## Project Layout
 
