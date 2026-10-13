@@ -336,9 +336,22 @@ private final class CommandDisclosureModel: ObservableObject {
     @Published var isExpanded = false
 }
 
+struct CommandDisclosureText: Equatable {
+    let stageTitle: String
+    let isExpanded: Bool
+
+    var title: String { isExpanded ? "Hide command" : "Show command" }
+    var accessibilityLabel: String { "\(title), \(stageTitle)" }
+    var accessibilityValue: String { isExpanded ? "Expanded" : "Collapsed" }
+}
+
 private struct CommandAction: View {
     let receipt: PipelineStageReceipt
     @StateObject private var disclosure = CommandDisclosureModel()
+
+    private var text: CommandDisclosureText {
+        CommandDisclosureText(stageTitle: receipt.stage.title, isExpanded: disclosure.isExpanded)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -346,13 +359,14 @@ private struct CommandAction: View {
                 Button {
                     disclosure.isExpanded.toggle()
                 } label: {
-                    Label(disclosure.isExpanded ? "Hide command" : "Show command", systemImage: disclosure.isExpanded ? "chevron.down" : "chevron.right")
+                    Label(text.title, systemImage: disclosure.isExpanded ? "chevron.down" : "chevron.right")
                         .releaseFont(13, weight: .regular, relativeTo: .subheadline)
                         .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(FocusStageButtonStyle())
-                .accessibilityValue(disclosure.isExpanded ? "Expanded" : "Collapsed")
+                .accessibilityLabel(text.accessibilityLabel)
+                .accessibilityValue(text.accessibilityValue)
                 .help(disclosure.isExpanded
                     ? "Hide the \(receipt.stage.title.lowercased()) command"
                     : "Inspect the full \(receipt.stage.title.lowercased()) command")
