@@ -25,10 +25,10 @@ export function CompactNavBehavior() {
       details.open = false;
     }
 
-    details.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown);
     details.addEventListener("click", onLinkClick);
     return () => {
-      details.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keydown", onKeyDown);
       details.removeEventListener("click", onLinkClick);
     };
   }, []);
