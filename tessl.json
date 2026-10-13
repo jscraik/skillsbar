@@ -1,17 +1,5 @@
 {
   "name": "skills-sdk-lab/skillsbar",
-  "mode": "vendored",
-  "dependencies": {
-    "tessl-labs/factory-setup": {
-      "version": "0.3.0"
-    }
-  },
-  "agents": [
-    "gemini",
-    "codex",
-    "copilot",
-    "copilot-vscode"
-  ],
   "actions": {
     "implement-github-issue": {
       "skill": "tessl-labs/factory#implement-github-issue",
