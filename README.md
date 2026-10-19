@@ -190,10 +190,13 @@ swift test --build-system native --disable-sandbox --build-path /private/tmp/ski
 
 ### Factory validation and Mac acceptance
 
-The Tessl factory implements GitHub issues when Jamie explicitly adds the
-`tessl` label, then opens a PR. Its shepherd follows submitted reviews and
-review comments on Tessl-labelled `tessl/` branches, human comments on
-Tessl-labelled PRs, and check results on `tessl/` branches. Keep
+Automatic Tessl Factory launches are stopped by the empty `triggers` map in
+`tessl.json` once that configuration reconciles from the default branch.
+The retained actions do not launch from labels, reviews, comments or check
+results without triggers. Existing runs are not cancelled by this change;
+verify their state separately. Restoring triggers requires explicit approval.
+The previous workflow implemented issues labelled `tessl` and shepherded
+review and check events on eligible PRs. For any authorised manual run, keep
 each issue small, name its allowed files and deterministic checks, and record
 any cloud-toolchain blocker instead of claiming a test passed. Do not install
 Linux Swift expecting AppKit or SwiftUI macOS builds to work.
@@ -255,13 +258,14 @@ rendered-page and browser tests.
 After Tessl opens a PR, inspect its head and checks with `gh pr checks` or the
 GitHub API, then reconcile them against the job's tested-revision artifact.
 The GitHub App's ability to read checks does not prove that the issue-to-PR
-starter waits for CI. The shepherd is a separate action with 90-second
-debounced triggers for Tessl PR reviews, human comments and hosted check
-results; bot comments do not start a round. A check failure that predates
-shepherd activation will not replay: a human comment on the still-open,
-Tessl-labelled PR provides a new trigger. Supervise its reply and new commit,
-then require fresh checks and independent review before any merge. No shepherd
-run or successful repair is proven solely by this manifest.
+starter waits for CI. The shepherd is a separate action. Its previous
+90-second debounced triggers handled Tessl PR reviews, human comments and
+hosted check results, excluding bot comments. Those triggers are now removed;
+comments and check events do not start a round once the default-branch
+configuration has reconciled. For any explicitly authorised manual shepherd
+run, supervise its reply and new commit, then require fresh checks and
+independent review before any merge. Neither a run nor a successful repair is
+proven solely by this manifest.
 
 ## Project Layout
 
