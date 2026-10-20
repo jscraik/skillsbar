@@ -70,6 +70,14 @@ Report validation as `Command: <exact command> -> pass|fail|blocked (<reason>)`.
 
 ## Documentation
 
+- The isolated browser design prototype and icon concepts live in
+  `verification/prototypes/`. Start with its [reopening guide](verification/prototypes/REOPEN.md)
+  and run `python3 verification/prototypes/serve.py` to reopen Guided evidence
+  (`http://127.0.0.1:8769/simplify-evidence.html?v=3`). Keep prototype changes
+  separate from the native app: do not promote assets, rebuild or relaunch
+  SkillsBar without an explicit request. Prototype scores and chooser inventory
+  are snapshots/fixtures, not fresh SDK, registry or activation proof.
+
 - README claims must map to live files, scripts, or inspected source.
 - Keep local absolute paths explicit when they are true for this workstation-only prototype, but do not treat them as portable release proof.
 - For substantial docs, preserve proof boundaries: local build/test evidence, Tessl registry state, hosted CI, and review readiness are separate lanes.
