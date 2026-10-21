@@ -1,4 +1,10 @@
-# Reopen the saved SkillsBar design prototype
+# Reopen the SkillsProof design prototype
+
+Guided evidence (`?v=3`) is the design working surface. Its layout and controls
+track approved native changes; future design work starts here before authorised
+native promotion. The native app remains the source of real runtime evidence.
+After changing either surface, compare overview, expanded Tessl results, gate
+detail, search and More before claiming parity. Review native changes in Borumi.
 
 This directory contains the standalone prototype and all its image, CSS,
 JavaScript and chooser snapshot assets. It does not depend on this chat or the
@@ -40,8 +46,8 @@ fresh checks. Reference assessments are labelled fixtures. Refresh is simulated;
 copy actions write text, never execute commands. External Tessl links need network
 access. The recording layout does not record video by itself.
 
-The native app remains separate. Codex Browser Recorder still requires its `iab`
-backend; reopening this page does not fix that connection. No video was created.
+The native app remains separate. Borumi native QA recordings are retained in the
+local SkillsProof Native QA project; they are not bundled with this prototype.
 
 Check the files without starting a server:
 

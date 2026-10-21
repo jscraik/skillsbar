@@ -31,7 +31,7 @@ struct PrototypePopover: View {
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 ReleaseHeader(dashboard: dashboard, isRefreshing: isRefreshing, isFixture: isFixture) {
                     Menu {
                         Button("Search skills…") { choosing = true }
@@ -88,6 +88,14 @@ struct PrototypePopover: View {
         .onChange(of: dashboard.pipeline) { previous, updated in
             navigation.reconcile(updated)
             if previous.fingerprint != updated.fingerprint { detail = false }
+        }
+        .onExitCommand {
+            if choosing || detail {
+                choosing = false
+                detail = false
+            } else {
+                NSApp.keyWindow?.orderOut(nil)
+            }
         }
     }
 
@@ -178,7 +186,7 @@ private struct SkillSearchChooser: View {
             }
             }.frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityElement(children: .contain)
-            }.accessibilityLabel("Matching skills")
+            }.id(query).accessibilityLabel("Matching skills")
         }.task { searchFocused = true }
             .accessibilityElement(children: .contain)
     }
@@ -191,10 +199,12 @@ private struct PrototypeRegistryCard: View {
     private var presentation: TesslRegistryPresentation { TesslRegistryPresentation(dashboard: dashboard) }
 
     var body: some View {
-        VStack(spacing: compact ? 6 : 10) {
+        VStack(spacing: 6) {
             HStack {
                 if let image = Bundle.module.url(forResource: "TesslWordmark", withExtension: "png").flatMap(NSImage.init(contentsOf:)) {
                     Image(nsImage: image).resizable().scaledToFit().frame(width: 247.5, height: 71.1).fixedSize()
+                        // Compensate for the banner's empty left margin without resizing its artwork.
+                        .offset(x: -36)
                         .frame(width: 148, height: 40).clipped()
                         .accessibilityLabel("Tessl")
                 }
@@ -203,7 +213,7 @@ private struct PrototypeRegistryCard: View {
                     Text(presentation.statusLabel).foregroundStyle(Color.advisoryAccent)
                     if presentation.hasRegistrySnapshot { Text(presentation.versionText) }
                     Text(dashboard.registryPath.isEmpty ? "No registry identity" : dashboard.registryPath).lineLimit(1)
-                }.font(.system(size: 11)).foregroundStyle(.secondary)
+                }.font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.75))
             }
             if !compact, presentation.hasRegistrySnapshot {
                 HStack(alignment: .top, spacing: 10) {
@@ -225,11 +235,10 @@ private struct PrototypeRegistryCard: View {
                     .lineLimit(compact ? 1 : 2).help(dashboard.registryEvidenceCaption)
                 Spacer(minLength: 0)
                 if let url = dashboard.registryURL { Link("Tessl.io ↗", destination: url).foregroundStyle(Color.advisoryAccent) }
-            }.font(.system(size: 11)).foregroundStyle(.secondary)
+            }.font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.75))
             DisclosureGroup("Result details", isExpanded: $expanded) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("Registry evidence · separate from local SDK proof")
-                        Text(presentation.observedText)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(presentation.observedText) · separate from local SDK proof")
                         HStack {
                             if let count = dashboard.tessl.registryEvalCount { Text("\(count) evaluations") }
                             if let visibility = dashboard.tessl.registryVisibility { Text("· \(visibility)") }

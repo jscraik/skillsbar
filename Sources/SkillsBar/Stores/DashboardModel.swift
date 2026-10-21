@@ -11,6 +11,7 @@ private let refreshLogger = Logger(
 final class DashboardModel: ObservableObject {
     @Published var dashboard: SkillDashboard
     @Published var isRefreshing = false
+    @Published private(set) var pendingSelectionPath: String?
     @Published private(set) var hasLoadedEvidence: Bool
     @Published private(set) var availableSkillPaths: [String] = []
     private let refreshIntervalNanoseconds: UInt64 = 5 * 60 * 1_000_000_000
@@ -64,12 +65,18 @@ final class DashboardModel: ObservableObject {
         repeat {
             refreshQueued = false
             do {
-                dashboard = try await source.load { [weak self] localDashboard in
+                let loadedDashboard = try await source.load { [weak self] localDashboard in
                     guard let self else { return }
+                    guard pendingSelectionPath == nil || pendingSelectionPath == localDashboard.fleet.selectedSkillPath else { return }
                     dashboard = localDashboard
+                    pendingSelectionPath = nil
                     hasLoadedEvidence = true
                     let elapsedMilliseconds = Int(Date().timeIntervalSince(refreshStartedAt) * 1_000)
                     refreshLogger.info("Local evidence ready in \(elapsedMilliseconds, privacy: .public) ms")
+                }
+                if pendingSelectionPath == nil || pendingSelectionPath == loadedDashboard.fleet.selectedSkillPath {
+                    dashboard = loadedDashboard
+                    pendingSelectionPath = nil
                 }
                 let root = URL(fileURLWithPath: dashboard.repoPath)
                 availableSkillPaths = await Task.detached(priority: .utility) {
@@ -81,6 +88,7 @@ final class DashboardModel: ObservableObject {
                 refreshLogger.info("Evidence refresh completed in \(elapsedMilliseconds, privacy: .public) ms")
             } catch {
                 dashboard = SkillDashboard.placeholder.withError(error.localizedDescription)
+                pendingSelectionPath = nil
                 let elapsedMilliseconds = Int(Date().timeIntervalSince(refreshStartedAt) * 1_000)
                 refreshLogger.error("Evidence refresh failed after \(elapsedMilliseconds, privacy: .public) ms")
             }
@@ -98,6 +106,7 @@ final class DashboardModel: ObservableObject {
 
     func selectSkill(path: String) {
         guard !isSkillSelectionPinned else { return }
+        pendingSelectionPath = path
         UserDefaults.standard.set(path, forKey: DashboardLoader.selectedSkillDefaultsKey)
         observedSkillDirectory = nil
         observedSkillSourceSignature = nil

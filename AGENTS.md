@@ -70,6 +70,13 @@ Report validation as `Command: <exact command> -> pass|fail|blocked (<reason>)`.
 
 ## Documentation
 
+- Use `verification/prototypes/simplify-evidence.html?v=3` as the design working
+  surface. Keep its layout and controls aligned with approved native changes;
+  retain explicit simulated-data labels. Design future UI changes there first,
+  then promote them to the native app only when requested. Review changed native
+  UI through Borumi playback using Emil AI for UI, Emil Kowalski and Interfacecraft;
+  a build or still screenshot alone is not recorded visual acceptance.
+
 - The isolated browser design prototype and icon concepts live in
   `verification/prototypes/`. Start with its [reopening guide](verification/prototypes/REOPEN.md)
   and run `python3 verification/prototypes/serve.py` to reopen Guided evidence
