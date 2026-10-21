@@ -261,25 +261,30 @@ each issue small, name its allowed files and deterministic checks, and record
 any cloud-toolchain blocker instead of claiming a test passed. Do not install
 Linux Swift expecting AppKit or SwiftUI macOS builds to work.
 
-`.github/workflows/validation.yml` provides the PR validation split:
+`.circleci/config.yml` provides the PR and main-branch validation split:
 
-- **Native macOS tests:** GitHub-hosted `macos-15` with Xcode 26.3, verified
-  against the [runner-image inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md).
+- **Native macOS tests:** CircleCI macOS with Xcode 26.4.1 on `m4pro.medium`.
   It builds, runs `ReviewPopoverTests` and the full deterministic suite, and
   renders an app fixture. Rendering failures stay failures with logs retained.
   The existing opt-in live integration test skips without a real agent-skills
   checkout and Tessl credentials; the optional managed-Python shell probe also
   skips when its workstation-only Python path is absent. Neither skip removes
   SwiftUI/AppKit rendering coverage. CodeQL remains separate.
-- **Demo site tests:** GitHub-hosted `ubuntu-24.04` installs the npm lockfile,
+- **Demo site tests:** CircleCI's pinned `cimg/node:22.14.0` installs the npm lockfile,
   provisions Playwright's `chrome` channel, lints, runs `npm test` (which already
   builds), then browser-tests that build through the production server. Server
   readiness has a 60-second limit; the test runner cleans up its owned process
   groups. Logs and success/failure screenshots use portable `outputs/ci` paths.
 
-Both jobs record the PR head, actual tested Git revision, OS, architecture and
-tool versions. A PR run normally checks GitHub's synthetic merge revision;
-do not attribute that result to an untested head or a different checkout.
+- **CodeQL:** a separate macOS job analyses Swift with the checksum-verified
+  pinned CodeQL bundle and uploads SARIF to GitHub. The upload token belongs
+  only in the project-restricted `skillsproof-codeql` context, which is
+  attached to this job. Native and site jobs do not request that context.
+
+Jobs record the actual checked-out Git revision and tool versions. CircleCI
+checks the branch revision; it does not establish proof for an untested
+merge result. The cutover removes both GitHub Actions workflows after the
+replacement native, site and CodeQL lanes passed on the migration PR.
 Artifacts prove builds, tests and rendered fixtures. They do not prove live
 menu-bar interaction, final visual acceptance, registry publication or deployment.
 
