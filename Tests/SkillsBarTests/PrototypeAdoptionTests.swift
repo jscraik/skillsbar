@@ -2,6 +2,14 @@ import XCTest
 @testable import SkillsBar
 
 final class PrototypeAdoptionTests: XCTestCase {
+    func testTracebackHasActionableSummaryWithoutDiscardingOrdinaryBlocker() {
+        let raw = "Automatic identity command failed: Traceback (most recent call last): File example.py"
+        XCTAssertTrue(GateDiagnosticPresentation.containsTraceback(raw))
+        XCTAssertFalse(GateDiagnosticPresentation.summary(raw).contains("example.py"))
+        XCTAssertTrue(GateDiagnosticPresentation.summary(raw).contains("diagnostic details"))
+        XCTAssertEqual(GateDiagnosticPresentation.summary("Package digest required"), "Package digest required")
+    }
+
     @MainActor
     func testSequentialNavigationStopsAtEndpointsAndPreservesEvidence() {
         let candidate = SkillDashboard.reviewFixture.pipeline

@@ -133,7 +133,7 @@ struct SelectedStageDetail: View {
            receipt.nextAction.contains("full governed security receipt is missing or malformed") {
             return "Full security receipt missing or malformed.\nInspect findings before continuing."
         }
-        return receipt.nextAction
+        return GateDiagnosticPresentation.summary(receipt.nextAction)
     }
 
     var body: some View {
@@ -154,7 +154,8 @@ struct SelectedStageDetail: View {
                 .releaseFont(19, weight: .medium, relativeTo: .headline)
                 .fixedSize(horizontal: false, vertical: true)
             Group {
-                if receipt.stage == .securityReview, !securityBadge.isEmpty {
+                if receipt.stage == .securityReview, !securityBadge.isEmpty,
+                   !GateDiagnosticPresentation.containsTraceback(securityBadge) {
                     SeverityBadges(labels: securityBadge)
                 } else {
                     Label(receipt.evidenceStatus.label, systemImage: receipt.evidenceStatus.symbol)
@@ -168,7 +169,15 @@ struct SelectedStageDetail: View {
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(minHeight: explanationHeight, alignment: .topLeading)
-                .accessibilityLabel(receipt.nextAction)
+                .accessibilityLabel(detailText)
+            if GateDiagnosticPresentation.containsTraceback(receipt.nextAction) {
+                DisclosureGroup("Diagnostic details") {
+                    Text(receipt.nextAction)
+                        .font(.system(size: 11, design: .monospaced))
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             if !receipt.command.isEmpty {
                 CommandAction(receipt: receipt)
             } else {
@@ -179,6 +188,18 @@ struct SelectedStageDetail: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+enum GateDiagnosticPresentation {
+    static func containsTraceback(_ text: String) -> Bool {
+        text.contains("Traceback (most recent call last)")
+    }
+
+    static func summary(_ text: String) -> String {
+        containsTraceback(text)
+            ? "The local evidence check failed. Inspect the diagnostic details and rerun the command after resolving the error."
+            : text
     }
 }
 

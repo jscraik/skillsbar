@@ -19,7 +19,15 @@ struct DashboardView: View {
                 snapshotMode: snapshotMode
             )
 
-            if model.hasLoadedEvidence {
+            if let path = model.pendingSelectionPath {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Loading \(InstalledSkillDiscovery.displayName(path: path))")
+                        .font(.headline)
+                    Text("Reading evidence for the selected copy…")
+                        .foregroundStyle(.primary)
+                }.padding(24).accessibilityElement(children: .combine)
+            } else if model.hasLoadedEvidence {
                 ReleaseEvidenceView(
                     dashboard: model.dashboard,
                     isRefreshing: model.isRefreshing,
@@ -44,7 +52,6 @@ struct DashboardView: View {
         )
         .foregroundStyle(.primaryText)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .onExitCommand { NSApp.keyWindow?.orderOut(nil) }
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)

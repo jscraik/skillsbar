@@ -1128,6 +1128,7 @@ final class ReviewPopoverTests: XCTestCase {
         let initialRefresh = Task { @MainActor in await model.refresh() }
         await gate.waitForBlockedLoad()
         model.selectSkill(path: "Skills/testing/alternate/SKILL.md")
+        XCTAssertEqual(model.pendingSelectionPath, "Skills/testing/alternate/SKILL.md")
         await Task.yield()
         await gate.releaseBlockedLoad()
         await initialRefresh.value
@@ -1135,6 +1136,8 @@ final class ReviewPopoverTests: XCTestCase {
 
         let loadCount = await gate.loadCount
         XCTAssertEqual(loadCount, 2)
+        XCTAssertEqual(model.pendingSelectionPath, "Skills/testing/alternate/SKILL.md",
+                       "An unrelated fixture must not clear the requested copy's loading state")
     }
 
     @MainActor
