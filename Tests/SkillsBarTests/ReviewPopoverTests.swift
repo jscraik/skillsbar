@@ -518,6 +518,72 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(candidate.postureScore, 35)
     }
 
+    func testMissingPipelineStageRemainsUnprovenAndHoldsLaterReceipts() {
+        for missing in PipelineStage.allCases {
+            let candidate = PipelineCandidate(
+                fingerprint: "candidate-a",
+                governedInputPaths: [],
+                observedAt: Date(timeIntervalSince1970: 0),
+                stageReceipts: PipelineStage.allCases
+                    .filter { $0 != missing }
+                    .map(passedPipelineReceipt)
+            )
+
+            XCTAssertEqual(candidate.orderedReceipts.map(\.stage), PipelineStage.allCases)
+            XCTAssertEqual(candidate.activeReceipt?.stage, missing)
+            for receipt in candidate.orderedReceipts {
+                let expected: PipelineEvidenceStatus = receipt.stage.number < missing.number
+                    ? .passed : (receipt.stage == missing ? .unproven : .held)
+                XCTAssertEqual(receipt.evidenceStatus, expected, "Missing \(missing): \(receipt.stage)")
+                if receipt.stage.number >= missing.number {
+                    XCTAssertEqual(candidate.contribution(for: receipt), 0)
+                }
+            }
+        }
+    }
+
+    func testEmptyPipelineHasNineUnprovenStages() {
+        let candidate = PipelineCandidate(
+            fingerprint: "candidate-a",
+            governedInputPaths: [],
+            observedAt: Date(timeIntervalSince1970: 0),
+            stageReceipts: []
+        )
+
+        XCTAssertEqual(candidate.orderedReceipts.map(\.stage), PipelineStage.allCases)
+        XCTAssertTrue(candidate.orderedReceipts.allSatisfy { $0.evidenceStatus == .unproven })
+        XCTAssertEqual(candidate.activeReceipt?.stage, .candidateBaseline)
+        XCTAssertEqual(candidate.postureScore, 0)
+    }
+
+    func testCompletePipelineRetainsPassedEvidence() {
+        let receipts = PipelineStage.allCases.map(passedPipelineReceipt)
+        let candidate = PipelineCandidate(
+            fingerprint: "candidate-a",
+            governedInputPaths: [],
+            observedAt: Date(timeIntervalSince1970: 0),
+            stageReceipts: receipts
+        )
+
+        XCTAssertEqual(candidate.orderedReceipts, receipts)
+        XCTAssertNil(candidate.activeReceipt)
+        XCTAssertEqual(candidate.postureScore, 100)
+    }
+
+    private func passedPipelineReceipt(_ stage: PipelineStage) -> PipelineStageReceipt {
+        PipelineStageReceipt(
+            stage: stage,
+            candidateFingerprint: "candidate-a",
+            evidenceStatus: .passed,
+            stageScore: 100,
+            command: "inspect \(stage.title)",
+            receiptPath: "receipt:\(stage.rawValue)",
+            modelProfile: "test",
+            observedAt: Date(timeIntervalSince1970: 0),
+            nextAction: "Inspect \(stage.title)"
+        )
+    }
+
     func testFingerprintChangeMakesOldReceiptsStale() {
         let oldFingerprint = "old"
         let candidate = PipelineCandidate(

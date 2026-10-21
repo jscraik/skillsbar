@@ -318,7 +318,21 @@ struct PipelineCandidate: Equatable {
         var earlierStagePassed = true
 
         for stage in PipelineStage.allCases {
-            guard var receipt = receiptByStage[stage] else { continue }
+            guard var receipt = receiptByStage[stage] else {
+                receiptByStage[stage] = PipelineStageReceipt(
+                    stage: stage,
+                    candidateFingerprint: fingerprint,
+                    evidenceStatus: .unproven,
+                    stageScore: nil,
+                    command: "",
+                    receiptPath: nil,
+                    modelProfile: nil,
+                    observedAt: nil,
+                    nextAction: "Evidence receipt missing for \(stage.title.lowercased())"
+                )
+                earlierStagePassed = false
+                continue
+            }
             let receiptMatchesCandidate = receipt.candidateFingerprint == fingerprint
             if !receiptMatchesCandidate {
                 receipt = PipelineStageReceipt(
