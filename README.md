@@ -1,6 +1,10 @@
-# SkillsBar
+# SkillsProof
 
-SkillsBar is a native macOS menu-bar app for watching local Skills SDK evidence without flattening separate proof lanes. It renders the selected skill's canonical package identity, validation, security, eval preparation, durable downstream receipts, runtime proof, inventory, and Tessl registry state in a compact SwiftUI popover.
+Every step. Every fault. One glance.
+
+Previously SkillsBar. Internal Swift module names, bundle identity, environment variables and evidence schemas retain their existing identifiers.
+
+SkillsProof is a native macOS menu-bar app for watching local Skills SDK evidence without flattening separate proof lanes. It renders the selected skill's canonical package identity, validation, security, eval preparation, durable downstream receipts, runtime proof, inventory, and Tessl registry state in a compact SwiftUI popover.
 
 The app is currently a local prototype with a release-capable packaging path. It builds and launches from this checkout, reads the agent-skills repository on disk, and keeps local SDK evidence separate from Tessl registry evidence. A public release still requires Jamie's Developer ID certificate and Apple notarization credentials.
 
@@ -24,9 +28,9 @@ These lanes are intentionally independent. Every downstream receipt must use the
 - A local agent-skills checkout. The default is `/Users/jamiecraik/dev/agent-skills`.
 - Optional: `tessl` CLI access for live registry status.
 
-SkillsBar is not App-Sandboxed: it reads the configured Skills SDK checkout and runs its read-only SDK checks locally. For Tessl, it prefers `TESSL_BIN` when set, then the current user's `~/.local/bin/tessl`, then `PATH`. Keep `SKILLSBAR_REVIEW_FIXTURE` unset for normal use; that variable is reserved for deterministic tests and mockup work.
+SkillsProof is not App-Sandboxed: it reads the configured Skills SDK checkout and runs its read-only SDK checks locally. For Tessl, it prefers `TESSL_BIN` when set, then the current user's `~/.local/bin/tessl`, then `PATH`. Keep `SKILLSBAR_REVIEW_FIXTURE` unset for normal use; that variable is reserved for deterministic tests and mockup work.
 
-SkillsBar never automatically runs provider-backed `oss-local` or `oss-cloud` evals, Tessl staging/publication, runtime installation, or runtime-proof commands when the menu opens. Those operations may cost money, require credentials, or mutate external/runtime state, so the app consumes their durable governed receipts instead. A live Tessl CLI search is a registry observation even when the result has a version mismatch or no version. Candidate-bound publication/score receipts, package/registry version equality, and governed registry visibility remain requirements for promotion and identity verification.
+SkillsProof never automatically runs provider-backed `oss-local` or `oss-cloud` evals, Tessl staging/publication, runtime installation, or runtime-proof commands when the menu opens. Those operations may cost money, require credentials, or mutate external/runtime state, so the app consumes their durable governed receipts instead. A live Tessl CLI search is a registry observation even when the result has a version mismatch or no version. Candidate-bound publication/score receipts, package/registry version equality, and governed registry visibility remain requirements for promotion and identity verification.
 
 ## Run
 
@@ -105,11 +109,11 @@ SKILLSBAR_BUNDLE_ID="com.yourcompany.skillsbar" \
 script/release.sh
 ```
 
-The interactive prompts store the Apple ID, team ID, and app-specific password in the login keychain. The script fails before publication when the identity or keychain profile is absent. It does not create a GitHub release, update feed, Homebrew cask, or automatic-update channel; those are deliberately deferred until SkillsBar has a stable public bundle identifier and a first notarized artifact.
+The interactive prompts store the Apple ID, team ID, and app-specific password in the login keychain. The script fails before publication when the identity or keychain profile is absent. It does not create a GitHub release, update feed, Homebrew cask, or automatic-update channel; those are deliberately deferred until SkillsProof has a stable public bundle identifier and a first notarized artifact.
 
 ## Configure The Data Source
 
-By default, SkillsBar looks for `Skills/agent-ops/improve-agent-native/SKILL.md` in `/Users/jamiecraik/dev/agent-skills`.
+By default, SkillsProof looks for `Skills/agent-ops/improve-agent-native/SKILL.md` in `/Users/jamiecraik/dev/agent-skills`.
 
 Use another agent-skills checkout:
 
@@ -125,7 +129,7 @@ AGENT_SKILL_PATH=Skills/agent-ops/technical-writer/SKILL.md ./Launch.command
 
 `SELECTED_SKILL_PATH` is also accepted for the selected skill path. Paths must point to an existing `Skills/**/SKILL.md` file in the configured root; otherwise the app falls back to the default skill.
 
-When no launch-time skill path is set, use the circular-arrow chooser beside the skill name to select any local `Skills/**/SKILL.md`; SkillsBar persists that choice. A launch-time `AGENT_SKILL_PATH` or `SELECTED_SKILL_PATH` intentionally pins the selection. The app refreshes the selected skill immediately after its directory changes, and also refreshes on its five-minute live-data interval.
+When no launch-time skill path is set, use the circular-arrow chooser beside the skill name to select any local `Skills/**/SKILL.md`; SkillsProof persists that choice. A launch-time `AGENT_SKILL_PATH` or `SELECTED_SKILL_PATH` intentionally pins the selection. The app refreshes the selected skill immediately after its directory changes, and also refreshes on its five-minute live-data interval.
 
 If Tessl is installed outside the normal user-local location, point the app at it explicitly:
 
@@ -139,7 +143,7 @@ For product demos, use the supported `./script/build_and_run.sh --demo` path abo
 
 Use `SKILLSBAR_REVIEW_FIXTURE=reference` only to review the tall visual composition against the approved design. It renders Gate 05, live-looking Tessl metrics, and the expanded utility panel as a **visual fixture**; it never substitutes for the selected skill's real evidence or registry state.
 
-A successful live Tessl CLI search stores only sanitized registry fields (version, score, Quality, Impact, Security, eval count, multiplier, and visibility) in local preferences. If the CLI later becomes unavailable, SkillsBar can show that last-known snapshot as historical context. It does not cache credentials, raw command output, or package contents, and cached registry data never promotes a local pipeline gate.
+A successful live Tessl CLI search stores only sanitized registry fields (version, score, Quality, Impact, Security, eval count, multiplier, and visibility) in local preferences. If the CLI later becomes unavailable, SkillsProof can show that last-known snapshot as historical context. It does not cache credentials, raw command output, or package contents, and cached registry data never promotes a local pipeline gate.
 
 `Tests/SkillsBarTests/Fixtures/` retains sanitized Tessl responses for Private, Public, and missing-visibility registry records. The focused popover tests also render the production `DashboardView` and compare it with the retained implementation snapshot, so model-contract and visible-layout drift fail together.
 
@@ -186,7 +190,7 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
 swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-test-build
 ```
 
-`script/build_and_run.sh --verify` launches the app and checks for a running `SkillsBar` process. Use it only when a live macOS UI launch is appropriate for the current task.
+`script/build_and_run.sh --verify` launches the app and checks for a running `SkillsProof` process. Use it only when a live macOS UI launch is appropriate for the current task.
 
 ### Factory validation and Mac acceptance
 

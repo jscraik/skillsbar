@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=version.env
 source "$ROOT_DIR/version.env"
 
-APP_NAME="SkillsBar"
+APP_NAME="SkillsProof"
 BUNDLE_ID="${SKILLSBAR_BUNDLE_ID:-local.jscraik.skillsbar}"
 BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-$HOME/.codex/usage-data/skillsbar}"
 CONFIGURATION="${1:-debug}"

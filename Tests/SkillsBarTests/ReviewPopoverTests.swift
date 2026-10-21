@@ -283,7 +283,7 @@ final class ReviewPopoverTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent(".harness/evidence/2026-09-29-skillsbar-focus-navigator.png")
+            .appendingPathComponent(".harness/evidence/2026-10-21-skillsproof-branding.png")
         XCTAssertTrue(FileManager.default.fileExists(atPath: baselineURL.path))
 
         let outputURL = FileManager.default.temporaryDirectory

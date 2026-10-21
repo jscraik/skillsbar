@@ -70,9 +70,9 @@ aside{font-size:var(--text-ui);line-height:1.5}aside label,aside legend{font-siz
 .popover .tessl-section{--cyan:#61c6df}
 .overview-view .persistent-gate-nav .gate-meta,.overview-view .installed-caption{display:none}.overview-view .persistent-gate-nav{padding:5px 0}.overview-view .scroll{min-height:168px}.overview-view.short .scroll{min-height:150px}.overview-view .grid .gate{min-height:42px}.overview-view .count{font-size:11px;margin:5px 0}.gate-stepper{display:flex;gap:4px;margin-left:auto}.gate-stepper button{background:transparent;border:1px solid var(--border);border-radius:5px;padding:4px 6px;font-size:11px;min-height:28px}.gate-stepper button:hover:not(:disabled){background:var(--track)}.detail-view .gate-meta>span:last-of-type{display:none}.detail-view .stage-title{margin-top:4px}.chooser-selection{margin:5px 8px;font-size:11px;line-height:1.4;color:var(--muted);overflow-wrap:anywhere}.popover.short .header .appicon{width:40px;height:40px}.popover.short .header .version-row{font-size:12px}.popover.short .tessl-section{min-height:90px;max-height:125px}
 .popover .registry-brand{width:148px;height:48px;position:relative;overflow:hidden}
-.popover .registry-brand img{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:330px;height:auto;max-width:none;max-height:none;object-fit:contain}
+.popover .registry-brand img{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:247.5px;height:auto;max-width:none;max-height:none;object-fit:contain}
 .popover.short .registry-brand{width:128px;height:40px}
-.popover.short .registry-brand img{width:275px}
+.popover.short .registry-brand img{width:206.25px}
 
 /* Search stays compact, with a single clear entry point and readable results. */
 .popover .menu{width:min(340px,calc(100% - 16px));padding:8px;border-radius:12px}

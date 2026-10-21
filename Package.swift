@@ -7,7 +7,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "SkillsBarCore", targets: ["SkillsBarCore"]),
-        .executable(name: "SkillsBar", targets: ["SkillsBar"])
+        .executable(name: "SkillsProof", targets: ["SkillsBar"])
     ],
     targets: [
         .target(name: "SkillsBarCore"),

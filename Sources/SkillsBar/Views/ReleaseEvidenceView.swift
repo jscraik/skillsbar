@@ -478,8 +478,11 @@ private struct ReleaseHeader<Actions: View>: View {
         HStack(alignment: .top, spacing: 12) {
             ReleaseSkillLogo(size: 48)
             VStack(alignment: .leading, spacing: 4) {
-                Text("SKILLS SDK")
+                Text("SkillsProof")
                     .releaseFont(12, weight: .regular, relativeTo: .caption)
+                    .foregroundStyle(.bodyText)
+                Text("Every step. Every fault. One glance.")
+                    .releaseFont(10, weight: .regular, relativeTo: .caption)
                     .foregroundStyle(.bodyText)
                 Text(dashboard.displayName)
                     .releaseFont(16, weight: .medium, relativeTo: .headline)
@@ -560,7 +563,7 @@ private struct SkillSelectionMenu: View {
         .background { Circle().fill(Color.primary.opacity(0.035)).frame(width: 34, height: 34) }
         .overlay { Circle().strokeBorder(Color.primary.opacity(0.13), lineWidth: 1).frame(width: 34, height: 34).allowsHitTesting(false) }
         .help("More actions and skill selection")
-        .accessibilityLabel("More SkillsBar actions; selected skill \(selectedName)")
+        .accessibilityLabel("More SkillsProof actions; selected skill \(selectedName)")
     }
 
     private static func skillName(for path: String) -> String {
@@ -926,14 +929,14 @@ private struct ReleaseUtilityActions: View {
             Button("Copy selected skill path") { feedback.copy(dashboard.fleet.selectedSkillPath, label: "Skill path") }
             Button("Copy model profile") { feedback.copy(profileSummary, label: "Model profile") }
             Divider()
-            Button("Quit SkillsBar") { NSApp.terminate(nil) }
+            Button("Quit SkillsProof") { NSApp.terminate(nil) }
         }
     }
 
     private var diagnosticSummary: String {
         let active = dashboard.pipeline.activeReceipt.map { "Gate \($0.stage.number) \($0.stage.title): \($0.evidenceStatus.label)" } ?? "All gates passed"
         return [
-            "SkillsBar diagnostic summary",
+            "SkillsProof diagnostic summary",
             "Skill: \(dashboard.displayName)",
             "Candidate: \(dashboard.pipeline.fingerprint)",
             active,
@@ -946,7 +949,7 @@ private struct ReleaseUtilityActions: View {
             ? ISO8601DateFormatter().string(from: dashboard.refreshedAt)
             : "unavailable"
         return [
-            "SkillsBar latest observation",
+            "SkillsProof latest observation",
             "Observed at: \(observation)",
             "Active gate: \(dashboard.pipeline.activeReceipt?.stage.title ?? "All gates passed")",
             "Registry: \(dashboard.registryEvidenceCaption)"
@@ -956,7 +959,7 @@ private struct ReleaseUtilityActions: View {
     private var profileSummary: String {
         let profile = dashboard.pipeline.activeReceipt?.modelProfile ?? "not declared"
         return [
-            "SkillsBar selected profile",
+            "SkillsProof selected profile",
             "Skill path: \(dashboard.fleet.selectedSkillPath)",
             "Model profile: \(profile)"
         ].joined(separator: "\n")

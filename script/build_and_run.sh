@@ -3,10 +3,10 @@ set -euo pipefail
 
 MODE="${1:-run}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="SkillsBar"
+APP_NAME="SkillsProof"
 BUNDLE_ID="local.jscraik.skillsbar"
 BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-$HOME/.codex/usage-data/skillsbar}"
-APP_BUNDLE="$BUILD_ROOT/SkillsBar.app"
+APP_BUNDLE="$BUILD_ROOT/SkillsProof.app"
 LAUNCH_RECEIPT="$BUILD_ROOT/SkillsBar.launch-receipt.json"
 
 stop_existing() {
@@ -50,7 +50,7 @@ case "$MODE" in
     [[ "$(/usr/bin/plutil -extract evidence_mode raw "$LAUNCH_RECEIPT")" == "deterministic_demo_fixture" ]]
     launch_method="$(/usr/bin/plutil -extract launch_method raw "$LAUNCH_RECEIPT")"
     [[ "$launch_method" == "launchservices_open" || "$launch_method" == "direct_executable_fallback" ]]
-    echo "SkillsBar demo fixture is running. Click the Skills SDK document icon in the macOS menu bar."
+    echo "SkillsProof demo fixture is running. Click the Skills SDK document icon in the macOS menu bar."
     echo "Launch method: $launch_method"
     echo "Launch receipt: $LAUNCH_RECEIPT"
     ;;

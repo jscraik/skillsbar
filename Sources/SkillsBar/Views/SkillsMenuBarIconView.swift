@@ -32,7 +32,7 @@ struct SkillsMenuBarIconView: View, Equatable {
         .frame(width: 18, height: 18, alignment: .center)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Skills SDK, \(status.label)")
-        .help("Skills SDK — \(status.label)")
+        .accessibilityLabel("SkillsProof, \(status.label)")
+        .help("SkillsProof — Every step. Every fault. One glance. — \(status.label)")
     }
 }

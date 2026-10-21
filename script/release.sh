@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=version.env
 source "$ROOT_DIR/version.env"
 
-APP_NAME="SkillsBar"
+APP_NAME="SkillsProof"
 BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-$ROOT_DIR/dist}"
 APP_BUNDLE="$BUILD_ROOT/$APP_NAME.app"
 ARCHES_VALUE="arm64 x86_64"

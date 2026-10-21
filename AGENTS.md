@@ -2,13 +2,13 @@
 schema_version: 2
 ---
 
-# SkillsBar Agent Instructions
+# SkillsProof Agent Instructions
 
 ## Scope
 
 These instructions apply to the whole `skillsbar` repository.
 
-SkillsBar is a local macOS SwiftUI menu-bar prototype for Skills SDK evidence visibility. Treat it as a live local app, not as a scratch rewrite. Keep local build, launch, UI, registry, hosted, and review-readiness truth separate.
+SkillsProof is a local macOS SwiftUI menu-bar prototype for Skills SDK evidence visibility. Treat it as a live local app, not as a scratch rewrite. Keep local build, launch, UI, registry, hosted, and review-readiness truth separate.
 
 ## Discovery
 
@@ -56,7 +56,7 @@ NO_OPEN=1 ./Launch.command
 HOME=/private/tmp/skillsbar-test-home \
 XDG_CACHE_HOME=/private/tmp/skillsbar-test-xdg \
 CLANG_MODULE_CACHE_PATH=/private/tmp/skillsbar-test-clang-cache \
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 swift test --build-system native --disable-sandbox --build-path /private/tmp/skillsbar-test-build
 ```
 
@@ -75,7 +75,7 @@ Report validation as `Command: <exact command> -> pass|fail|blocked (<reason>)`.
   and run `python3 verification/prototypes/serve.py` to reopen Guided evidence
   (`http://127.0.0.1:8769/simplify-evidence.html?v=3`). Keep prototype changes
   separate from the native app: do not promote assets, rebuild or relaunch
-  SkillsBar without an explicit request. Prototype scores and chooser inventory
+  SkillsProof without an explicit request. Prototype scores and chooser inventory
   are snapshots/fixtures, not fresh SDK, registry or activation proof.
 
 - README claims must map to live files, scripts, or inspected source.

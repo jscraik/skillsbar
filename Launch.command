@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_ROOT="${SKILLSBAR_BUILD_ROOT:-$HOME/.codex/usage-data/skillsbar}"
-APP_DIR="$BUILD_ROOT/SkillsBar.app"
-EXECUTABLE="$APP_DIR/Contents/MacOS/SkillsBar"
+APP_DIR="$BUILD_ROOT/SkillsProof.app"
+EXECUTABLE="$APP_DIR/Contents/MacOS/SkillsProof"
 LAUNCH_RECEIPT="$BUILD_ROOT/SkillsBar.launch-receipt.json"
 LOCK_DIR="$BUILD_ROOT/launch.lock"
 LOCK_PID_FILE="$LOCK_DIR/pid"
@@ -33,7 +33,7 @@ trap 'exit 143' TERM
 while ! mkdir "$LOCK_DIR" 2>/dev/null; do
   existing_pid="$(cat "$LOCK_PID_FILE" 2>/dev/null || true)"
   if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
-    echo "Another SkillsBar build is running (pid $existing_pid); waiting..."
+    echo "Another SkillsProof build is running (pid $existing_pid); waiting..."
     sleep 1
   else
     rm -rf "$LOCK_DIR"
@@ -45,8 +45,9 @@ rm -f "$LAUNCH_RECEIPT"
 
 stop_existing() {
   if command -v pkill >/dev/null 2>&1; then
+    pkill -x SkillsProof >/dev/null 2>&1 || true
     pkill -x SkillsBar >/dev/null 2>&1 || true
-    pkill -f "SkillsBar.app/Contents/MacOS/SkillsBar" >/dev/null 2>&1 || true
+    pkill -f "SkillsProof.app/Contents/MacOS/SkillsProof" >/dev/null 2>&1 || true
     sleep 0.4
   fi
 }
@@ -83,7 +84,7 @@ if /usr/bin/open -n "$APP_DIR" >"$OPEN_OUTPUT" 2>&1; then
 }
 JSON
   for _ in {1..10}; do
-    if pgrep -x SkillsBar >/dev/null 2>&1; then
+    if pgrep -x SkillsProof >/dev/null 2>&1; then
       exit 0
     fi
     sleep 0.4
