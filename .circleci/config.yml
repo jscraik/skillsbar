@@ -51,6 +51,13 @@ jobs:
           name: Analyse Swift with pinned CodeQL
           command: |
             mkdir -p artifacts/codeql
+            # CodeQL's build tracer requires Rosetta on Apple Silicon.
+            if [[ "$(uname -m)" == "arm64" ]]; then
+              if ! /usr/bin/arch -x86_64 /usr/bin/true; then
+                sudo /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+              fi
+              /usr/bin/arch -x86_64 /usr/bin/true
+            fi
             curl --fail --location --retry 3 --max-time 600 https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.27.3/codeql-bundle-osx64.tar.gz -o /tmp/codeql.tar.gz
             echo "5a035e81cd8c76622d0e453d1d5197cfee46177f171d623f15fbb560a0b2b215  /tmp/codeql.tar.gz" | shasum -a 256 -c -
             tar -xzf /tmp/codeql.tar.gz -C /tmp
