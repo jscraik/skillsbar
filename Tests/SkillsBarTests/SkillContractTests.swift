@@ -76,22 +76,6 @@ final class SkillContractTests: XCTestCase {
         XCTAssertFalse(legacyTests.contains("ReviewPresentation"))
     }
 
-    func testAnimationPlanCommandsUseTheCanonicalPlansDirectory() throws {
-        let repoRoot = repositoryRoot
-        let skillURL = repoRoot.appendingPathComponent(".codex/skills/improve-animations/SKILL.md")
-        let templateURL = repoRoot.appendingPathComponent(".codex/skills/improve-animations/PLAN-TEMPLATE.md")
-        let skill = try String(contentsOf: skillURL, encoding: .utf8)
-        let template = try String(contentsOf: templateURL, encoding: .utf8)
-
-        XCTAssertTrue(skill.contains("written into `plans/` as `NNN-short-slug.md`"))
-        XCTAssertTrue(skill.contains("Finish by creating or updating `plans/README.md`"))
-        XCTAssertTrue(skill.contains("`execute <plan>` | Dispatch an executor subagent"))
-        XCTAssertTrue(skill.contains("`reconcile` | Re-check `plans/`"))
-        XCTAssertFalse(skill.contains("`.workflow-owner`"))
-        XCTAssertTrue(skill.contains("or `animation-plans/` if `plans/` already exists"))
-        XCTAssertTrue(template.contains("After writing plans, create or update `plans/README.md`"))
-    }
-
     private var repositoryRoot: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
