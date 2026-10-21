@@ -133,7 +133,7 @@ enum PipelineStage: String, CaseIterable, Identifiable {
         case .candidateBaseline:
             return "Canonical package identity is required before downstream proof."
         case .mechanicalValidation:
-            return "Package verification and strict audit receipts are required."
+            return "Applicable plugin and skill structure, metadata, resources, references and presentation require evidence. An SDK structural pass alone is partial validation."
         case .securityReview:
             return "Governed risk-mode evidence must be current for this candidate."
         case .evalPreparation:
@@ -485,6 +485,7 @@ struct SkillDashboard {
         impact.ratioLabel ?? (impact.score == nil ? "Not run" : impact.statusLabel)
     }
     var registryURL: URL? {
+        guard !registryPath.isEmpty else { return nil }
         let escaped = registryPath
             .split(separator: "/")
             .map { String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0) }
@@ -529,7 +530,10 @@ struct SkillDashboard {
         security.inspectCommand
     }
     var selectedSkillInspectCommand: String {
-        "cd \(globalShellQuoted(repoPath)) && sed -n '1,120p' \(globalShellQuoted(fleet.selectedSkillPath))"
+        if fleet.selectedSkillPath.hasPrefix("/") {
+            return "sed -n '1,120p' \(globalShellQuoted(fleet.selectedSkillPath))"
+        }
+        return "cd \(globalShellQuoted(repoPath)) && sed -n '1,120p' \(globalShellQuoted(fleet.selectedSkillPath))"
     }
     var emblemBadgeLabel: String {
         if security.disposition.requiresReview {
@@ -1031,15 +1035,26 @@ struct TesslRegistryMetadata {
             }
         }
 
+        if let requested = registryPath {
+            var candidates = root["results"] as? [[String: Any]] ?? []
+            if let data = root["data"] as? [String: Any], let result = data["result"] as? [String: Any] {
+                candidates.append(result)
+            }
+            if let result = root["result"] as? [String: Any] { candidates.append(result) }
+            if let data = root["data"] as? [String: Any] { candidates.append(data) }
+            candidates.append(root)
+            if let selected = candidates.first(where: {
+                ($0["fullName"] as? String)?.caseInsensitiveCompare(requested) == .orderedSame
+            }) { appendResult(selected) }
+            return containers
+        }
         if let data = root["data"] as? [String: Any], let result = data["result"] as? [String: Any] {
             appendResult(result)
         }
         if let result = root["result"] as? [String: Any] { appendResult(result) }
         if let data = root["data"] as? [String: Any] { containers.append(data) }
         if let results = root["results"] as? [[String: Any]] {
-            let selected = registryPath.flatMap { requested in
-                results.first { ($0["fullName"] as? String)?.caseInsensitiveCompare(requested) == .orderedSame }
-            } ?? results.first
+            let selected = results.first
             if let selected { appendResult(selected) }
         }
         containers.append(root)

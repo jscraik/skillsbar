@@ -229,6 +229,29 @@ or certify every pixel over desktop material.
 
 ## Data Contract
 
+### 20 October: linked SDK plugin route
+
+SkillsBar consumes the SDK's portable plugin capture and `verify-evidence`
+contracts without narrowing the nine lifecycle gates. Exact binding and
+structural checks are partial evidence: Identity also needs provenance, rights
+and ownership; Validation also needs applicable quality, reference and
+presentation evidence. A portable structural pass maps to Review required,
+subject to upstream holding, rather than Passed. Details retain the actual SDK
+result and missing requirements. Security, evaluation, staging, publication and
+runtime require their own evidence. No synthetic score or downstream pass may
+be derived from structural capture. Changed or unverifiable bindings lose
+clearance. Security remains continuous, including the final scoped staging
+check; publication and runtime require external proof.
+
+For a linked plugin with a complete supplied source review, Identity can pass as
+recorded provenance and ownership with its stated dirty-source and rights limits.
+Validation additionally needs a reviewed root document set, no unresolved source
+finding, and complete current SDK content and presentation results. The app's
+read-only SDK bridge validates the full retained contracts and freshly reassesses
+the bound source, including every direct child, before mapping a pass. This does
+not require claiming that the larger SDK quality aggregate passed: its scenario
+and calibration stages belong to Eval preparation. No later gate is inferred.
+
 The next implementation must add an explicit model rather than infer stages
 from the existing independent snapshot fields.
 

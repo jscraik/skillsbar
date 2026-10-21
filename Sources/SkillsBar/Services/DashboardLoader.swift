@@ -2,6 +2,10 @@ import Foundation
 import SkillsBarCore
 
 struct DashboardLoader {
+    var environment: [String: String] = ProcessInfo.processInfo.environment
+    var homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+    var storedSkillPath: String? = UserDefaults.standard.string(forKey: selectedSkillDefaultsKey)
+    var installedRegistryLookup: (@Sendable (URL, String) -> TesslSignal)? = nil
     struct CandidateEvidenceBinding<Value> {
         let candidateFingerprint: String
         let evidence: Value
@@ -147,6 +151,11 @@ struct DashboardLoader {
     ) async throws -> SkillDashboard {
         let root = try findRepoRoot()
         let selectedSkillPath = try findSelectedSkillPath(root: root)
+        if selectedSkillPath.hasPrefix("/") {
+            return try await Task.detached(priority: .utility) {
+                try installedDashboard(root: root, skillPath: selectedSkillPath)
+            }.value
+        }
         let metadata = try SkillMetadata.load(from: root.appendingPathComponent(selectedSkillPath))
         let registryPath = "jscraik/\(metadata.name)"
         let packageBuildCommand = Self.packageBuildCommand(for: selectedSkillPath)
@@ -310,6 +319,9 @@ struct DashboardLoader {
     func loadSync() throws -> SkillDashboard {
         let root = try findRepoRoot()
         let selectedSkillPath = try findSelectedSkillPath(root: root)
+        if selectedSkillPath.hasPrefix("/") {
+            return try installedDashboard(root: root, skillPath: selectedSkillPath)
+        }
         let metadata = try SkillMetadata.load(from: root.appendingPathComponent(selectedSkillPath))
         let registryPath = "jscraik/\(metadata.name)"
         let packageBuildCommand = Self.packageBuildCommand(for: selectedSkillPath)
@@ -642,7 +654,7 @@ struct DashboardLoader {
     }
 
     private func findRepoRoot() throws -> URL {
-        if let explicit = ProcessInfo.processInfo.environment["AGENT_SKILLS_ROOT"], !explicit.isEmpty {
+        if let explicit = environment["AGENT_SKILLS_ROOT"], !explicit.isEmpty {
             return URL(fileURLWithPath: explicit)
         }
         var candidate = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -656,15 +668,18 @@ struct DashboardLoader {
         if FileManager.default.fileExists(atPath: fallback.appendingPathComponent("Skills/agent-ops/improve-agent-native/SKILL.md").path) {
             return fallback
         }
+        if !InstalledSkillDiscovery.paths(home: homeDirectory).isEmpty { return homeDirectory }
         throw SkillsBarError.missingRepoRoot
     }
 
     private func findSelectedSkillPath(root: URL) throws -> String {
-        let environment = ProcessInfo.processInfo.environment
         let rawPath = environment["AGENT_SKILL_PATH"]
             ?? environment["SELECTED_SKILL_PATH"]
-            ?? UserDefaults.standard.string(forKey: Self.selectedSkillDefaultsKey)
+            ?? storedSkillPath
+            ?? InstalledSkillDiscovery.paths(home: homeDirectory).first
             ?? Self.defaultSkillPath
+        let installedPaths = InstalledSkillDiscovery.paths(home: homeDirectory)
+        if installedPaths.contains(rawPath) { return rawPath }
         let resolvedRoot = root.standardizedFileURL.resolvingSymlinksInPath()
         let skillsRoot = resolvedRoot.appendingPathComponent("Skills")
             .standardizedFileURL
@@ -676,6 +691,9 @@ struct DashboardLoader {
         guard selectedURL.lastPathComponent == "SKILL.md",
               Self.isContained(selectedURL, beneath: skillsRoot),
               FileManager.default.fileExists(atPath: selectedURL.path) else {
+            if let installed = installedPaths.first { return installed }
+            let fallback = root.appendingPathComponent(Self.defaultSkillPath)
+            guard FileManager.default.fileExists(atPath: fallback.path) else { throw SkillsBarError.missingRepoRoot }
             return Self.defaultSkillPath
         }
         let rootPrefix = resolvedRoot.path.hasSuffix("/") ? resolvedRoot.path : resolvedRoot.path + "/"
@@ -685,6 +703,95 @@ struct DashboardLoader {
 
     private func run(root: URL, command: String) async -> CommandResult {
         await Task.detached(priority: .utility) { Shell.run(command, cwd: root, timeout: 45) }.value
+    }
+
+    private func installedDashboard(root: URL, skillPath: String) throws -> SkillDashboard {
+        let skillURL = URL(fileURLWithPath: skillPath)
+        let metadata = try SkillMetadata.load(from: skillURL)
+        let inspect = "sed -n '1,120p' \(Self.shellQuoted(skillPath))"
+        let notice = "Installed copy found. Locate its checked source package to establish SDK evidence."
+        var dashboard = SkillDashboard.placeholder
+        dashboard.displayName = metadata.name
+        dashboard.version = metadata.version
+        dashboard.description = metadata.description
+        dashboard.repoPath = root.path
+        dashboard.registryPath = ""
+        dashboard.installCommand = ""
+        dashboard.localEvidenceCommand = inspect
+        dashboard.reviewedText = "Installed skill inventory"
+        dashboard.deltaText = "Installed copy"
+        dashboard.quality = MetricSignal(score: nil, detail: notice, source: "Installed inventory", command: inspect)
+        dashboard.impact = MetricSignal(score: nil, detail: notice, source: "Installed inventory", command: inspect)
+        dashboard.security = SecuritySignal(score: nil, status: "Pending", detail: notice, sourceLabel: "Installed inventory", segmentCount: 0, inspectCommand: inspect)
+        dashboard.tessl.displayStatus = "Not linked"
+        dashboard.tessl.detail = "No registry identity established for this installed copy."
+        dashboard.tessl.recoveryCommand = ""
+        let paths = InstalledSkillDiscovery.paths(home: homeDirectory)
+        dashboard.fleet = FleetSignal(
+            skillCount: paths.count, groupCount: 0, largestGroupName: "installed", largestGroupCount: paths.count,
+            metadataCount: 0, referencesCount: 0, evalsCount: 0,
+            selectedSkillPath: skillPath, inventoryCommand: inspect
+        )
+        // A filesystem fingerprint distinguishes refreshes; it cannot clear a gate.
+        let fingerprint = PipelineCandidate.fingerprint(for: [skillURL], root: skillURL.deletingLastPathComponent())
+            ?? "unreadable-installed-copy"
+        dashboard.pipeline = PipelineCandidate(
+            fingerprint: fingerprint, governedInputPaths: [skillPath], observedAt: Date(),
+            stageReceipts: PipelineStage.allCases.map { stage in
+                PipelineStageReceipt(stage: stage, candidateFingerprint: fingerprint, evidenceStatus: .unproven,
+                    stageScore: nil, command: inspect, receiptPath: nil, modelProfile: nil,
+                    observedAt: nil, nextAction: notice)
+            }
+        )
+        if let link = InstalledSourceEvidence.link(skill: skillURL, home: homeDirectory) {
+            let observation = InstalledSourceEvidence.observe(link: link, skill: skillURL)
+            let capture = observation.capture
+            let boundFingerprint = capture.map { "sha256:" + $0.candidate.content_sha256 } ?? fingerprint
+            dashboard.pipeline = PipelineCandidate(
+                fingerprint: boundFingerprint, governedInputPaths: [skillPath], observedAt: Date(),
+                stageReceipts: PipelineStage.allCases.map { stage in
+                    let linked = stage == .candidateBaseline || stage == .mechanicalValidation
+                    return PipelineStageReceipt(
+                        stage: stage, candidateFingerprint: boundFingerprint,
+                        evidenceStatus: stage == .candidateBaseline ? observation.identityStatus
+                            : (stage == .mechanicalValidation ? observation.validationStatus : .unproven),
+                        stageScore: nil, command: observation.command,
+                        receiptPath: linked ? (observation.sourceReview != nil ? link.source_review_path : link.validation_path) : nil,
+                        modelProfile: linked ? (observation.sourceReview != nil ? "skillsbar-source-review/v1" : (link.package_kind == "skill" ? "skills-sdk/runtime-copy-comparison/v1" : "skills-sdk/plugin-package-validation/v1")) : nil,
+                        observedAt: linked && observation.status == .passed ? Date() : nil,
+                        nextAction: linked
+                            ? (stage == .candidateBaseline && capture != nil
+                                ? (observation.sourceReview.map {
+                                    "Exact SDK candidate binding verified · owner and maintainer: \($0.owner) · \($0.rights_basis). Supplied provenance recorded; \($0.revision_boundary)"
+                                } ?? "SDK candidate binding verified against installed copy · provenance, rights and ownership evidence still required for Identity clearance")
+                                : observation.detail + (observation.sourceReview.map {
+                                    observation.validationApproved
+                                        ? " Candidate-bound child content and plugin presentation checks passed; root documentation reviewed. Scorer calibration and evaluation remain separate."
+                                        : " Source review finding: " + $0.validation_findings.joined(separator: " · ")
+                                } ?? " Full Validation still requires applicable quality, reference and presentation evidence."))
+                            : "No Skills SDK \(stage.title.lowercased()) receipt linked. Structural validation does not establish this proof."
+                    )
+                }
+            )
+            dashboard.localEvidenceCommand = observation.command
+            dashboard.quality.detail = observation.detail
+            dashboard.quality.source = link.package_kind == "skill" ? "Skills SDK standalone comparison" : "Skills SDK plugin structure"
+            dashboard.quality.command = observation.command
+            dashboard.security.detail = "No candidate-bound security and permission review is linked. Source binding and Validation do not establish Security."
+            dashboard.security.sourceLabel = "Skills SDK security evidence required"
+            dashboard.impact.detail = "No matched local or cloud evaluation evidence is linked for this candidate."
+            dashboard.reviewedText = observation.status == .stale ? "Skills SDK source drift" : "Skills SDK checked source"
+        }
+        dashboard.refreshedAt = Date()
+        // Registry observations are independent of installed-copy lifecycle proof.
+        let requestedRegistryPath = "jscraik/\(metadata.name)"
+        let registry = installedRegistryLookup?(root, requestedRegistryPath)
+            ?? tesslSignalSync(root: root, registryPath: requestedRegistryPath)
+        dashboard.tessl = registry
+        if registry.registryVersion != nil || registry.registryScore != nil {
+            dashboard.registryPath = requestedRegistryPath
+        }
+        return dashboard
     }
 
     private func fleetSignal(root: URL, selectedSkillPath: String) -> FleetSignal {
@@ -761,7 +868,7 @@ struct DashboardLoader {
             return fixture
         }
 
-        let tessl = Self.tesslCommand()
+        let tessl = Self.tesslCommand(environment: environment)
         let cachedRegistry = TesslRegistryCache().load(registryPath: registryPath)?.cachedSignal
         let cachedVersion = TesslSessionCache.shared.version(for: tessl) ?? cachedRegistry?.cliVersion
         let version: String

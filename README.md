@@ -17,6 +17,7 @@ The app is currently a local prototype with a release-capable packaging path. It
 - **Eval local, Eval cloud, and Tessl staging proof** from the canonical `.harness/evidence/handoff/<skill>/gate-chain.json` and its governed release receipts.
 - **Runtime truth** from `.harness/evidence/runtime-proof/<skill>/<runtime>/runtime-card.json` only when the card proves the installed digest, doctor result, and observed behavior for the current package digest.
 - **Skill inventory coverage** by scanning `Skills/**/SKILL.md` in the configured agent-skills repository.
+- **Installed skill discovery** from `~/.codex/skills`, `~/.agents/skills` and `~/.codex/plugins/cache/<provider>/<plugin>/<version>/skills`. The chooser identifies standalone origins and plugin versions. This is filesystem inventory, not proof of activation in Codex.
 - **Tessl registry status** when the `tessl` CLI is available, authenticated, and registry search succeeds.
 
 These lanes are intentionally independent. Every downstream receipt must use the canonical gate-chain order, remain inside the configured repository, include its proof and non-proof boundaries, resolve every evidence reference, and carry exactly the current package digest. Eval local, Eval cloud, and Tessl staging must also identify the same scenario set. Missing, malformed, unbound, or mixed-digest evidence stays unproven or stale. A clean registry result does not prove local source safety, and local build or test proof does not prove hosted CI, registry publication, notarization, or review readiness.
@@ -25,7 +26,7 @@ These lanes are intentionally independent. Every downstream receipt must use the
 
 - macOS 14 or newer.
 - SwiftPM from Xcode or the active developer toolchain.
-- A local agent-skills checkout. The default is `/Users/jamiecraik/dev/agent-skills`.
+- Installed skills in the home locations below. A local agent-skills checkout is optional for inventory, and required for the existing source SDK evidence route; its default is `/Users/jamiecraik/dev/agent-skills`.
 - Optional: `tessl` CLI access for live registry status.
 
 SkillsProof is not App-Sandboxed: it reads the configured Skills SDK checkout and runs its read-only SDK checks locally. For Tessl, it prefers `TESSL_BIN` when set, then the current user's `~/.local/bin/tessl`, then `PATH`. Keep `SKILLSBAR_REVIEW_FIXTURE` unset for normal use; that variable is reserved for deterministic tests and mockup work.
@@ -127,9 +128,58 @@ Use another skill:
 AGENT_SKILL_PATH=Skills/agent-ops/technical-writer/SKILL.md ./Launch.command
 ```
 
-`SELECTED_SKILL_PATH` is also accepted for the selected skill path. Paths must point to an existing `Skills/**/SKILL.md` file in the configured root; otherwise the app falls back to the default skill.
+`SELECTED_SKILL_PATH` is also accepted for the selected skill path. Paths may identify an existing `Skills/**/SKILL.md` in the configured source root or an absolute `SKILL.md` discovered in the home locations above. SkillsProof follows symlinked installed packages and deduplicates their aliases within the installed inventory. The singular `~/.agent/skills` and `~/.codex/plugin` directories are not the installed locations on this workstation.
 
-When no launch-time skill path is set, use the circular-arrow chooser beside the skill name to select any local `Skills/**/SKILL.md`; SkillsProof persists that choice. A launch-time `AGENT_SKILL_PATH` or `SELECTED_SKILL_PATH` intentionally pins the selection. The app refreshes the selected skill immediately after its directory changes, and also refreshes on its five-minute live-data interval.
+Without a saved or explicit selection, SkillsProof chooses a discovered installed skill before falling back to the source checkout's default. A missing saved selection falls back to an existing installed skill. Installed selections work without an agent-skills checkout. Without a checked-source link, all nine stages remain Unproven; **Copy command** only inspects the skill. Independently, SkillsProof looks up `jscraik/<skill-name>` through the existing Tessl reader and displays registry observations only from an exact package match. Registry scores and version comparisons do not establish installed-copy identity or clear SDK gates.
+
+### Link an installed plugin to checked source
+
+SkillsProof uses Skills SDK's `validate-plugin` and `--verify-evidence` contracts,
+not an app-owned validator. Run `python3 script/link_installed_source.py --help`
+for the local link helper. Supply the trusted SDK CLI, source plugin directory,
+installed plugin version directory, forty-character source revision and link
+storage directory (`~/.codex/usage-data/skillsbar/source-links`). The helper
+captures source through the SDK, verifies that capture against both source and
+installed plugin, and saves the link only if all three SDK calls pass. Neither
+package is modified. Captures and links are local runtime data; keep them out of
+Git and outside the package being captured.
+
+On refresh, the app asks the SDK to verify both copies again against the retained
+capture. The nine stages remain full SDK lifecycle evidence gates. Exact binding
+and structural checks are partial evidence: Identity also needs provenance,
+rights and ownership; Validation also needs applicable quality, reference and
+presentation evidence. These observations remain Review required (or Held behind
+an incomplete upstream gate), with missing requirements in their details. The
+remaining seven stages stay Unproven until their own supported SDK evidence is
+linked. Scores are not invented from a structural pass.
+
+An optional `--source-review <absolute-path>` attaches a separately supplied,
+candidate-bound `skillsbar-source-review/v1` ownership/provenance review. It must
+record owner, maintainer, rights basis, source, revision limits, reviewer and
+hashed supporting evidence. SkillsProof rechecks its candidate/mode binding and
+supporting hashes after fresh SDK copy verification. This can clear Identity as
+recorded provenance; it does not authenticate rights or imply a clean commit.
+Retained validation findings block Validation. Structural, content, presentation
+and whole-plugin aggregate outcomes remain distinct; an aggregate scenario
+blocker belongs to Eval preparation, not a retroactive structural failure.
+With no retained findings, an optional `validation_proof` can supply the complete
+plugin presentation receipt and one content-review receipt for every direct
+child. Their hashes must be listed in the source review. The bundled read-only
+bridge uses the linked SDK's Python environment to validate the full SDK
+contracts and freshly reassess actual source with those supplied approvals and
+assessments. All results must match before Validation can pass. A summary-only
+receipt, retained assessment gap, foreign child or incoherent approval cannot
+clear the gate. This is separate from scorer calibration and matched evaluation.
+
+Missing or changed captures, mismatched copies, invalid SDK output and failed
+verification remove clearance and show Stale. The observer includes hidden files,
+permission metadata and removals for both linked packages and the link store,
+then schedules fresh SDK verification. Metadata watching is a refresh aid, not an
+atomic filesystem or byte-integrity guarantee. Local source revision is a caller
+binding; a matching capture does not certify clean Git history or provenance.
+The app never automatically runs provider evals, publication or installation.
+
+When no launch-time skill path is set, use **… → Select skill**, then the source, shared-skills or plugin-version submenu, to choose a skill; SkillsProof persists that choice. A launch-time `AGENT_SKILL_PATH` or `SELECTED_SKILL_PATH` intentionally pins the selection. The app refreshes the selected skill immediately after its directory changes, and also refreshes on its five-minute live-data interval.
 
 If Tessl is installed outside the normal user-local location, point the app at it explicitly:
 

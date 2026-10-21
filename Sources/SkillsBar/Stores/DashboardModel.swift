@@ -1,5 +1,6 @@
 import Foundation
 import OSLog
+import Darwin
 
 private let refreshLogger = Logger(
     subsystem: Bundle.main.bundleIdentifier ?? "local.jscraik.skillsbar",
@@ -22,7 +23,7 @@ final class DashboardModel: ObservableObject {
     private var sourceChangeTask: Task<Void, Never>?
     private var sourceChangeDebounceTask: Task<Void, Never>?
     private var observedSkillDirectory: String?
-    private var observedSkillSourceModificationDate: Date?
+    private var observedSkillSourceSignature: String?
     private var refreshQueued = false
     private let source: DashboardDataSource
 
@@ -70,7 +71,11 @@ final class DashboardModel: ObservableObject {
                     let elapsedMilliseconds = Int(Date().timeIntervalSince(refreshStartedAt) * 1_000)
                     refreshLogger.info("Local evidence ready in \(elapsedMilliseconds, privacy: .public) ms")
                 }
-                availableSkillPaths = DashboardLoader.discoverSkillPaths(root: URL(fileURLWithPath: dashboard.repoPath))
+                let root = URL(fileURLWithPath: dashboard.repoPath)
+                availableSkillPaths = await Task.detached(priority: .utility) {
+                    DashboardLoader.discoverSkillPaths(root: root)
+                        + InstalledSkillDiscovery.paths(home: FileManager.default.homeDirectoryForCurrentUser)
+                }.value
                 await recordSelectedSkillDirectory()
                 let elapsedMilliseconds = Int(Date().timeIntervalSince(refreshStartedAt) * 1_000)
                 refreshLogger.info("Evidence refresh completed in \(elapsedMilliseconds, privacy: .public) ms")
@@ -95,7 +100,7 @@ final class DashboardModel: ObservableObject {
         guard !isSkillSelectionPinned else { return }
         UserDefaults.standard.set(path, forKey: DashboardLoader.selectedSkillDefaultsKey)
         observedSkillDirectory = nil
-        observedSkillSourceModificationDate = nil
+        observedSkillSourceSignature = nil
         Task { await refresh() }
     }
 
@@ -138,56 +143,52 @@ final class DashboardModel: ObservableObject {
     }
 
     private func selectedSkillChanged() async -> Bool {
-        guard let directory = selectedSkillDirectory(),
-              let currentDate = await Self.selectedSkillSourceModificationDate(in: directory) else { return false }
-        guard observedSkillDirectory == directory.path,
-              let previousDate = observedSkillSourceModificationDate else {
-            observedSkillDirectory = directory.path
-            observedSkillSourceModificationDate = currentDate
-            return false
+        let directories = selectedSkillDirectories()
+        let key = directories.map(\.path).joined(separator: "\n")
+        let currentSignature = await Self.selectedSkillSourceSignature(in: directories)
+        guard observedSkillDirectory == key,
+              let previousSignature = observedSkillSourceSignature else {
+            let changed = observedSkillDirectory != nil
+            observedSkillDirectory = key
+            observedSkillSourceSignature = currentSignature
+            return changed
         }
-        guard currentDate > previousDate else { return false }
-        observedSkillSourceModificationDate = currentDate
+        guard currentSignature != previousSignature else { return false }
+        observedSkillSourceSignature = currentSignature
         return true
     }
 
     private func recordSelectedSkillDirectory() async {
-        guard let directory = selectedSkillDirectory() else { return }
-        observedSkillDirectory = directory.path
-        observedSkillSourceModificationDate = await Self.selectedSkillSourceModificationDate(in: directory)
+        let directories = selectedSkillDirectories()
+        observedSkillDirectory = directories.map(\.path).joined(separator: "\n")
+        observedSkillSourceSignature = await Self.selectedSkillSourceSignature(in: directories)
     }
 
-    private func selectedSkillDirectory() -> URL? {
-        let skill = URL(fileURLWithPath: dashboard.repoPath)
-            .appendingPathComponent(dashboard.fleet.selectedSkillPath)
-        return skill.deletingLastPathComponent()
+    private func selectedSkillDirectories() -> [URL] {
+        let skill = InstalledSkillDiscovery.skillURL(
+            path: dashboard.fleet.selectedSkillPath, root: URL(fileURLWithPath: dashboard.repoPath)
+        )
+        let linked = dashboard.fleet.selectedSkillPath.hasPrefix("/")
+            ? InstalledSourceEvidence.watchDirectories(skill: skill, home: FileManager.default.homeDirectoryForCurrentUser) : []
+        return [skill.deletingLastPathComponent()] + linked
     }
 
-    private nonisolated static func selectedSkillSourceModificationDate(in directory: URL) async -> Date? {
+    private nonisolated static func selectedSkillSourceSignature(in directories: [URL]) async -> String {
         await Task.detached(priority: .utility) {
-            selectedSkillSourceModificationDateSync(in: directory)
+            directories.map { sourceChangeSignature(in: $0) }.joined(separator: "\n")
         }.value
     }
 
-    private nonisolated static func selectedSkillSourceModificationDateSync(in directory: URL) -> Date? {
-        let fileManager = FileManager.default
-        var latest = modificationDate(for: directory)
-        guard let enumerator = fileManager.enumerator(
-            at: directory,
-            includingPropertiesForKeys: [.contentModificationDateKey],
-            options: [.skipsHiddenFiles]
-        ) else { return latest }
-        for case let url as URL in enumerator {
-            guard let date = modificationDate(for: url) else { continue }
-            if latest == nil || date > latest! {
-                latest = date
-            }
+    /// Schedules SDK re-verification; this metadata observation never proves bytes.
+    nonisolated static func sourceChangeSignature(in directory: URL) -> String {
+        var paths = [directory]
+        if let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: nil, options: []) {
+            paths += enumerator.compactMap { $0 as? URL }
         }
-        return latest
-    }
-
-    private nonisolated static func modificationDate(for url: URL) -> Date? {
-        let values = try? url.resourceValues(forKeys: [.contentModificationDateKey])
-        return values?.contentModificationDate
+        return paths.sorted { $0.path < $1.path }.map { url in
+            var info = stat()
+            guard lstat(url.path, &info) == 0 else { return "missing:\(url.path)" }
+            return "\(url.path)|\(info.st_mode)|\(info.st_size)|\(info.st_ino)|\(info.st_mtimespec.tv_sec).\(info.st_mtimespec.tv_nsec)|\(info.st_ctimespec.tv_sec).\(info.st_ctimespec.tv_nsec)"
+        }.joined(separator: "\n")
     }
 }

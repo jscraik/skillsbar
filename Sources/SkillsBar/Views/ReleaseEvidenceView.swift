@@ -529,17 +529,21 @@ private struct SkillSelectionMenu: View {
                 Text("No local skills discovered")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(availableSkillPaths, id: \.self) { path in
-                    Button {
-                        onSelect?(path)
-                    } label: {
-                        if path == selectedSkillPath {
-                            Label(Self.skillName(for: path), systemImage: "checkmark")
-                        } else {
-                            Text(Self.skillName(for: path))
+                ForEach(InstalledSkillDiscovery.menuGroups(paths: availableSkillPaths)) { group in
+                    Menu(group.title) {
+                        ForEach(group.paths, id: \.self) { path in
+                            Button {
+                                onSelect?(path)
+                            } label: {
+                                if path == selectedSkillPath {
+                                    Label(Self.skillName(for: path), systemImage: "checkmark")
+                                } else {
+                                    Text(Self.skillName(for: path))
+                                }
+                            }
+                            .disabled(isPinned || onSelect == nil)
                         }
                     }
-                    .disabled(isPinned || onSelect == nil)
                 }
             }
             if isPinned {
@@ -567,10 +571,7 @@ private struct SkillSelectionMenu: View {
     }
 
     private static func skillName(for path: String) -> String {
-        let url = URL(fileURLWithPath: path)
-        return url.deletingLastPathComponent().lastPathComponent.isEmpty
-            ? path
-            : url.deletingLastPathComponent().lastPathComponent
+        InstalledSkillDiscovery.displayName(path: path)
     }
 }
 
@@ -630,7 +631,10 @@ private struct TesslRegistryPresentation {
         hasCurrentCandidateDigest = dashboard.pipeline.orderedReceipts
             .first(where: { $0.stage == .candidateBaseline })?.evidenceStatus == .passed
 
-        if isLive {
+        if dashboard.registryPath.isEmpty {
+            statusLabel = "NOT LINKED"
+            statusTone = .pending
+        } else if isLive {
             statusLabel = "LIVE"
             statusTone = .advisory
         } else if !dashboard.tessl.cliAvailable {
@@ -644,9 +648,11 @@ private struct TesslRegistryPresentation {
             statusTone = .warning
         }
 
-        compactCaption = !dashboard.tessl.cliAvailable && !hasRegistrySnapshot
-            ? "No cached evidence · separate from local proof."
-            : dashboard.registryEvidenceCaption
+        compactCaption = dashboard.registryPath.isEmpty
+            ? "Installed inventory · no registry identity established."
+            : (!dashboard.tessl.cliAvailable && !hasRegistrySnapshot
+                ? "No cached evidence · separate from local proof."
+                : dashboard.registryEvidenceCaption)
 
         if let version = dashboard.tessl.registryVersion, !version.isEmpty {
             versionText = "v" + version.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
