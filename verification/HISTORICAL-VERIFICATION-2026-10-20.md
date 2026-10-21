@@ -19,7 +19,7 @@ The repair inserts an Unproven placeholder and clears the prerequisite state.
 Later evidence is held; empty input produces nine Unproven stages. Complete
 input retains its receipts. The repair and regression tests were subsequently
 backed up in commit
-[`2674fbf`](https://github.com/jscraik/skillsbar/commit/2674fbf976a9b4a1ad9071328b5cc7b88224aa97).
+[`2674fbf`](https://github.com/jscraik/skillsproof/commit/2674fbf976a9b4a1ad9071328b5cc7b88224aa97).
 See [the gating model](../Sources/SkillsBar/Models/DashboardModels.swift) and
 [regression tests](../Tests/SkillsBarTests/ReviewPopoverTests.swift).
 
@@ -43,7 +43,7 @@ The runner's exit zero alone was never the solver verdict: logs required review.
 ## Installed evidence and interface observations
 
 Installed discovery and checked-source linking were backed up in
-[`b4b4c5e`](https://github.com/jscraik/skillsbar/commit/b4b4c5e9a1653330d253c51455606698a1dc7d32).
+[`b4b4c5e`](https://github.com/jscraik/skillsproof/commit/b4b4c5e9a1653330d253c51455606698a1dc7d32).
 The implementation keeps installed-copy identity and SDK receipts separate from
 Tessl observations. Exact package matching prevents unrelated search results
 from supplying metrics. Retained source/runtime drift must not clear SDK gates.
@@ -54,9 +54,9 @@ and [the documented evidence boundaries](../README.md).
 Historical UI observations recorded grouped chooser origins and plugin versions,
 an explicit missing-version label, and an elapsed-time display that updates
 without fetching new evidence. The presentation changes were backed up in
-[`ccb8e5c`](https://github.com/jscraik/skillsbar/commit/ccb8e5cd1469b82758d3a717a19cbd9811d30b43)
+[`ccb8e5c`](https://github.com/jscraik/skillsproof/commit/ccb8e5cd1469b82758d3a717a19cbd9811d30b43)
 and chooser coverage in
-[`0661507`](https://github.com/jscraik/skillsbar/commit/066150782ebd4b3ceb2f5e449a480c3d40a78872).
+[`0661507`](https://github.com/jscraik/skillsproof/commit/066150782ebd4b3ceb2f5e449a480c3d40a78872).
 See [presentation tests](../Tests/SkillsBarTests/PresentationPolishTests.swift).
 These historical observations do not establish fresh VoiceOver acceptance,
 host activation, registry publication or current UI behaviour.

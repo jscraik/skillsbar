@@ -10,8 +10,8 @@ export default function Home() {
       <a className="skip-link" href="#top">Skip to content</a>
       <nav className="site-nav" aria-label="Primary navigation">
         <a className="brand" href="#top" aria-label="SkillsBar home"><Image src="/skillsbar-icon-168.webp" alt="" width={28} height={28} unoptimized /><span>SkillsBar</span><small>by jscraik</small></a>
-        <div className="nav-links"><a href="#product">Product proof</a><a href="#walkthrough">How it works</a><a className="nav-cta" href="https://github.com/jscraik/skillsbar">Repository ↗</a></div>
-        <details className="compact-nav"><summary>Explore</summary><div><a href="#walkthrough">Interactive demo</a><a href="#product">Native app detail</a><a href="https://github.com/jscraik/skillsbar">Repository ↗</a></div></details><CompactNavBehavior />
+        <div className="nav-links"><a href="#product">Product proof</a><a href="#walkthrough">How it works</a><a className="nav-cta" href="https://github.com/jscraik/skillsproof">Repository ↗</a></div>
+        <details className="compact-nav"><summary>Explore</summary><div><a href="#walkthrough">Interactive demo</a><a href="#product">Native app detail</a><a href="https://github.com/jscraik/skillsproof">Repository ↗</a></div></details><CompactNavBehavior />
       </nav>
 
       <section className="hero" id="top" tabIndex={-1} aria-labelledby="hero-title">
@@ -63,8 +63,8 @@ export default function Home() {
       </section>
 
       <section className="closing" aria-labelledby="closing-title">
-        <div className="closing-copy"><p className="kicker">The maintainer decides</p><h2 id="closing-title">Run the next check. Decide what the result proves.</h2><p>Inspect the source, the native app, and the line between demo data and local evidence.</p><a className="button primary" href="https://github.com/jscraik/skillsbar">Open the repository ↗</a></div>
-        <div className="closing-qr"><div><Image src="/skillsbar-repo-qr-1024.png" alt="QR code for the SkillsBar GitHub repository" width={1024} height={1024} unoptimized /></div><a href="https://github.com/jscraik/skillsbar">github.com/jscraik/skillsbar</a></div>
+        <div className="closing-copy"><p className="kicker">The maintainer decides</p><h2 id="closing-title">Run the next check. Decide what the result proves.</h2><p>Inspect the source, the native app, and the line between demo data and local evidence.</p><a className="button primary" href="https://github.com/jscraik/skillsproof">Open the repository ↗</a></div>
+        <div className="closing-qr"><div><Image src="/skillsbar-repo-qr-1024.png" alt="QR code for the SkillsProof GitHub repository" width={1024} height={1024} unoptimized /></div><a href="https://github.com/jscraik/skillsproof">github.com/jscraik/skillsproof</a></div>
       </section>
 
       <footer className="site-footer"><div className="brand"><Image src="/skillsbar-icon-168.webp" alt="" width={24} height={24} unoptimized /><span>SkillsBar</span><small>by jscraik</small></div><p>Evidence at a glance. The next check in reach.</p><a href="#top">Back to top ↑</a></footer>

@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import QRCode from "qrcode";
 
-const repositoryURL = "https://github.com/jscraik/skillsbar";
+const repositoryURL = "https://github.com/jscraik/skillsproof";
 const outputDirectory = resolve(process.argv[2] ?? "public");
 
 await mkdir(outputDirectory, { recursive: true });

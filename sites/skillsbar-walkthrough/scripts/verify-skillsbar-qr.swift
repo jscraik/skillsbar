@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import Vision
 
-let expected = "https://github.com/jscraik/skillsbar"
+let expected = "https://github.com/jscraik/skillsproof"
 let paths = CommandLine.arguments.dropFirst()
 
 guard !paths.isEmpty else {

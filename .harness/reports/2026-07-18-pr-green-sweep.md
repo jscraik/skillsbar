@@ -1,8 +1,8 @@
 ---
 schema_version: pr-green-sweep/v1
 artifact_id: skillsbar-pr-2-green-sweep-2026-07-18
-repo: jscraik/skillsbar
-pr_url: https://github.com/jscraik/skillsbar/pull/2
+repo: jscraik/skillsproof
+pr_url: https://github.com/jscraik/skillsproof/pull/2
 head_before: 587cad7640c1be48ee6d2b7c86fde1cf67b66a4b
 ---
 
@@ -10,7 +10,7 @@ head_before: 587cad7640c1be48ee6d2b7c86fde1cf67b66a4b
 
 ## URL-first action queue
 
-- https://github.com/jscraik/skillsbar/pull/2 — feat: add nine-gate Skills SDK evidence view
+- https://github.com/jscraik/skillsproof/pull/2 — feat: add nine-gate Skills SDK evidence view
   - Head before repair: codex/review-popover-delivery @ 587cad7640c1be48ee6d2b7c86fde1cf67b66a4b
   - State before repair: mergeable but blocked; eight current unresolved CodeRabbit threads; Analyze (swift) failed.
   - Queue: auto_fixable_now; source and proof edits were made in an isolated checkout at /private/tmp/skillsbar-pr2.
