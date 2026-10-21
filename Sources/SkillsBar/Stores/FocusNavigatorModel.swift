@@ -16,6 +16,12 @@ final class FocusNavigatorModel: ObservableObject {
         hasManualSelection = true
     }
 
+    func step(_ offset: Int) {
+        let index = selectedStage.number - 1 + offset
+        guard PipelineStage.allCases.indices.contains(index) else { return }
+        select(PipelineStage.allCases[index])
+    }
+
     func receipt(in candidate: PipelineCandidate) -> PipelineStageReceipt? {
         candidate.orderedReceipts.first { $0.stage == selectedStage }
     }

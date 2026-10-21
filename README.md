@@ -6,6 +6,12 @@ Previously SkillsBar. Internal Swift module names, bundle identity, environment 
 
 SkillsProof is a native macOS menu-bar app for watching local Skills SDK evidence without flattening separate proof lanes. It renders the selected skill's canonical package identity, validation, security, eval preparation, durable downstream receipts, runtime proof, inventory, and Tessl registry state in a compact SwiftUI popover.
 
+The native Guided evidence layout offers a nine-gate overview, searchable skill
+and plugin chooser, and individual gate details with persistent navigation.
+One Tessl results card stays visible alongside those views. Blue indicates
+selection independently of evidence status colours. All displayed native results
+come from the dashboard loaders; the browser prototype remains illustrative.
+
 The app is currently a local prototype with a release-capable packaging path. It builds and launches from this checkout, reads the agent-skills repository on disk, and keeps local SDK evidence separate from Tessl registry evidence. A public release still requires Jamie's Developer ID certificate and Apple notarization credentials.
 
 ## What It Shows

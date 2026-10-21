@@ -24,10 +24,6 @@ struct SkillsMenuBarIconView: View, Equatable {
             }
             .frame(width: 18, height: 18)
 
-            Circle()
-                .fill(status.color)
-                .frame(width: 5, height: 5)
-                .overlay(Circle().stroke(Color.primary.opacity(0.85), lineWidth: 1))
         }
         .frame(width: 18, height: 18, alignment: .center)
         .contentShape(Rectangle())

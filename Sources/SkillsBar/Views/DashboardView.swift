@@ -120,8 +120,33 @@ enum SkillsSDKIconLoader {
     static let image: NSImage? = resourceImage(named: "SkillsSDKIcon")
 
     static let menuBarImage: NSImage? = {
-        guard let image = image?.copy() as? NSImage else { return nil }
-        image.size = NSSize(width: 18, height: 18)
+        // Vector equivalent of the approved 18-point stacked-card template.
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
+            NSColor.black.setStroke()
+            for (x, y) in [(1.75, 2.25), (4.25, 4.0)] {
+                let path = NSBezierPath()
+                path.move(to: NSPoint(x: x + 2.75, y: y))
+                path.line(to: NSPoint(x: x + 1.25, y: y))
+                path.curve(to: NSPoint(x: x, y: y + 1.25), controlPoint1: NSPoint(x: x + 0.55, y: y), controlPoint2: NSPoint(x: x, y: y + 0.55))
+                path.line(to: NSPoint(x: x, y: y + 10.25))
+                path.lineWidth = 1.5
+                path.lineCapStyle = .round
+                path.stroke()
+            }
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: NSRect(x: 6.5, y: 5.75, width: 9.75, height: 10.5), xRadius: 2, yRadius: 2).fill()
+            NSGraphicsContext.current?.compositingOperation = .destinationOut
+            let check = NSBezierPath()
+            check.move(to: NSPoint(x: 9, y: 11))
+            check.line(to: NSPoint(x: 10.6, y: 12.6))
+            check.line(to: NSPoint(x: 13.9, y: 8.9))
+            check.lineWidth = 1.5
+            check.lineCapStyle = .round
+            check.lineJoinStyle = .round
+            check.stroke()
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+            return true
+        }
         image.isTemplate = true
         return image
     }()

@@ -108,8 +108,16 @@ done
 
 cp "$ROOT_DIR/Sources/SkillsBar/Resources/TesslLogo.png" "$RESOURCES_DIR/TesslLogo.png"
 ICON_SOURCE="$ROOT_DIR/Sources/SkillsBar/Resources/SkillsSDKIcon.png"
-sips -s format icns "$ICON_SOURCE" --out "$RESOURCES_DIR/SkillsSDKIcon.icns" >/dev/null
 cp "$ICON_SOURCE" "$RESOURCES_DIR/SkillsSDKIcon.png"
+# Build a complete standard iconset from the approved artwork.
+ICONSET_DIR="$BUILD_ROOT/package/SkillsProof.iconset"
+mkdir -p "$ICONSET_DIR"
+for size in 16 32 128 256 512; do
+  sips -z "$size" "$size" "$ICON_SOURCE" --out "$ICONSET_DIR/icon_${size}x${size}.png" >/dev/null
+  retina_size=$((size * 2))
+  sips -z "$retina_size" "$retina_size" "$ICON_SOURCE" --out "$ICONSET_DIR/icon_${size}x${size}@2x.png" >/dev/null
+done
+iconutil -c icns "$ICONSET_DIR" -o "$RESOURCES_DIR/SkillsSDKIcon.icns"
 
 PREFERRED_BUILD_DIR="$(dirname "${BUILT_BINARIES[0]}")"
 shopt -s nullglob

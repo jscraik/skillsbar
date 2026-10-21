@@ -7,59 +7,6 @@ private enum SkillsBarMotion {
     static let tesslRefresh = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.18)
 }
 
-private struct EvidenceValueTransition<Content: View>: View {
-    let key: String
-    let isEnabled: Bool
-    let anchor: UnitPoint
-    let animation: Animation
-    let content: () -> Content
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    init(
-        key: String,
-        isEnabled: Bool = true,
-        anchor: UnitPoint = .leading,
-        animation: Animation = SkillsBarMotion.candidateRefresh,
-        @ViewBuilder content: @escaping () -> Content
-    ) {
-        self.key = key
-        self.isEnabled = isEnabled
-        self.anchor = anchor
-        self.animation = animation
-        self.content = content
-    }
-
-    var body: some View {
-        if isEnabled {
-            ZStack(alignment: .leading) {
-                content()
-                    .id(key)
-                    .transition(
-                        reduceMotion
-                            ? .identity
-                            : .opacity.combined(with: .scale(scale: 0.98, anchor: anchor))
-                    )
-            }
-            .animation(reduceMotion ? nil : animation, value: key)
-        } else {
-            content()
-        }
-    }
-}
-
-private extension TesslSignal {
-    var motionKey: String {
-        [
-            registryResultLabel,
-            registryVersion ?? "—",
-            registryQualityScore.map(String.init) ?? "—",
-            registryImpactScore.map(String.init) ?? "—",
-            registrySecurityDisplay
-        ].joined(separator: "|")
-    }
-}
-
 struct ReleaseEvidenceView: View {
     let dashboard: SkillDashboard
     let isRefreshing: Bool
@@ -91,92 +38,16 @@ struct ReleaseEvidenceView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ReleaseHeader(
-                dashboard: dashboard,
-                isRefreshing: isRefreshing,
-                isFixture: isFixture
-            ) {
-                SkillSelectionMenu(
-                    dashboard: dashboard,
-                    selectedSkillPath: selectedSkillPath,
-                    availableSkillPaths: availableSkillPaths,
-                    isPinned: isSkillSelectionPinned,
-                    onSelect: onSelectSkill
-                )
-            }
-            ReleaseDivider().padding(.top, 8).padding(.bottom, 4)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    FocusNavigator(candidate: dashboard.pipeline, securityBadge: dashboard.security.severityLine)
-                    TesslEvidenceCard(dashboard: dashboard)
-                    .padding(.vertical, 8)
-                    .overlay(alignment: .top) { ReleaseDivider() }
-                }
-                .padding(.trailing, 2)
-            }
-            .scrollIndicators(.automatic)
-            .scrollBounceBehavior(.basedOnSize)
-            .frame(maxHeight: .infinity)
-            .layoutPriority(1)
-            ReleaseDivider().padding(.top, 2)
-            ReleaseFooter(dashboard: dashboard, isRefreshing: isRefreshing, onRefresh: onRefresh)
-        }
+        PrototypePopover(dashboard: dashboard, isRefreshing: isRefreshing, isFixture: isFixture,
+                         paths: availableSkillPaths, selectedPath: selectedSkillPath,
+                         pinned: isSkillSelectionPinned, onSelect: onSelectSkill, onRefresh: onRefresh)
     }
 }
 
-private struct FocusNavigator: View {
-    let candidate: PipelineCandidate
-    let securityBadge: String
-    @StateObject private var selection: FocusNavigatorModel
-
-    init(candidate: PipelineCandidate, securityBadge: String) {
-        self.candidate = candidate
-        self.securityBadge = securityBadge
-        _selection = StateObject(wrappedValue: FocusNavigatorModel(candidate: candidate))
-    }
-
-    private var summary: String {
-        let receipts = candidate.orderedReceipts
-        let counts: [(PipelineEvidenceStatus, String)] = [
-            (.passed, "passed"), (.reviewRequired, "needs review"),
-            (.blocked, "blocked"), (.stale, "stale")
-        ]
-        var parts = counts.compactMap { status, label -> String? in
-            let count = receipts.filter { $0.evidenceStatus == status }.count
-            return count > 0 ? "\(count) \(label)" : nil
-        }
-        let awaiting = receipts.filter { $0.evidenceStatus == .held || $0.evidenceStatus == .unproven }.count
-        if awaiting > 0 { parts.append("\(awaiting) awaiting proof") }
-        return parts.joined(separator: " · ")
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            PipelineStageGrid(candidate: candidate, selection: selection)
-            Text(summary)
-                .releaseFont(13, weight: .regular, relativeTo: .caption)
-                .foregroundStyle(.bodyText).monospacedDigit()
-                .fixedSize(horizontal: false, vertical: true)
-            ReleaseDivider().padding(.vertical, 4)
-            if let receipt = selection.receipt(in: candidate) {
-                SelectedStageDetail(
-                    receipt: receipt,
-                    activeStage: candidate.activeReceipt?.stage,
-                    stageCount: candidate.orderedReceipts.count,
-                    securityBadge: securityBadge
-                )
-                .id(receipt.stage)
-                .id(candidate.fingerprint)
-            }
-        }
-        .onChange(of: candidate) { _, updated in selection.reconcile(updated) }
-    }
-}
-
-private struct PipelineStageGrid: View {
+struct PipelineStageGrid: View {
     let candidate: PipelineCandidate
     @ObservedObject var selection: FocusNavigatorModel
+    var onOpen: (() -> Void)? = nil
     @FocusState private var focusedStage: PipelineStage?
 
     var body: some View {
@@ -189,6 +60,7 @@ private struct PipelineStageGrid: View {
                     isFocused: focusedStage == receipt.stage
                 ) {
                     selection.select(receipt.stage)
+                    onOpen?()
                 }
                 .focused($focusedStage, equals: receipt.stage)
             }
@@ -211,7 +83,7 @@ private struct PipelineStageCell: View {
     let action: () -> Void
 
     private var tint: Color {
-        isCurrent ? (colorScheme == .dark ? .warningAccent : .focusWarningInk) : .focusActionBlue
+        .focusActionBlue
     }
 
     var body: some View {
@@ -230,7 +102,7 @@ private struct PipelineStageCell: View {
                 }
                 Text(receipt.stage.compactTitle)
                     .releaseFont(13, weight: .regular, relativeTo: .caption)
-                    .foregroundStyle(isSelected && isCurrent ? tint : Color.primary)
+                    .foregroundStyle(receipt.evidenceStatus.iconColor(in: colorScheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
             .foregroundStyle(.primary)
@@ -399,12 +271,13 @@ private extension PipelineEvidenceStatus {
     }
 
     func iconColor(in colorScheme: ColorScheme) -> Color {
-        guard colorScheme == .light else { return tone.color }
+        if self == .held || self == .unproven { return .primary }
+        guard colorScheme == .light else { return self == .stale ? .warningAccent : tone.color }
         switch self {
         case .passed: return Color(red: 0.08, green: 0.46, blue: 0.20)
-        case .reviewRequired: return .focusWarningInk
+        case .reviewRequired, .stale: return .focusWarningInk
         case .blocked: return Color(red: 0.72, green: 0.12, blue: 0.10)
-        case .held, .unproven, .stale: return .secondary
+        case .held, .unproven: return .secondary
         }
     }
 }
@@ -449,7 +322,7 @@ struct SkillVersionText {
     }
 }
 
-private struct ReleaseHeader<Actions: View>: View {
+struct ReleaseHeader<Actions: View>: View {
     @Environment(\.colorScheme) private var colorScheme
     let dashboard: SkillDashboard
     let isRefreshing: Bool
@@ -469,6 +342,9 @@ private struct ReleaseHeader<Actions: View>: View {
     }
 
     private var statusLabel: String {
+        if !isRefreshing, dashboard.pipeline.orderedReceipts.contains(where: { $0.evidenceStatus == .stale }) {
+            return "Evidence stale"
+        }
         switch status {
         case .current: return "Up to date"
         case .attention: return "Needs attention"
@@ -529,70 +405,6 @@ private struct ReleaseHeader<Actions: View>: View {
     }
 }
 
-private struct SkillSelectionMenu: View {
-    let dashboard: SkillDashboard
-    let selectedSkillPath: String
-    let availableSkillPaths: [String]
-    let isPinned: Bool
-    let onSelect: ((String) -> Void)?
-
-    private var selectedName: String {
-        Self.skillName(for: selectedSkillPath)
-    }
-
-    var body: some View {
-            Menu {
-            Menu("Select skill") {
-            if availableSkillPaths.isEmpty {
-                Text("No local skills discovered")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(InstalledSkillDiscovery.menuGroups(paths: availableSkillPaths)) { group in
-                    Menu(group.title) {
-                        ForEach(group.paths, id: \.self) { path in
-                            Button {
-                                onSelect?(path)
-                            } label: {
-                                if path == selectedSkillPath {
-                                    Label(Self.skillName(for: path), systemImage: "checkmark")
-                                } else {
-                                    Text(Self.skillName(for: path))
-                                }
-                            }
-                            .disabled(isPinned || onSelect == nil)
-                        }
-                    }
-                }
-            }
-            if isPinned {
-                Divider()
-                Text("Selection pinned by environment")
-                    .foregroundStyle(.secondary)
-            }
-            }
-            Divider()
-            ReleaseUtilityActions(dashboard: dashboard)
-            Button("Close popover") { NSApp.keyWindow?.orderOut(nil) }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 12, weight: .semibold))
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .frame(width: 44, height: 44)
-        .background { Circle().fill(Color.primary.opacity(0.035)).frame(width: 34, height: 34) }
-        .overlay { Circle().strokeBorder(Color.primary.opacity(0.13), lineWidth: 1).frame(width: 34, height: 34).allowsHitTesting(false) }
-        .help("More actions and skill selection")
-        .accessibilityLabel("More SkillsProof actions; selected skill \(selectedName)")
-    }
-
-    private static func skillName(for path: String) -> String {
-        InstalledSkillDiscovery.displayName(path: path)
-    }
-}
-
 private struct GateCopyButton: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let receipt: PipelineStageReceipt
@@ -616,7 +428,7 @@ private struct GateCopyButton: View {
             .padding(.horizontal, 10)
             .frame(minHeight: 32)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.bordered)
         .buttonBorderShape(.roundedRectangle(radius: 8))
         .tint(.focusActionBlue)
         .help(copyError ?? "Copy the full \(receipt.stage.title.lowercased()) command")
@@ -625,7 +437,7 @@ private struct GateCopyButton: View {
     }
 }
 
-private struct TesslRegistryPresentation {
+struct TesslRegistryPresentation {
     let isLive: Bool
     let hasRegistrySnapshot: Bool
     let isHistorical: Bool
@@ -695,218 +507,6 @@ private struct TesslRegistryPresentation {
     }
 }
 
-private struct TesslRegistrySummary: View {
-    enum Style { case compact, expanded }
-
-    let dashboard: SkillDashboard
-    let presentation: TesslRegistryPresentation
-    let style: Style
-
-    var body: some View {
-        HStack(alignment: .top, spacing: style == .compact ? 10 : 13) {
-            ReleaseTesslLogo(size: 36)
-                .accessibilityHidden(style == .compact)
-            VStack(alignment: .leading, spacing: style == .compact ? 4 : 5) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) { heading }
-                    VStack(alignment: .leading, spacing: 5) { heading }
-                }
-                if style == .compact {
-                    Text(presentation.compactCaption)
-                        .releaseFont(12, weight: .regular, relativeTo: .caption)
-                        .foregroundStyle(.bodyText)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    if presentation.hasRegistrySnapshot {
-                        Text("\(presentation.versionText) · \(presentation.observedText)")
-                            .releaseFont(12.5, weight: .regular, relativeTo: .caption)
-                            .foregroundStyle(.bodyText)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .monospacedDigit()
-                    }
-                    Text(dashboard.registryPath)
-                        .releaseFont(11.5, weight: .regular, relativeTo: .caption2)
-                        .foregroundStyle(.secondaryText)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .help("Tessl package identity: \(dashboard.registryPath)")
-                }
-            }
-            if style == .expanded {
-                Spacer(minLength: 4)
-                VStack(alignment: .trailing, spacing: 5) {
-                    if let score = dashboard.tessl.registryScore {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("\(score)")
-                                .releaseFont(22, weight: .semibold, relativeTo: .title3)
-                                .monospacedDigit()
-                            Text("Registry score")
-                                .releaseFont(11, weight: .regular, relativeTo: .caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .accessibilityElement(children: .combine)
-                    }
-                    if let multiplier = dashboard.tessl.registryImprovementMultiplier {
-                        StatusBadge(
-                            text: String(format: "%.2fx lift", multiplier),
-                            tone: dashboard.tessl.registryImpactTone
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder private var heading: some View {
-                    Text("Tessl Registry")
-                        .releaseFont(style == .compact ? 14 : 17, weight: .medium, relativeTo: .subheadline)
-                    StatusBadge(text: presentation.statusLabel == "CLI UNAVAILABLE" ? "CLI unavailable" : presentation.statusLabel.capitalized, tone: presentation.statusTone)
-    }
-}
-
-private struct TesslEvidenceCard: View {
-    let dashboard: SkillDashboard
-
-    var body: some View {
-        let presentation = TesslRegistryPresentation(dashboard: dashboard)
-        VStack(alignment: .leading, spacing: 10) {
-            TesslRegistrySummary(dashboard: dashboard, presentation: presentation,
-                                 style: presentation.hasRegistrySnapshot ? .expanded : .compact)
-
-            if presentation.hasRegistrySnapshot {
-                EvidenceValueTransition(
-                    key: dashboard.tessl.motionKey,
-                    isEnabled: presentation.isLive,
-                    animation: SkillsBarMotion.tesslRefresh
-                ) {
-                    HStack(spacing: 12) {
-                        RegistryMetric(
-                            label: "Quality",
-                            value: dashboard.tessl.registryQualityScore.map { "\($0)%" } ?? "—",
-                            progress: dashboard.tessl.registryQualityScore.map { Double($0) / 100 },
-                            tone: RegistryMetricPresentation.percentTone(dashboard.tessl.registryQualityScore),
-                            muted: !presentation.isLive,
-                            animateChanges: presentation.isLive
-                        )
-                        RegistryVerticalDivider()
-                        RegistryMetric(
-                            label: "Impact",
-                            value: dashboard.tessl.registryImpactScore.map { "\($0)%" } ?? "—",
-                            progress: dashboard.tessl.registryImpactScore.map { Double($0) / 100 },
-                            tone: RegistryMetricPresentation.percentTone(dashboard.tessl.registryImpactScore),
-                            muted: !presentation.isLive,
-                            animateChanges: presentation.isLive
-                        )
-                        RegistryVerticalDivider()
-                        RegistryMetric(
-                            label: "Security",
-                            value: dashboard.tessl.registrySecurityDisplay,
-                            progress: dashboard.tessl.registrySecurityTone == .positive ? 1 : nil,
-                            tone: dashboard.tessl.registrySecurityTone,
-                            muted: !presentation.isLive,
-                            animateChanges: presentation.isLive
-                        )
-                    }
-                }
-            }
-
-            if presentation.hasRegistrySnapshot, !dashboard.registryEvidenceCaption.isEmpty {
-                Text(dashboard.registryEvidenceCaption)
-                    .releaseFont(11, weight: .regular, relativeTo: .caption2)
-                    .foregroundStyle(.bodyText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let url = dashboard.registryURL {
-                HStack {
-                    if presentation.hasRegistrySnapshot {
-                        Text("Registry evidence · separate from local proof")
-                            .releaseFont(11, weight: .regular, relativeTo: .caption)
-                            .foregroundStyle(.bodyText)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 8)
-                    Button {
-                        NSWorkspace.shared.open(url)
-                    } label: {
-                        Text("Tessl.io ↗")
-                            .releaseFont(12, weight: .medium, relativeTo: .caption)
-                            .foregroundStyle(Color.advisoryAccent)
-                            .frame(minHeight: 40)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("View in Tessl.io")
-                }
-            }
-            if !presentation.isLive, !presentation.hasCurrentCandidateDigest {
-                Text("Content comparison blocked until candidate digest exists.")
-                    .releaseFont(10, weight: .regular, relativeTo: .caption2)
-                    .foregroundStyle(.secondaryText)
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(
-            "Tessl Registry. \(presentation.statusLabel). "
-                + dashboard.registryEvidenceCaption
-        )
-    }
-}
-
-private struct RegistryMetric: View {
-    let label: String
-    let value: String
-    let progress: Double?
-    let tone: StatusTone
-    let muted: Bool
-    let animateChanges: Bool
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(label)
-                .releaseFont(12, weight: .regular, relativeTo: .caption2)
-                .foregroundStyle(.bodyText)
-            Text(value)
-                .releaseFont(17, weight: .medium, design: .rounded, relativeTo: .subheadline)
-                .foregroundStyle(tone.color.opacity(muted ? 0.68 : 1))
-                .monospacedDigit()
-                .contentTransition(.opacity)
-                .animation(
-                    animateChanges && !reduceMotion ? SkillsBarMotion.tesslRefresh : nil,
-                    value: value
-                )
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.releaseMetricTrack)
-                    if let progress {
-                        Capsule()
-                            .fill(tone.color.opacity(muted ? 0.62 : 1))
-                            .frame(maxWidth: .infinity)
-                            .scaleEffect(
-                                x: min(max(progress, 0), 1),
-                                y: 1,
-                                anchor: .leading
-                            )
-                            .animation(
-                                animateChanges && !reduceMotion ? SkillsBarMotion.tesslRefresh : nil,
-                                value: progress
-                            )
-                    }
-                }
-            .frame(height: 7)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct RegistryVerticalDivider: View {
-    var body: some View {
-        Rectangle()
-            .fill(Color.primary.opacity(0.12))
-            .frame(width: 1, height: 50)
-    }
-}
-
 enum EvidenceAgeText {
     static func label(observedAt: Date, now: Date) -> String {
         guard observedAt.timeIntervalSince1970 > 0 else { return "Checked time unavailable" }
@@ -917,7 +517,7 @@ enum EvidenceAgeText {
     }
 }
 
-private struct ReleaseFooter: View {
+struct ReleaseFooter: View {
     let dashboard: SkillDashboard
     let isRefreshing: Bool
     let onRefresh: (() -> Void)?
@@ -947,7 +547,7 @@ private struct ReleaseFooter: View {
     }
 }
 
-private struct ReleaseUtilityActions: View {
+struct ReleaseUtilityActions: View {
     let dashboard: SkillDashboard
     @ObservedObject private var feedback = CopyFeedbackModel.shared
 
@@ -1057,29 +657,6 @@ private struct ReleaseSkillLogo: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder((colorScheme == .dark ? Color.white : .black).opacity(0.10), lineWidth: 1)
-        )
-    }
-}
-
-private struct ReleaseTesslLogo: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let size: CGFloat
-
-    var body: some View {
-        Group {
-            if let image = TesslLogoLoader.image {
-                Image(nsImage: image).resizable().interpolation(.high).scaledToFit()
-            } else {
-                Image(systemName: "shippingbox")
-                    .font(.system(size: size * 0.48, weight: .medium))
-            }
-        }
-        .frame(width: size, height: size)
-        .background(Color.primary.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .strokeBorder((colorScheme == .dark ? Color.white : .black).opacity(0.10), lineWidth: 1)
         )
     }

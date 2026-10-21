@@ -18,6 +18,20 @@ supersedes: .harness/specs/2026-07-09-skills-sdk-menubar-review-popover-spec.md
 
 # SkillsBar Pipeline Posture
 
+## 2026-10-21 native Guided evidence adoption
+
+Jamie authorised promoting `verification/prototypes/simplify-evidence.html?v=3`
+to the running SkillsProof app. This amendment supersedes the older visual
+composition below, while retaining its evidence contracts. Use the nine-gate
+overview, searchable grouped chooser, separate detail view with fixed previous,
+next and All gates controls, and one persistently visible Tessl results card.
+Selection is blue; status colours remain independent in light and dark modes.
+Use the approved stacked-card app and monochrome menu-bar icons, the SkillsProof
+name and “Every step. Every fault. One glance.” tagline. Browser fixture values
+must never replace native dashboard evidence. The native fixture baseline is
+`../evidence/2026-10-21-skillsproof-guided-native.png`; it is rendering proof,
+not a live registry or installation receipt.
+
 ## Command Summary
 
 Make the selected pipeline-posture mockup the default SkillsBar experience.
