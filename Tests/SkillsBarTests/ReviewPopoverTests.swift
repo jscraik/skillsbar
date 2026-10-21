@@ -56,6 +56,7 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertNil(incompleteDashboard.score)
     }
 
+    #if DEBUG
     func testReferenceFixtureIsVisualOnlyAndKeepsTheGateModelIntact() throws {
         let dashboard = SkillDashboard.visualReferenceFixture
 
@@ -69,6 +70,7 @@ final class ReviewPopoverTests: XCTestCase {
         XCTAssertEqual(try source.loadSync().pipeline.activeReceipt?.stage, .ossLocal)
         XCTAssertEqual(SkillDashboard.reviewFixture.pipeline.activeReceipt?.stage, .candidateBaseline)
     }
+    #endif
 
     func testPipelinePresentationMovesTheFocusedSectionWithLiveEvidence() {
         let presentation = PipelinePresentation(candidate: pipelineCandidate(activeStage: .securityReview))
@@ -395,6 +397,7 @@ final class ReviewPopoverTests: XCTestCase {
         )
     }
 
+    #if DEBUG
     func testReviewFixtureBypassesLiveLoader() throws {
         var liveLoadCount = 0
         let source = DashboardDataSource(
@@ -451,6 +454,7 @@ final class ReviewPopoverTests: XCTestCase {
             "Historical external baseline · not proof for this candidate."
         )
     }
+    #endif
 
     @MainActor
     func testAsyncLoadUsesLiveLoaderWhenFixtureIsDisabled() async throws {
@@ -822,6 +826,7 @@ final class ReviewPopoverTests: XCTestCase {
         )
     }
 
+    #if DEBUG
     func testNoCLIFixtureUsesCachedRegistryDataWithoutALiveClaim() throws {
         var liveLoadCount = 0
         let source = DashboardDataSource(
@@ -844,6 +849,7 @@ final class ReviewPopoverTests: XCTestCase {
             "Historical external baseline · not proof for this candidate."
         )
     }
+    #endif
 
     func testTesslRegistryCacheRoundTripsOnlyLiveRegistryObservations() throws {
         let suiteName = "skillsbar-registry-cache-\(UUID().uuidString)"

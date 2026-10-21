@@ -32,7 +32,7 @@ These lanes are intentionally independent. Every downstream receipt must use the
 
 - macOS 14 or newer.
 - SwiftPM from Xcode or the active developer toolchain.
-- Installed skills in the home locations below. A local agent-skills checkout is optional for inventory, and required for the existing source SDK evidence route; its default is `/Users/jamiecraik/dev/agent-skills`.
+- Installed skills in the home locations below. A local agent-skills checkout is optional for inventory and required for the source SDK evidence route. SkillsProof discovers a checkout from the working directory or uses `AGENT_SKILLS_ROOT` when set; no fixed checkout location is assumed.
 - Optional: `tessl` CLI access for live registry status.
 
 SkillsProof is not App-Sandboxed: it reads the configured Skills SDK checkout and runs its read-only SDK checks locally. For Tessl, it prefers `TESSL_BIN` when set, then the current user's `~/.local/bin/tessl`, then `PATH`. Keep `SKILLSBAR_REVIEW_FIXTURE` unset for normal use; that variable is reserved for deterministic tests and mockup work.
