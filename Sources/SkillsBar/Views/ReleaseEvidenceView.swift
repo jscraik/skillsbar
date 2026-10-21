@@ -433,6 +433,22 @@ private final class SurfaceInteraction: ObservableObject {
     @Published var isHovered = false
 }
 
+struct SkillVersionText {
+    private let version: String
+
+    init(_ raw: String) {
+        version = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
+    }
+
+    private var isDeclared: Bool { !version.isEmpty && version.lowercased() != "unknown" }
+    var label: String { isDeclared ? "v\(version)" : "—" }
+    var accessibilityLabel: String { isDeclared ? "Skill version \(version)" : "Skill version not declared" }
+    var help: String {
+        isDeclared ? accessibilityLabel : "No version declared in this skill. Plugin versions appear in Select skill."
+    }
+}
+
 private struct ReleaseHeader<Actions: View>: View {
     @Environment(\.colorScheme) private var colorScheme
     let dashboard: SkillDashboard
@@ -490,9 +506,11 @@ private struct ReleaseHeader<Actions: View>: View {
                     .help(dashboard.displayName)
                 HStack(spacing: 8) {
                     StatusBadge(text: isFixture ? "Demo" : "Local", tone: .advisory)
-                    Text("v\(dashboard.version.trimmingCharacters(in: CharacterSet(charactersIn: "vV")))")
+                    Text(SkillVersionText(dashboard.version).label)
                         .releaseFont(13, weight: .regular, relativeTo: .caption)
                         .foregroundStyle(.bodyText).monospacedDigit().fixedSize()
+                        .accessibilityLabel(SkillVersionText(dashboard.version).accessibilityLabel)
+                        .help(SkillVersionText(dashboard.version).help)
                     HStack(spacing: 5) {
                         Circle().fill(statusColor).frame(width: 8, height: 8)
                         Text(statusLabel)
@@ -889,38 +907,43 @@ private struct RegistryVerticalDivider: View {
     }
 }
 
+enum EvidenceAgeText {
+    static func label(observedAt: Date, now: Date) -> String {
+        guard observedAt.timeIntervalSince1970 > 0 else { return "Checked time unavailable" }
+        let elapsed = now.timeIntervalSince(observedAt)
+        if elapsed < 60 { return "Checked \(max(1, Int(elapsed.rounded())))s ago" }
+        if elapsed < 3_600 { return "Checked \(Int(elapsed / 60))m ago" }
+        return "Checked \(Int(elapsed / 3_600))h ago"
+    }
+}
+
 private struct ReleaseFooter: View {
     let dashboard: SkillDashboard
     let isRefreshing: Bool
     let onRefresh: (() -> Void)?
 
-    private var refreshedText: String {
-        guard dashboard.refreshedAt.timeIntervalSince1970 > 0 else { return "Checked time unavailable" }
-        let elapsed = Date().timeIntervalSince(dashboard.refreshedAt)
-        if elapsed < 60 { return "Checked \(max(1, Int(elapsed.rounded())))s ago" }
-        if elapsed < 3_600 { return "Checked \(Int(elapsed / 60))m ago" }
-        return "Checked \(Int(elapsed / 3_600))h ago"
-    }
-
     var body: some View {
-        Button { onRefresh?() } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 18, weight: .regular))
-                Text(isRefreshing ? "Refreshing…" : refreshedText)
-                    .releaseFont(12, weight: .regular, relativeTo: .caption)
-                    .monospacedDigit()
-                Spacer()
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let refreshedText = EvidenceAgeText.label(observedAt: dashboard.refreshedAt, now: context.date)
+            Button { onRefresh?() } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 18, weight: .regular))
+                    Text(isRefreshing ? "Refreshing…" : refreshedText)
+                        .releaseFont(12, weight: .regular, relativeTo: .caption)
+                        .monospacedDigit()
+                    Spacer()
+                }
+                .foregroundStyle(.bodyText)
+                .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .foregroundStyle(.bodyText)
-            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
-            .contentShape(Rectangle())
+            .buttonStyle(FocusStageButtonStyle())
+            .disabled(onRefresh == nil || isRefreshing)
+            .help("Refresh local evidence and registry metadata")
+            .accessibilityLabel("Refresh evidence")
+            .accessibilityValue(isRefreshing ? "Refreshing" : refreshedText)
         }
-        .buttonStyle(FocusStageButtonStyle())
-        .disabled(onRefresh == nil || isRefreshing)
-        .help("Refresh local evidence and registry metadata")
-        .accessibilityLabel("Refresh evidence")
-        .accessibilityValue(isRefreshing ? "Refreshing" : refreshedText)
     }
 }
 
