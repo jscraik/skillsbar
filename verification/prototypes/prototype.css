@@ -91,3 +91,8 @@ aside{font-size:var(--text-ui);line-height:1.5}aside label,aside legend{font-siz
 /* Evidence status belongs to the symbol; blue outlines indicate selection. */
 .gate-symbol.stale,.status.stale{color:var(--amber)}
 .status.held,.status.unproven{color:var(--muted)}
+/* Light surfaces need status on the label too; selection keeps its blue outline. */
+body.light .gate:has(.gate-symbol.stale),body.light .gate:has(.gate-symbol.reviewRequired){color:var(--amber)}
+body.light .gate:has(.gate-symbol.passed){color:var(--green)}
+body.light .gate:has(.gate-symbol.blocked){color:var(--red)}
+body.light .gate-top{color:var(--ink)}
