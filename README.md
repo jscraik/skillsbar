@@ -101,6 +101,21 @@ Set `ARCHES="arm64 x86_64"` and use the `release` configuration to create a univ
 
 `script/release.sh` is the production distribution boundary. It creates a universal release build, signs with hardened runtime and a timestamp, submits it to Apple notarization, staples the ticket, verifies the signature and distribution policy, and produces a `ditto` zip under `dist/`.
 
+Release builds ignore demo, review and Tessl fixture environment switches and
+disable snapshot entry points. Debug builds retain those design tools, with
+Tessl fixtures labelled as simulated evidence. Installed-skill discovery uses
+the current user's home; `AGENT_SKILLS_ROOT` selects an explicit SDK source
+checkout. No workstation-specific source checkout is assumed.
+
+To build and check a local release without replacing or stopping the running
+app, use `./script/package_app.sh release /path/to/isolated-build-root`.
+Release packaging strips debug/local symbols and runs
+`python3 script/check_release.py /path/to/SkillsProof.app` before promoting the
+staged bundle. This checks packaged files for personal home paths and fixture
+switches, then probes the release executable with fixture overrides enabled.
+It also verifies bundled resources are available. An ad hoc local build does
+not establish Developer ID signing, notarisation or distribution acceptance.
+
 Store notarization credentials in a keychain profile once:
 
 ```bash
@@ -120,7 +135,11 @@ The interactive prompts store the Apple ID, team ID, and app-specific password i
 
 ## Configure The Data Source
 
-By default, SkillsProof looks for `Skills/agent-ops/improve-agent-native/SKILL.md` in `/Users/jamiecraik/dev/agent-skills`.
+By default, SkillsProof discovers installed skills in the current user's home.
+It can also locate a source checkout from the working directory by looking for
+`Skills/agent-ops/improve-agent-native/SKILL.md`. Set `AGENT_SKILLS_ROOT` to use
+a source checkout explicitly; no particular username or checkout location is
+assumed.
 
 Use another agent-skills checkout:
 

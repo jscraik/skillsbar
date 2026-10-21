@@ -22,8 +22,8 @@ final class ReviewPopoverTests: XCTestCase {
         }
     }
 
-    private let expectedCommand = "cd '/Users/jamiecraik/dev/agent-skills' && ./bin/ask sdk security risk-modes 'Skills/agent-ops/improve-agent-native/SKILL.md' --preview --json --robot"
-    private let expectedIdentityCommand = "cd '/Users/jamiecraik/dev/agent-skills' && ./bin/ask sdk start 'Skills/agent-ops/improve-agent-native' --json --robot"
+    private let expectedCommand = "cd '\(DashboardLoader.defaultRepoRoot.path.replacingOccurrences(of: "'", with: "'\\''"))' && ./bin/ask sdk security risk-modes 'Skills/agent-ops/improve-agent-native/SKILL.md' --preview --json --robot"
+    private let expectedIdentityCommand = "cd '\(DashboardLoader.defaultRepoRoot.path.replacingOccurrences(of: "'", with: "'\\''"))' && ./bin/ask sdk start 'Skills/agent-ops/improve-agent-native' --json --robot"
 
     func testReviewFixtureMatchesImplementationHandoffContract() {
         let dashboard = SkillDashboard.reviewFixture
