@@ -2,6 +2,22 @@ import XCTest
 @testable import SkillsBar
 
 final class PresentationPolishTests: XCTestCase {
+    func testChooserGroupsOriginsAndKeepsPluginVersionsDistinct() {
+        let paths = [
+            "Skills/tools/source/SKILL.md",
+            "/home/user/.codex/skills/local/SKILL.md",
+            "/home/user/.agents/skills/shared/SKILL.md",
+            "/home/user/.codex/plugins/cache/remote/skillsbar-internal/0.1.1/skills/verify/SKILL.md",
+            "/home/user/.codex/plugins/cache/remote/skillsbar-internal/0.1.0/skills/verify/SKILL.md"
+        ]
+        let groups = InstalledSkillDiscovery.menuGroups(paths: paths)
+        XCTAssertEqual(groups.count, 5)
+        XCTAssertEqual(Set(groups.flatMap(\.paths)), Set(paths))
+        XCTAssertEqual(groups.first?.title, "Source checkout")
+        XCTAssertEqual(groups.filter { $0.title.hasPrefix("skillsbar-internal") }.count, 2)
+        XCTAssertTrue(groups.allSatisfy { $0.paths.count == 1 })
+    }
+
     func testMissingVersionDoesNotRenderAsASoftwareVersion() {
         for raw in ["unknown", "", "  vunknown  "] {
             XCTAssertEqual(SkillVersionText(raw).label, "—")
