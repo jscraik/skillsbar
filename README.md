@@ -261,7 +261,7 @@ each issue small, name its allowed files and deterministic checks, and record
 any cloud-toolchain blocker instead of claiming a test passed. Do not install
 Linux Swift expecting AppKit or SwiftUI macOS builds to work.
 
-`.circleci/config.yml` provides the PR and main-branch validation split:
+`.circleci/config.yml` provides the CircleCI validation workflow:
 
 - **Native macOS tests:** CircleCI macOS with Xcode 26.4.1 on `m4pro.medium`.
   It builds, runs `ReviewPopoverTests` and the full deterministic suite, and
@@ -287,8 +287,7 @@ Linux Swift expecting AppKit or SwiftUI macOS builds to work.
   copy. Recheck those hosted settings when changing credential configuration.
 
 The native and site jobs record the checked-out Git revision and tool versions.
-CircleCI
-checks the branch revision; it does not establish proof for an untested
+CircleCI checks the branch revision; it does not establish proof for an untested
 merge result. The cutover removes both GitHub Actions workflows after the
 replacement native, site and CodeQL lanes passed on the migration PR.
 Artifacts prove builds, tests and rendered fixtures. They do not prove live
