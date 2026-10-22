@@ -266,8 +266,10 @@ Linux Swift expecting AppKit or SwiftUI macOS builds to work.
 - **Native macOS tests:** CircleCI macOS with Xcode 26.4.1 on `m4pro.medium`.
   It builds, runs `ReviewPopoverTests` and the full deterministic suite, and
   renders an app fixture. Rendering failures stay failures with logs retained.
-  The existing opt-in live integration test skips without a real agent-skills
-  checkout and Tessl credentials; the optional managed-Python shell probe also
+  CircleCI explicitly unsets `SKILLSBAR_LIVE_INTEGRATION` and
+  `SKILLSBAR_REVIEW_FIXTURE`, so this lane does not run live integration tests.
+  Elsewhere, the opt-in live integration test requires a real agent-skills
+  checkout and Tessl credentials. The optional managed-Python shell probe also
   skips when its workstation-only Python path is absent. Neither skip removes
   SwiftUI/AppKit rendering coverage. CodeQL remains separate.
 - **Demo site tests:** CircleCI's pinned `cimg/node:22.14.0` installs the npm lockfile,
@@ -280,8 +282,12 @@ Linux Swift expecting AppKit or SwiftUI macOS builds to work.
   pinned CodeQL bundle and uploads SARIF to GitHub. The upload token belongs
   only in the project-restricted `skillsproof-codeql` context, which is
   attached to this job. Native and site jobs do not request that context.
+  Hosted settings verified on 22 October 2026 restrict the context to this
+  project and contain `CODEQL_GITHUB_TOKEN`; the project environment has no
+  copy. Recheck those hosted settings when changing credential configuration.
 
-Jobs record the actual checked-out Git revision and tool versions. CircleCI
+The native and site jobs record the checked-out Git revision and tool versions.
+CircleCI
 checks the branch revision; it does not establish proof for an untested
 merge result. The cutover removes both GitHub Actions workflows after the
 replacement native, site and CodeQL lanes passed on the migration PR.
