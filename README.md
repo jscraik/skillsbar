@@ -268,8 +268,9 @@ Linux Swift expecting AppKit or SwiftUI macOS builds to work.
   renders an app fixture. Rendering failures stay failures with logs retained.
   CircleCI explicitly unsets `SKILLSBAR_LIVE_INTEGRATION` and
   `SKILLSBAR_REVIEW_FIXTURE`, so this lane does not run live integration tests.
-  Elsewhere, the opt-in live integration test requires a real agent-skills
-  checkout and Tessl credentials. The optional managed-Python shell probe also
+  Elsewhere, the opt-in live integration test reads the configured agent-skills
+  checkout and Tessl surfaces; it does not assert authenticated Tessl access.
+  The optional managed-Python shell probe also
   skips when its workstation-only Python path is absent. Neither skip removes
   SwiftUI/AppKit rendering coverage. CodeQL remains separate.
 - **Demo site tests:** CircleCI's pinned `cimg/node:22.14.0` installs the npm lockfile,
