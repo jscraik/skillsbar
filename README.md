@@ -288,7 +288,7 @@ Linux Swift expecting AppKit or SwiftUI macOS builds to work.
   copy. Recheck those hosted settings when changing credential configuration.
 
 The native and site jobs record the checked-out Git revision and tool versions.
-CircleCI checks the branch revision; it does not establish proof for an untested
+CircleCI records the checked-out revision; it does not establish proof for an untested
 merge result. The cutover removes both GitHub Actions workflows after the
 replacement native, site and CodeQL lanes passed on the migration PR.
 Artifacts prove builds, tests and rendered fixtures. They do not prove live

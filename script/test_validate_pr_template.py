@@ -167,7 +167,15 @@ class PullRequestTemplateValidatorTests(unittest.TestCase):
     def test_documented_command_outcomes_are_accepted(self) -> None:
         """Bind every outcome alternative to the required command-line prefix."""
         command = "- Command: `python3 script/validate_pr_template.py --template .github/PULL_REQUEST_TEMPLATE.md` -> pass"
-        for outcome in ["pass", "fail", "n.a. (not provided by this repository)", "n/a (not applicable)", "blocked (service unavailable)"]:
+        for outcome in [
+            "pass",
+            "pass (local check).",
+            "fail",
+            "fail (known failure).",
+            "n.a. (not provided by this repository)",
+            "n/a (not applicable)",
+            "blocked (service unavailable)",
+        ]:
             with self.subTest(outcome=outcome):
                 body = VALID_BODY.replace(command, command.replace("-> pass", f"-> {outcome}"))
                 self.assertEqual(validate_body(body), [])
